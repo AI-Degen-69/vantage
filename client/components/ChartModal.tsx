@@ -148,12 +148,14 @@ export default function ChartModal({ metric, isOpen, onClose }: ChartModalProps)
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border sticky top-0 bg-card">
           <div className="flex items-center gap-3">
-            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="white">
-              <circle cx="12" cy="12" r="11" fill="#333" stroke="white" strokeWidth="2" />
-              <text x="12" y="15" textAnchor="middle" fontSize="8" fill="white" fontWeight="bold">
-                A
-              </text>
-            </svg>
+            <img
+              src="/api/company-logo?ticker=AAPL"
+              alt="Apple Inc. logo"
+              className="w-8 h-8 rounded"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
             <div>
               <h2 className="text-xl font-semibold text-foreground">{metric.name}</h2>
               <p className="text-sm text-muted-foreground">Apple Inc.</p>

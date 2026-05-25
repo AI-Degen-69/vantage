@@ -131,10 +131,14 @@ export default function Index() {
         {/* Centered Header Section */}
         <div className="mb-12 text-center">
           <div className="flex items-center justify-center gap-4 mb-4">
-            <svg className="w-12 h-12" viewBox="0 0 24 24" fill="white">
-              <rect x="2" y="2" width="20" height="20" rx="4" fill="#333" stroke="white" strokeWidth="1.5" />
-              <path d="M8 12c0-1.1.6-2.1 1.5-2.6m5.5 0c.9.5 1.5 1.5 1.5 2.6m-5.5 4c0 .6.4 1 1 1s1-.4 1-1" stroke="white" strokeWidth="1.5" fill="none"/>
-            </svg>
+            <img
+              src="/api/company-logo?ticker=AAPL"
+              alt="Apple Inc. logo"
+              className="w-12 h-12 rounded-md"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
             <div>
               <h1 className="text-3xl font-bold text-foreground">Apple Inc.</h1>
               <p className="text-sm text-muted-foreground">AAPL | NASDAQ</p>
