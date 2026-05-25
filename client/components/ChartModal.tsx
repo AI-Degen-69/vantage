@@ -90,12 +90,6 @@ export default function ChartModal({ metric, isOpen, onClose }: ChartModalProps)
         return (
           <ResponsiveContainer width="100%" height={400}>
             <AreaChart {...commonProps}>
-              <defs>
-                <linearGradient id="colorArea" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={chartColor} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={chartColor} stopOpacity={0} />
-                </linearGradient>
-              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="date" stroke="#9ca3af" />
               <YAxis stroke="#9ca3af" />
@@ -111,8 +105,8 @@ export default function ChartModal({ metric, isOpen, onClose }: ChartModalProps)
                 type="monotone"
                 dataKey="value"
                 stroke={chartColor}
-                fillOpacity={1}
-                fill="url(#colorArea)"
+                fill={chartColor}
+                fillOpacity={0.2}
               />
             </AreaChart>
           </ResponsiveContainer>
