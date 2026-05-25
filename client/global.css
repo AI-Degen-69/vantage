@@ -60,17 +60,17 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    --background: 224 35% 12%;
     --foreground: 210 40% 98%;
 
-    --card: 222.2 84% 4.9%;
+    --card: 224 35% 18%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 222.2 84% 4.9%;
+    --popover: 224 35% 12%;
     --popover-foreground: 210 40% 98%;
 
     --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary-foreground: 224 35% 12%;
 
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
@@ -84,9 +84,18 @@
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217.2 32.6% 17.5%;
+    --border: 224 20% 25%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+
+    /* Financial dashboard colors */
+    --chart-green: 160 100% 50%;
+    --chart-orange: 32 100% 50%;
+    --chart-blue: 217 91% 60%;
+    --chart-cyan: 188 94% 50%;
+    --chart-purple: 270 100% 55%;
+    --chart-pink: 340 82% 52%;
+
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -99,6 +108,10 @@
 }
 
 @layer base {
+  html {
+    @apply dark;
+  }
+
   * {
     @apply border-border;
   }
