@@ -9,17 +9,21 @@ export interface FinancialMetric {
   color: string;
   unit: string;
   data: StockMetric[];
-  growth1Y?: number;
-  growth2Y?: number;
-  growth5Y?: number;
+  // YoY - year-over-year (absolute growth rate)
+  yoy?: number;
+  // CAGR - Compound Annual Growth Rate (annualized average)
+  cagr3Y?: number;
+  cagr5Y?: number;
 }
 
 export interface QuickStat {
   label: string;
   value: string;
-  change?: string;
-  changePercent?: number;
-  changeType?: "positive" | "negative";
+  subtitle?: string;
+  details?: Array<{
+    label: string;
+    value: string;
+  }>;
 }
 
 export const appleStockData = {
@@ -35,44 +39,66 @@ export const quickStats: QuickStat[] = [
   {
     label: "Valuation",
     value: "$3.42T",
-    change: "+$185.5B",
-    changePercent: 5.74,
-    changeType: "positive",
+    details: [
+      { label: "Market Cap", value: "$3,421.2B" },
+      { label: "P/E (TTM/USD/D2D)", value: "27.23 | 30.81 | 30.12" },
+      { label: "Price to Sales", value: "8.42" },
+      { label: "EV to EBITDA", value: "26.39" },
+      { label: "Price to Book", value: "42.66" },
+    ],
   },
   {
     label: "Cash Flow",
     value: "$110.5B",
-    change: "+$8.2B",
-    changePercent: 8.01,
-    changeType: "positive",
+    details: [
+      { label: "Operating Cash Flow (TTM)", value: "$110.5B" },
+      { label: "FCF (Free Cash Flow TTM)", value: "$97.2B" },
+      { label: "FCF Payout Ratio / Price (B)", value: "0.24" },
+      { label: "Dividend/Price", value: "$30,820" },
+      { label: "Cash Amount", value: "$29.2B" },
+    ],
   },
   {
     label: "Margins & Growth",
     value: "46.2%",
-    change: "+2.1%",
-    changePercent: 4.76,
-    changeType: "positive",
+    details: [
+      { label: "Gross Margin (NTM)", value: "46.21%" },
+      { label: "Operating Margin", value: "33.64%" },
+      { label: "Net Margin", value: "19.34%" },
+      { label: "Quarterly Earnings (NTM)", value: "14.60%" },
+    ],
   },
   {
-    label: "Returns",
-    value: "157.3%",
-    change: "+42.1%",
-    changePercent: 36.71,
-    changeType: "positive",
+    label: "Balance",
+    value: "$1,245.6B",
+    details: [
+      { label: "Total Assets", value: "$352.6B" },
+      { label: "Total Debt", value: "$106.8B" },
+      { label: "Debt to Equity", value: "1.69x" },
+      { label: "Current Ratio", value: "1.51x" },
+      { label: "Quick Ratio", value: "1.39x" },
+    ],
   },
   {
     label: "Dividend",
     value: "$0.24/q",
-    change: "+$0.01",
-    changePercent: 4.35,
-    changeType: "positive",
+    details: [
+      { label: "Quarterly Dividend", value: "$0.24" },
+      { label: "Annual Dividend", value: "$0.96" },
+      { label: "Dividend Yield", value: "0.43%" },
+      { label: "Payout Ratio", value: "12.69%" },
+      { label: "Next Ex-Date", value: "May 11, 2024" },
+    ],
   },
   {
-    label: "Yield",
-    value: "0.43%",
-    change: "-0.02%",
-    changePercent: -4.44,
-    changeType: "negative",
+    label: "Valuation",
+    value: "Premium",
+    details: [
+      { label: "52-Week High", value: "$309.25" },
+      { label: "52-Week Low", value: "$164.08" },
+      { label: "Average Volume", value: "52.8M" },
+      { label: "Market Position", value: "Tech Leader" },
+    ],
   },
 ];
 
@@ -102,9 +128,9 @@ export const financialMetrics: FinancialMetric[] = [
     color: "chart-green",
     unit: "B",
     data: generateQuarterlyData(83.0, 8),
-    growth1Y: 4.28,
-    growth2Y: 8.65,
-    growth5Y: 14.2,
+    yoy: 16.60,
+    cagr3Y: 8.65,
+    cagr5Y: 4.41,
   },
   {
     name: "Revenue by Segment",
@@ -112,9 +138,9 @@ export const financialMetrics: FinancialMetric[] = [
     color: "chart-orange",
     unit: "B",
     data: generateQuarterlyData(79.5, 6),
-    growth1Y: 2.15,
-    growth2Y: 5.42,
-    growth5Y: 11.8,
+    yoy: 14.35,
+    cagr3Y: 6.32,
+    cagr5Y: 3.28,
   },
   {
     name: "EBITDA",
@@ -122,9 +148,9 @@ export const financialMetrics: FinancialMetric[] = [
     color: "chart-orange",
     unit: "B",
     data: generateQuarterlyData(28.5, 3),
-    growth1Y: 6.73,
-    growth2Y: 12.15,
-    growth5Y: 18.9,
+    yoy: 18.94,
+    cagr3Y: 10.52,
+    cagr5Y: 5.87,
   },
   {
     name: "Gross Profit",
@@ -132,9 +158,9 @@ export const financialMetrics: FinancialMetric[] = [
     color: "chart-blue",
     unit: "B",
     data: generateQuarterlyData(28.0, 2.5),
-    growth1Y: 5.82,
-    growth2Y: 9.34,
-    growth5Y: 15.6,
+    yoy: 15.73,
+    cagr3Y: 7.84,
+    cagr5Y: 4.12,
   },
   {
     name: "Operating Income",
@@ -142,9 +168,9 @@ export const financialMetrics: FinancialMetric[] = [
     color: "chart-orange",
     unit: "B",
     data: generateQuarterlyData(24.5, 2),
-    growth1Y: 8.91,
-    growth2Y: 13.65,
-    growth5Y: 19.2,
+    yoy: 20.45,
+    cagr3Y: 11.68,
+    cagr5Y: 6.42,
   },
   {
     name: "Net Income",
@@ -152,9 +178,9 @@ export const financialMetrics: FinancialMetric[] = [
     color: "chart-orange",
     unit: "B",
     data: generateQuarterlyData(19.8, 1.8),
-    growth1Y: 7.54,
-    growth2Y: 11.42,
-    growth5Y: 16.8,
+    yoy: 17.28,
+    cagr3Y: 9.45,
+    cagr5Y: 5.64,
   },
   {
     name: "Cash & Equivalents",
@@ -162,9 +188,9 @@ export const financialMetrics: FinancialMetric[] = [
     color: "chart-orange",
     unit: "B",
     data: generateQuarterlyData(29.2, 3),
-    growth1Y: 12.34,
-    growth2Y: 18.72,
-    growth5Y: 25.6,
+    yoy: 22.67,
+    cagr3Y: 13.25,
+    cagr5Y: 7.89,
   },
   {
     name: "Free Cash Flow",
@@ -172,9 +198,9 @@ export const financialMetrics: FinancialMetric[] = [
     color: "chart-cyan",
     unit: "B",
     data: generateQuarterlyData(24.5, 2),
-    growth1Y: 6.28,
-    growth2Y: 10.15,
-    growth5Y: 14.9,
+    yoy: 14.56,
+    cagr3Y: 7.92,
+    cagr5Y: 4.38,
   },
   {
     name: "Shareholders Equity",
@@ -182,9 +208,9 @@ export const financialMetrics: FinancialMetric[] = [
     color: "chart-purple",
     unit: "B",
     data: generateQuarterlyData(63.1, 3.5),
-    growth1Y: 5.43,
-    growth2Y: 9.87,
-    growth5Y: 13.2,
+    yoy: 12.34,
+    cagr3Y: 6.78,
+    cagr5Y: 3.94,
   },
   {
     name: "Total Assets",
@@ -192,9 +218,9 @@ export const financialMetrics: FinancialMetric[] = [
     color: "chart-blue",
     unit: "B",
     data: generateQuarterlyData(352.6, 10),
-    growth1Y: 3.92,
-    growth2Y: 7.65,
-    growth5Y: 12.4,
+    yoy: 11.45,
+    cagr3Y: 5.84,
+    cagr5Y: 3.21,
   },
   {
     name: "Market Cap",
@@ -202,9 +228,9 @@ export const financialMetrics: FinancialMetric[] = [
     color: "chart-green",
     unit: "B",
     data: generateQuarterlyData(2800, 150),
-    growth1Y: 7.12,
-    growth2Y: 14.58,
-    growth5Y: 22.3,
+    yoy: 19.34,
+    cagr3Y: 10.78,
+    cagr5Y: 6.25,
   },
   {
     name: "EPS",
@@ -212,8 +238,8 @@ export const financialMetrics: FinancialMetric[] = [
     color: "chart-pink",
     unit: "$",
     data: generateQuarterlyData(6.05, 0.5),
-    growth1Y: 9.23,
-    growth2Y: 15.64,
-    growth5Y: 21.7,
+    yoy: 21.45,
+    cagr3Y: 12.56,
+    cagr5Y: 7.34,
   },
 ];

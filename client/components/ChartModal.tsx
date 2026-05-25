@@ -205,19 +205,36 @@ export default function ChartModal({ metric, isOpen, onClose }: ChartModalProps)
 
         {/* Growth Metrics */}
         {showGrowthMetrics && (
-          <div className="grid grid-cols-3 gap-4 p-6 border-t border-border bg-secondary/30">
-            {[
-              { label: "1Y Growth", value: metric.growth1Y },
-              { label: "2Y Growth", value: metric.growth2Y },
-              { label: "5Y Growth", value: metric.growth5Y },
-            ].map((metric, idx) => (
-              <div key={idx} className="text-center">
-                <p className="text-sm text-muted-foreground mb-1">{metric.label}</p>
-                <p className="text-2xl font-semibold text-chart-green">
-                  {metric.value ? `+${metric.value.toFixed(2)}%` : "-"}
-                </p>
-              </div>
-            ))}
+          <div className="border-t border-border bg-secondary/30">
+            <div className="grid grid-cols-3 gap-4 p-6">
+              {[
+                {
+                  label: "1Y (YoY)",
+                  value: metric.yoy,
+                  description: "Year-over-year growth: absolute change in the most recent 12-month period"
+                },
+                {
+                  label: "3Y (CAGR)",
+                  value: metric.cagr3Y,
+                  description: "Compound annual growth rate: annualized average growth over 3 years"
+                },
+                {
+                  label: "5Y (CAGR)",
+                  value: metric.cagr5Y,
+                  description: "Compound annual growth rate: annualized average growth over 5 years"
+                },
+              ].map((item, idx) => (
+                <div key={idx} className="text-center group cursor-help">
+                  <p className="text-sm text-muted-foreground mb-1">{item.label}</p>
+                  <p className="text-2xl font-semibold text-chart-green">
+                    {item.value ? `${item.value.toFixed(2)}%` : "-"}
+                  </p>
+                  <div className="mt-2 invisible group-hover:visible text-xs text-muted-foreground bg-card p-2 rounded absolute z-10 w-max border border-border">
+                    {item.description}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

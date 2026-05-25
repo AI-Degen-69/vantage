@@ -14,10 +14,11 @@ import {
 } from "recharts";
 import ChartModal from "@/components/ChartModal";
 import { appleStockData, quickStats, financialMetrics, FinancialMetric } from "@/lib/mockData";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
 export default function Index() {
   const [selectedMetric, setSelectedMetric] = useState<FinancialMetric | null>(null);
+  const [expandedStats, setExpandedStats] = useState<{ [key: number]: boolean }>({});
 
   const colorMap: { [key: string]: string } = {
     "chart-green": "#00d084",
@@ -28,9 +29,16 @@ export default function Index() {
     "chart-pink": "#ec4899",
   };
 
+  const toggleStatExpand = (idx: number) => {
+    setExpandedStats((prev) => ({
+      ...prev,
+      [idx]: !prev[idx],
+    }));
+  };
+
   const renderSmallChart = (metric: FinancialMetric) => {
     const chartColor = colorMap[metric.color] || "#3b82f6";
-    const data = metric.data.slice(-8); // Last 2 years (8 quarters)
+    const data = metric.data.slice(-8);
 
     const commonProps = {
       data,
@@ -126,58 +134,92 @@ export default function Index() {
   return (
     <div className="min-h-screen bg-background dark">
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Header Section */}
-        <div className="mb-12">
-          <div className="flex items-center gap-4 mb-4">
-            <svg className="w-10 h-10" viewBox="0 0 24 24" fill="white">
-              <circle cx="12" cy="12" r="11" fill="#333" stroke="white" strokeWidth="1.5" />
-              <text x="12" y="15" textAnchor="middle" fontSize="10" fill="white" fontWeight="bold">
-                A
-              </text>
+        {/* Centered Header Section */}
+        <div className="mb-12 text-center">
+          <div className="flex items-center justify-center gap-4 mb-4">
+            <svg className="w-12 h-12" viewBox="0 0 24 24" fill="white">
+              <rect x="2" y="2" width="20" height="20" rx="4" fill="#333" stroke="white" strokeWidth="1.5" />
+              <path d="M8 12c0-1.1.6-2.1 1.5-2.6m5.5 0c.9.5 1.5 1.5 1.5 2.6m-5.5 4c0 .6.4 1 1 1s1-.4 1-1" stroke="white" strokeWidth="1.5" fill="none"/>
             </svg>
             <div>
-              <h1 className="text-4xl font-bold text-foreground">Apple Inc.</h1>
-              <p className="text-muted-foreground">{appleStockData.symbol}</p>
+              <h1 className="text-3xl font-bold text-foreground">Apple Inc.</h1>
+              <p className="text-sm text-muted-foreground">AAPL | NASDAQ</p>
             </div>
           </div>
 
-          {/* Stock Price Section */}
-          <div className="bg-card rounded-xl p-8 border border-border">
-            <div className="flex items-baseline gap-4 mb-2">
+          {/* Stock Price */}
+          <div className="mb-3">
+            <div className="flex items-baseline justify-center gap-3">
               <span className="text-5xl font-bold text-foreground">
                 ${appleStockData.currentPrice.toFixed(2)}
               </span>
-              <span className="text-2xl font-semibold text-chart-green">
-                +${appleStockData.priceChange.toFixed(2)}
-              </span>
-              <span className="px-3 py-1 bg-chart-green/20 text-chart-green rounded-full text-sm font-semibold">
-                +{appleStockData.percentChange.toFixed(2)}%
+              <span className="flex items-center gap-1">
+                <span className="text-lg font-semibold text-chart-green">
+                  +${appleStockData.priceChange.toFixed(2)}
+                </span>
+                <span className="px-2 py-1 bg-chart-green/20 text-chart-green rounded text-xs font-semibold">
+                  +{appleStockData.percentChange.toFixed(2)}%
+                </span>
               </span>
             </div>
-            <p className="text-muted-foreground text-sm">Earnings: Q2 2024 | Trading: NASDAQ</p>
+          </div>
+
+          {/* After Hours & Earnings */}
+          <div className="flex justify-center gap-6 text-sm text-muted-foreground">
+            <span>After hours: <span className="text-red-400">$308.40</span> <span className="text-red-400">-$0.42 -0.14%</span></span>
+            <span>Earnings: <span className="text-blue-400">Jul 30, 2024</span></span>
           </div>
         </div>
 
-        {/* Quick Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
+        {/* Quality Brief Section */}
+        <div className="bg-card rounded-lg p-8 border border-border mb-12">
+          <h2 className="text-xl font-semibold text-foreground mb-4">Quality in Brief</h2>
+          <ul className="space-y-3 text-sm text-foreground">
+            <li className="flex gap-2">
+              <span className="text-chart-green font-bold">•</span>
+              <span>
+                <strong>Neutral Google appeals iPhone search ruling</strong> – May 22, 2024. Google appealed a 2024 U.S. antitrust ruling that restricted its ability to secure exclusive default search agreements, but the company can still pay Apple...
+              </span>
+            </li>
+            <li className="flex gap-2">
+              <span className="text-chart-green font-bold">•</span>
+              <span>
+                <strong>Apple faces labor concerns in Asia</strong> – Recent reports highlight working conditions at suppliers in the region.
+              </span>
+            </li>
+          </ul>
+          <button className="mt-4 text-blue-400 hover:text-blue-300 text-sm font-medium">View More</button>
+        </div>
+
+        {/* Quick Stats Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
           {quickStats.map((stat, idx) => (
-            <div key={idx} className="bg-card rounded-lg p-5 border border-border">
-              <p className="text-sm text-muted-foreground mb-2">{stat.label}</p>
-              <p className="text-2xl font-bold text-foreground mb-2">{stat.value}</p>
-              {stat.change && (
-                <div className="flex items-center gap-1">
-                  {stat.changeType === "positive" ? (
-                    <TrendingUp className="w-4 h-4 text-chart-green" />
-                  ) : (
-                    <TrendingDown className="w-4 h-4 text-red-500" />
-                  )}
-                  <span
-                    className={
-                      stat.changeType === "positive" ? "text-chart-green" : "text-red-500"
-                    }
-                  >
-                    {stat.change} ({stat.changePercent?.toFixed(2)}%)
-                  </span>
+            <div key={idx} className="bg-card rounded-lg border border-border overflow-hidden">
+              {/* Header */}
+              <button
+                onClick={() => toggleStatExpand(idx)}
+                className="w-full p-4 flex items-center justify-between hover:bg-secondary/50 transition-colors"
+              >
+                <div className="text-left">
+                  <p className="text-sm text-muted-foreground mb-1">{stat.label}</p>
+                  <p className="text-xl font-bold text-foreground">{stat.value}</p>
+                </div>
+                <ChevronDown
+                  className={`w-5 h-5 text-muted-foreground transition-transform ${
+                    expandedStats[idx] ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {/* Details */}
+              {expandedStats[idx] && stat.details && (
+                <div className="border-t border-border bg-secondary/30 p-4 space-y-2">
+                  {stat.details.map((detail, dIdx) => (
+                    <div key={dIdx} className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">{detail.label}</span>
+                      <span className="text-foreground font-medium">{detail.value}</span>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -185,17 +227,20 @@ export default function Index() {
         </div>
 
         {/* Charts Grid */}
+        <h2 className="text-2xl font-semibold text-foreground mb-6">Financial Metrics</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {financialMetrics.map((metric, idx) => (
             <div
               key={idx}
               onClick={() => setSelectedMetric(metric)}
-              className="bg-card rounded-xl p-6 border border-border hover:border-foreground/50 cursor-pointer transition-all duration-200 hover:shadow-lg"
+              className="bg-card rounded-lg p-6 border border-border hover:border-foreground/50 cursor-pointer transition-all duration-200 hover:shadow-lg"
             >
               <h3 className="text-lg font-semibold text-foreground mb-4">{metric.name}</h3>
               <div className="h-[140px]">{renderSmallChart(metric)}</div>
               <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Latest: {metric.data[metric.data.length - 1].value.toFixed(1)}{metric.unit}</span>
+                <span className="text-sm text-muted-foreground">
+                  Latest: {metric.data[metric.data.length - 1].value.toFixed(1)}{metric.unit}
+                </span>
                 <span className="text-xs bg-foreground/10 text-foreground px-2 py-1 rounded">
                   {metric.type === "bar" ? "Bar" : metric.type === "area" ? "Area" : "Line"}
                 </span>
