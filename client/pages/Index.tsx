@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useParams } from "react-router-dom";
 import {
   LineChart,
   Line,
@@ -16,9 +17,30 @@ import ChartModal from "@/components/ChartModal";
 import { appleStockData, quickStats, financialMetrics, FinancialMetric } from "@/lib/mockData";
 import { ChevronDown } from "lucide-react";
 
+interface StockData {
+  symbol: string;
+  name: string;
+  currentPrice: number;
+  priceChange: number;
+  percentChange: number;
+}
+
 export default function Index() {
+  const { ticker: urlTicker } = useParams<{ ticker?: string }>();
   const [selectedMetric, setSelectedMetric] = useState<FinancialMetric | null>(null);
   const [expandedStats, setExpandedStats] = useState<{ [key: number]: boolean }>({});
+
+  // Use ticker from URL or default to AAPL
+  const ticker = urlTicker?.toUpperCase() || "AAPL";
+
+  // Generate stock data based on ticker
+  const stockData: StockData = {
+    symbol: ticker,
+    name: ticker === "AAPL" ? "Apple Inc." : `Company ${ticker}`,
+    currentPrice: appleStockData.currentPrice + Math.random() * 100,
+    priceChange: appleStockData.priceChange + Math.random() * 20,
+    percentChange: appleStockData.percentChange + (Math.random() - 0.5) * 5,
+  };
 
   const colorMap: { [key: string]: string } = {
     "chart-green": "#00d084",

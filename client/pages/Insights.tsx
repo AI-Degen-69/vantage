@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { Search, Settings } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface Stock {
   symbol: string;
@@ -61,6 +62,7 @@ const tabs = [
 ];
 
 export default function Insights() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("sp500");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -124,6 +126,7 @@ export default function Insights() {
           {filteredStocks.map((stock) => (
             <div
               key={stock.symbol}
+              onClick={() => navigate(`/stock/${stock.symbol}`)}
               className="bg-card rounded-lg p-4 border border-slate-700 hover:border-slate-600 hover:bg-slate-700/30 transition-all cursor-pointer group"
             >
               {/* Header with Logo and Price */}
