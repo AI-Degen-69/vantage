@@ -126,7 +126,7 @@ export default function Index() {
   };
 
   return (
-    <div className="min-h-screen bg-background dark">
+    <div className="w-full bg-background dark">
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Centered Header Section */}
         <div className="mb-12 text-center">
