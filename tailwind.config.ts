@@ -12,6 +12,16 @@ export default {
         "2xl": "1400px",
       },
     },
+    borderRadius: {
+      none: "0",
+      sm: "0",
+      md: "0",
+      lg: "0",
+      xl: "0",
+      "2xl": "0",
+      "3xl": "0",
+      full: "9999px",
+    },
     extend: {
       colors: {
         border: "hsl(var(--border))",
@@ -64,6 +74,9 @@ export default {
           cyan: "hsl(var(--chart-cyan))",
           purple: "hsl(var(--chart-purple))",
           pink: "hsl(var(--chart-pink))",
+          accent: "hsl(var(--chart-accent))",
+          positive: "hsl(var(--chart-positive))",
+          negative: "hsl(var(--chart-negative))",
         },
       },
       borderRadius: {
