@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Sidebar from "@/components/Sidebar";
 import Index from "./pages/Index";
+import Insights from "./pages/Insights";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,7 +35,7 @@ const App = () => (
               </AppLayout>
             }
           />
-          <Route path="/insights" element={<AppLayout><Index /></AppLayout>} />
+          <Route path="/insights" element={<AppLayout><Insights /></AppLayout>} />
           <Route path="/watchlists" element={<AppLayout><NotFound /></AppLayout>} />
           <Route path="/charts" element={<AppLayout><NotFound /></AppLayout>} />
           <Route path="/earnings" element={<AppLayout><NotFound /></AppLayout>} />
