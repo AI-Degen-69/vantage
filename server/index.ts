@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import { handleDemo } from "./routes/demo";
 import { handleCompanyLogo } from "./routes/company-logo";
+import { handleStockQuote, handleStockTimeSeries, handleStockOverview } from "./routes/stock-data";
 
 export function createServer() {
   const app = express();
@@ -20,6 +21,9 @@ export function createServer() {
 
   app.get("/api/demo", handleDemo);
   app.get("/api/company-logo", handleCompanyLogo);
+  app.get("/api/stock-quote", handleStockQuote);
+  app.get("/api/stock-time-series", handleStockTimeSeries);
+  app.get("/api/stock-overview", handleStockOverview);
 
   return app;
 }

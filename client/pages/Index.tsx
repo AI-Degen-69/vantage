@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   LineChart,
@@ -14,16 +14,9 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import ChartModal from "@/components/ChartModal";
-import { appleStockData, quickStats, financialMetrics, FinancialMetric } from "@/lib/mockData";
+import { quickStats, financialMetrics, FinancialMetric } from "@/lib/mockData";
 import { ChevronDown } from "lucide-react";
-
-interface StockData {
-  symbol: string;
-  name: string;
-  currentPrice: number;
-  priceChange: number;
-  percentChange: number;
-}
+import { useStockQuote, useStockOverview } from "@/hooks/useStockData";
 
 export default function Index() {
   const { ticker: urlTicker } = useParams<{ ticker?: string }>();
@@ -33,14 +26,9 @@ export default function Index() {
   // Use ticker from URL or default to AAPL
   const ticker = urlTicker?.toUpperCase() || "AAPL";
 
-  // Generate stock data based on ticker (memoized to prevent re-generation on re-renders)
-  const stockData: StockData = useMemo(() => ({
-    symbol: ticker,
-    name: ticker === "AAPL" ? "Apple Inc." : `Company ${ticker}`,
-    currentPrice: appleStockData.currentPrice + Math.random() * 100,
-    priceChange: appleStockData.priceChange + Math.random() * 20,
-    percentChange: appleStockData.percentChange + (Math.random() - 0.5) * 5,
-  }), [ticker]);
+  // Fetch real stock data from API
+  const { data: quoteData, loading: quoteLoading } = useStockQuote(ticker);
+  const { data: overviewData, loading: overviewLoading } = useStockOverview(ticker);
 
   const colorMap: { [key: string]: string } = {
     "chart-green": "#00d084",
@@ -162,32 +150,42 @@ export default function Index() {
               }}
             />
             <div>
-              <h1 className="text-3xl font-bold text-foreground">{stockData.name}</h1>
+              <h1 className="text-3xl font-bold text-foreground">
+                {overviewData ? overviewData["Name"] || ticker : ticker}
+              </h1>
               <p className="text-sm text-muted-foreground">{ticker} | NASDAQ</p>
             </div>
           </div>
 
           {/* Stock Price */}
           <div className="mb-3">
-            <div className="flex items-baseline justify-center gap-3">
-              <span className="text-5xl font-bold text-foreground">
-                ${stockData.currentPrice.toFixed(2)}
-              </span>
-              <span className="flex items-center gap-1">
-                <span className={`text-lg font-semibold ${
-                  stockData.priceChange >= 0 ? "text-chart-green" : "text-red-400"
-                }`}>
-                  {stockData.priceChange >= 0 ? "+" : ""} ${stockData.priceChange.toFixed(2)}
+            {quoteLoading ? (
+              <div className="text-center text-slate-400">Loading price data...</div>
+            ) : quoteData ? (
+              <div className="flex items-baseline justify-center gap-3">
+                <span className="text-5xl font-bold text-foreground">
+                  ${quoteData.price}
                 </span>
-                <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                  stockData.percentChange >= 0
-                    ? "bg-chart-green/20 text-chart-green"
-                    : "bg-red-400/20 text-red-400"
-                }`}>
-                  {stockData.percentChange >= 0 ? "+" : ""}{stockData.percentChange.toFixed(2)}%
+                <span className="flex items-center gap-1">
+                  <span className={`text-lg font-semibold ${
+                    typeof quoteData.change === "string"
+                      ? (parseFloat(quoteData.change) >= 0 ? "text-chart-green" : "text-red-400")
+                      : (quoteData.change >= 0 ? "text-chart-green" : "text-red-400")
+                  }`}>
+                    {typeof quoteData.change === "string" ? quoteData.change : quoteData.change}
+                  </span>
+                  <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                    typeof quoteData.changePercent === "string"
+                      ? (parseFloat(quoteData.changePercent) >= 0 ? "bg-chart-green/20 text-chart-green" : "bg-red-400/20 text-red-400")
+                      : (quoteData.changePercent >= 0 ? "bg-chart-green/20 text-chart-green" : "bg-red-400/20 text-red-400")
+                  }`}>
+                    {quoteData.changePercent}%
+                  </span>
                 </span>
-              </span>
-            </div>
+              </div>
+            ) : (
+              <div className="text-center text-slate-400 text-xl">Unavailable via API</div>
+            )}
           </div>
 
           {/* After Hours & Earnings */}
@@ -277,12 +275,14 @@ export default function Index() {
       </div>
 
       {/* Chart Modal */}
-      <ChartModal
-        metric={selectedMetric || financialMetrics[0]}
-        isOpen={selectedMetric !== null}
-        onClose={() => setSelectedMetric(null)}
-        ticker={ticker}
-      />
+      {selectedMetric && (
+        <ChartModal
+          metric={selectedMetric}
+          isOpen={selectedMetric !== null}
+          onClose={() => setSelectedMetric(null)}
+          ticker={ticker}
+        />
+      )}
     </div>
   );
 }
