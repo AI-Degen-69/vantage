@@ -21,11 +21,12 @@ interface ChartModalProps {
   metric: FinancialMetric;
   isOpen: boolean;
   onClose: () => void;
+  ticker?: string;
 }
 
 type TimeframeType = "1Y" | "3Y" | "5Y";
 
-export default function ChartModal({ metric, isOpen, onClose }: ChartModalProps) {
+export default function ChartModal({ metric, isOpen, onClose, ticker = "AAPL" }: ChartModalProps) {
   const [timeframe, setTimeframe] = useState<TimeframeType>("1Y");
   const [filteredData, setFilteredData] = useState(metric.data);
 
@@ -149,8 +150,8 @@ export default function ChartModal({ metric, isOpen, onClose }: ChartModalProps)
         <div className="flex items-center justify-between p-6 border-b border-border sticky top-0 bg-card">
           <div className="flex items-center gap-3">
             <img
-              src="/api/company-logo?ticker=AAPL"
-              alt="Apple Inc. logo"
+              src={`/api/company-logo?ticker=${ticker}`}
+              alt={`${ticker} logo`}
               className="w-8 h-8 rounded"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = 'none';
@@ -158,7 +159,7 @@ export default function ChartModal({ metric, isOpen, onClose }: ChartModalProps)
             />
             <div>
               <h2 className="text-xl font-semibold text-foreground">{metric.name}</h2>
-              <p className="text-sm text-muted-foreground">Apple Inc.</p>
+              <p className="text-sm text-muted-foreground">{ticker}</p>
             </div>
           </div>
           <button

@@ -45,6 +45,7 @@ export default function App() {
                 </AppLayout>
               }
             />
+            <Route path="/stock/:ticker" element={<AppLayout><Index /></AppLayout>} />
             <Route path="/insights" element={<AppLayout><Insights /></AppLayout>} />
             <Route path="/watchlists" element={<AppLayout><PlaceholderPage /></AppLayout>} />
             <Route path="/charts" element={<AppLayout><PlaceholderPage /></AppLayout>} />

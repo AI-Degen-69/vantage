@@ -154,16 +154,16 @@ export default function Index() {
         <div className="mb-12 text-center">
           <div className="flex items-center justify-center gap-4 mb-4">
             <img
-              src="/api/company-logo?ticker=AAPL"
-              alt="Apple Inc. logo"
+              src={`/api/company-logo?ticker=${ticker}`}
+              alt={`${ticker} logo`}
               className="w-12 h-12 rounded-md"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = 'none';
               }}
             />
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Apple Inc.</h1>
-              <p className="text-sm text-muted-foreground">AAPL | NASDAQ</p>
+              <h1 className="text-3xl font-bold text-foreground">{stockData.name}</h1>
+              <p className="text-sm text-muted-foreground">{ticker} | NASDAQ</p>
             </div>
           </div>
 
@@ -171,14 +171,20 @@ export default function Index() {
           <div className="mb-3">
             <div className="flex items-baseline justify-center gap-3">
               <span className="text-5xl font-bold text-foreground">
-                ${appleStockData.currentPrice.toFixed(2)}
+                ${stockData.currentPrice.toFixed(2)}
               </span>
               <span className="flex items-center gap-1">
-                <span className="text-lg font-semibold text-chart-green">
-                  +${appleStockData.priceChange.toFixed(2)}
+                <span className={`text-lg font-semibold ${
+                  stockData.priceChange >= 0 ? "text-chart-green" : "text-red-400"
+                }`}>
+                  {stockData.priceChange >= 0 ? "+" : ""} ${stockData.priceChange.toFixed(2)}
                 </span>
-                <span className="px-2 py-1 bg-chart-green/20 text-chart-green rounded text-xs font-semibold">
-                  +{appleStockData.percentChange.toFixed(2)}%
+                <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                  stockData.percentChange >= 0
+                    ? "bg-chart-green/20 text-chart-green"
+                    : "bg-red-400/20 text-red-400"
+                }`}>
+                  {stockData.percentChange >= 0 ? "+" : ""}{stockData.percentChange.toFixed(2)}%
                 </span>
               </span>
             </div>
@@ -275,6 +281,7 @@ export default function Index() {
         metric={selectedMetric || financialMetrics[0]}
         isOpen={selectedMetric !== null}
         onClose={() => setSelectedMetric(null)}
+        ticker={ticker}
       />
     </div>
   );
