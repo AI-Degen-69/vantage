@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import {
   LineChart,
@@ -33,14 +33,14 @@ export default function Index() {
   // Use ticker from URL or default to AAPL
   const ticker = urlTicker?.toUpperCase() || "AAPL";
 
-  // Generate stock data based on ticker
-  const stockData: StockData = {
+  // Generate stock data based on ticker (memoized to prevent re-generation on re-renders)
+  const stockData: StockData = useMemo(() => ({
     symbol: ticker,
     name: ticker === "AAPL" ? "Apple Inc." : `Company ${ticker}`,
     currentPrice: appleStockData.currentPrice + Math.random() * 100,
     priceChange: appleStockData.priceChange + Math.random() * 20,
     percentChange: appleStockData.percentChange + (Math.random() - 0.5) * 5,
-  };
+  }), [ticker]);
 
   const colorMap: { [key: string]: string } = {
     "chart-green": "#00d084",
