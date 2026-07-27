@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { Search, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 interface Stock {
   symbol: string;
@@ -50,18 +51,19 @@ const sp500Stocks: Stock[] = [
 ];
 
 const tabs = [
-  { id: "sp500", label: "S&P 500" },
-  { id: "trending", label: "Most Trending" },
-  { id: "growth", label: "Growth" },
-  { id: "dividend", label: "Dividend Growth" },
-  { id: "buyback", label: "Buyback Machines" },
-  { id: "ai", label: "Artificial Intelligence" },
-  { id: "cloud", label: "Cloud" },
-  { id: "ev", label: "Electric Vehicles" },
-  { id: "leisure", label: "Leisure and Entertainment" },
+  { id: "sp500", i18nKey: "insights.tabs.sp500" },
+  { id: "trending", i18nKey: "insights.tabs.trending" },
+  { id: "growth", i18nKey: "insights.tabs.growth" },
+  { id: "dividend", i18nKey: "insights.tabs.dividend" },
+  { id: "buyback", i18nKey: "insights.tabs.buyback" },
+  { id: "ai", i18nKey: "insights.tabs.ai" },
+  { id: "cloud", i18nKey: "insights.tabs.cloud" },
+  { id: "ev", i18nKey: "insights.tabs.ev" },
+  { id: "leisure", i18nKey: "insights.tabs.leisure" },
 ];
 
 export default function Insights() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("sp500");
   const [searchQuery, setSearchQuery] = useState("");
@@ -78,21 +80,21 @@ export default function Insights() {
     <div className="w-full bg-background dark min-h-screen">
       {/* Header Section */}
       <div className="bg-slate-800/50 border-b border-slate-700 px-8 py-12">
-        <h1 className="text-4xl font-bold text-center text-foreground mb-8">Insights</h1>
+        <h1 className="text-4xl font-bold text-center text-foreground mb-8">{t("insights.title")}</h1>
 
         {/* Search Bar */}
         <div className="max-w-2xl mx-auto">
           <div className="relative flex items-center bg-slate-700/50 border border-slate-600 rounded-lg overflow-hidden">
-            <Search className="w-4 h-4 ml-4 text-slate-400" />
+            <Search className="w-4 h-4 ms-4 text-slate-400 shrink-0" />
             <input
               type="text"
-              placeholder="Search stocks..."
+              placeholder={t("insights.search")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="flex-1 bg-transparent outline-none border-0 px-4 py-3 text-foreground placeholder-slate-400"
             />
-            <button className="flex items-center justify-center px-3 py-3 text-slate-400 hover:text-blue-400 transition-colors border-l border-slate-600">
-              <Settings className="w-4 h-4" />
+            <button className="flex items-center justify-center px-3 py-3 text-slate-400 hover:text-blue-400 transition-colors border-s border-slate-600">
+              <Settings className="w-4 h-4 shrink-0" />
             </button>
           </div>
         </div>
@@ -111,11 +113,11 @@ export default function Insights() {
                   : "border-transparent text-slate-400 hover:text-foreground"
               }`}
             >
-              {tab.label}
+              {t(tab.i18nKey)}
             </button>
           ))}
-          <button className="px-4 py-3 text-slate-400 hover:text-foreground font-medium text-sm whitespace-nowrap ml-auto">
-            More ▼
+          <button className="px-4 py-3 text-slate-400 hover:text-foreground font-medium text-sm whitespace-nowrap ms-auto">
+            {t("index.more")}
           </button>
         </div>
       </div>
@@ -139,12 +141,13 @@ export default function Insights() {
                     <p className="text-sm font-semibold text-foreground">{stock.symbol}</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-foreground">${stock.price.toFixed(2)}</p>
+                <div className="text-right rtl:text-left">
+                  <p className="text-sm font-bold text-foreground" dir="ltr">${stock.price.toFixed(2)}</p>
                   <p
                     className={`text-xs font-semibold ${
                       stock.changePercent >= 0 ? "text-green-400" : "text-red-400"
                     }`}
+                    dir="ltr"
                   >
                     {stock.changePercent >= 0 ? "+" : ""}
                     {stock.changePercent.toFixed(2)}%
@@ -154,14 +157,17 @@ export default function Insights() {
 
               {/* Company Info */}
               <p className="text-xs text-slate-400 mb-2 truncate">{stock.name}</p>
-              <p className="text-xs text-slate-500">{stock.marketCap}</p>
+              <p className="text-xs text-slate-500 flex items-center gap-1">
+                <span>{t("insights.marketCap")}:</span>
+                <span dir="ltr">{stock.marketCap.replace("Market Cap: ", "")}</span>
+              </p>
             </div>
           ))}
         </div>
 
         {filteredStocks.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-slate-400">No stocks found matching "{searchQuery}"</p>
+            <p className="text-slate-400">{t("insights.noMatch", { query: searchQuery })}</p>
           </div>
         )}
       </div>

@@ -26,6 +26,130 @@ export interface QuickStat {
   }>;
 }
 
+export interface CompanyProfile {
+  ceo: string;
+  sector: string;
+  industry: string;
+  employees: number;
+  beta: number;
+  piotroskiScore: number;
+  description: string;
+}
+
+export interface InsiderTrade {
+  name: string;
+  date: string;
+  type: string;
+  price: number;
+  transacted: number;
+  value: number;
+}
+
+export interface AnalystEstimate {
+  metric: "EPS" | "Revenue";
+  period: "Current Qtr" | "Current Year" | "Next Year";
+  avg: number;
+  low: number;
+  high: number;
+}
+
+export interface NewsItem {
+  headline: string;
+  publisher: string;
+  timestamp: string;
+  url: string;
+}
+
+export interface EarningsEvent {
+  ticker: string;
+  date: string;
+  epsEst: number;
+  epsActual?: number;
+  revEst: number;
+  revActual?: number;
+  time: "Before Open" | "After Close";
+  surprise?: "beat" | "miss" | "none";
+}
+
+export interface PortfolioHolding {
+  ticker: string;
+  weight: number;
+  gainLoss: number;
+}
+
+export interface Portfolio {
+  name: string;
+  currentValue: number;
+  gainLoss: number;
+  annualIncome: number;
+  dividendYield: number;
+  holdings: PortfolioHolding[];
+}
+
+export interface WatchlistTicker {
+  symbol: string;
+  name: string;
+  price: number;
+  changePercent: number;
+  sma200Distance: number; // Percentage distance from 200-day SMA
+}
+
+// Curated Market Leaders & ETFs Watchlist
+export const defaultWatchlist: WatchlistTicker[] = [
+  { symbol: "NVDA", name: "NVIDIA Corp.", price: 1120.45, changePercent: 2.34, sma200Distance: 35.2 },
+  { symbol: "MSFT", name: "Microsoft Corp.", price: 425.10, changePercent: 1.15, sma200Distance: 12.4 },
+  { symbol: "AAPL", name: "Apple Inc.", price: 215.30, changePercent: 0.85, sma200Distance: 5.6 },
+  { symbol: "AMZN", name: "Amazon.com Inc.", price: 185.20, changePercent: -0.45, sma200Distance: 8.2 },
+  { symbol: "GOOGL", name: "Alphabet Inc.", price: 175.80, changePercent: 1.20, sma200Distance: 9.5 },
+  { symbol: "META", name: "Meta Platforms", price: 495.60, changePercent: 3.10, sma200Distance: 22.1 },
+  { symbol: "TSLA", name: "Tesla Inc.", price: 175.40, changePercent: -2.15, sma200Distance: -15.4 },
+  { symbol: "SPY", name: "SPDR S&P 500 ETF", price: 545.20, changePercent: 0.50, sma200Distance: 10.1 },
+  { symbol: "QQQ", name: "Invesco QQQ Trust", price: 475.10, changePercent: 0.80, sma200Distance: 14.5 },
+  { symbol: "XLV", name: "Health Care Select ETF", price: 145.30, changePercent: -0.10, sma200Distance: 4.2 },
+  { symbol: "XLF", name: "Financial Select ETF", price: 41.50, changePercent: 0.25, sma200Distance: 6.8 },
+];
+
+export const mockCompanyProfile: CompanyProfile = {
+  ceo: "Tim Cook",
+  sector: "Technology",
+  industry: "Consumer Electronics",
+  employees: 161000,
+  beta: 1.25,
+  piotroskiScore: 8,
+  description: "Apple Inc. designs, manufactures, and markets smartphones, personal computers, tablets, wearables, and accessories worldwide. The company offers iPhone, a line of smartphones; Mac, a line of personal computers; iPad, a line of multi-purpose tablets; and wearables, home, and accessories comprising AirPods, Apple TV, Apple Watch, Beats products, and HomePod."
+};
+
+export const mockAnalystEstimates: AnalystEstimate[] = [
+  { metric: "EPS", period: "Current Qtr", avg: 1.54, low: 1.45, high: 1.62 },
+  { metric: "EPS", period: "Current Year", avg: 6.55, low: 6.30, high: 6.75 },
+  { metric: "EPS", period: "Next Year", avg: 7.20, low: 6.85, high: 7.50 },
+  { metric: "Revenue", period: "Current Qtr", avg: 90.2, low: 88.5, high: 92.1 },
+  { metric: "Revenue", period: "Current Year", avg: 385.5, low: 375.0, high: 395.0 },
+  { metric: "Revenue", period: "Next Year", avg: 410.2, low: 395.5, high: 425.0 }
+];
+
+export const mockInsiderTrades: InsiderTrade[] = [
+  { name: "Tim Cook", date: "2024-05-15", type: "Sell", price: 185.50, transacted: -150000, value: -27825000 },
+  { name: "Luca Maestri", date: "2024-04-20", type: "Sell", price: 175.20, transacted: -25000, value: -4380000 },
+  { name: "Deirdre O'Brien", date: "2024-03-10", type: "Option Exercise", price: 45.50, transacted: 50000, value: 2275000 },
+  { name: "Craig Federighi", date: "2024-02-15", type: "Sell", price: 182.30, transacted: -40000, value: -7292000 }
+];
+
+export const mockNews: NewsItem[] = [
+  { headline: "Neutral Google appeals iPhone search ruling", publisher: "Financial Times", timestamp: "May 22, 2024", url: "#" },
+  { headline: "Apple faces labor concerns in Asia", publisher: "WSJ", timestamp: "May 21, 2024", url: "#" },
+  { headline: "New iPad Pro features OLED display", publisher: "Bloomberg", timestamp: "May 20, 2024", url: "#" },
+  { headline: "Apple announces WWDC dates", publisher: "TechCrunch", timestamp: "May 18, 2024", url: "#" }
+];
+
+export const mockEmployeeCount = [
+  { year: "2019", count: 137000 },
+  { year: "2020", count: 147000 },
+  { year: "2021", count: 154000 },
+  { year: "2022", count: 164000 },
+  { year: "2023", count: 161000 },
+];
+
 export const appleStockData = {
   symbol: "AAPL",
   name: "Apple Inc.",
@@ -37,85 +161,85 @@ export const appleStockData = {
 
 export const quickStats: QuickStat[] = [
   {
-    label: "Valuation",
+    label: "metrics.valuation",
     value: "$3.42T",
     details: [
-      { label: "Market Cap", value: "$3,421.2B" },
-      { label: "P/E (TTM/USD/D2D)", value: "27.23 | 30.81 | 30.12" },
-      { label: "Price to Sales", value: "8.42" },
-      { label: "EV to EBITDA", value: "26.39" },
-      { label: "Price to Book", value: "42.66" },
+      { label: "metrics.marketCap", value: "$3,421.2B" },
+      { label: "metrics.pe", value: "27.23 | 30.81 | 30.12" },
+      { label: "metrics.priceToSales", value: "8.42" },
+      { label: "metrics.evToEbitda", value: "26.39" },
+      { label: "metrics.priceToBook", value: "42.66" },
     ],
   },
   {
-    label: "Cash Flow",
+    label: "metrics.cashFlow",
     value: "$110.5B",
     details: [
-      { label: "Operating Cash Flow (TTM)", value: "$110.5B" },
-      { label: "FCF (Free Cash Flow TTM)", value: "$97.2B" },
-      { label: "FCF Payout Ratio / Price (B)", value: "0.24" },
-      { label: "Dividend/Price", value: "$30,820" },
-      { label: "Cash Amount", value: "$29.2B" },
+      { label: "metrics.ocf", value: "$110.5B" },
+      { label: "metrics.fcf", value: "$97.2B" },
+      { label: "metrics.fcfPayout", value: "0.24" },
+      { label: "metrics.dividendPrice", value: "$30,820" },
+      { label: "metrics.cashAmount", value: "$29.2B" },
     ],
   },
   {
-    label: "Margins & Growth",
+    label: "metrics.marginsGrowth",
     value: "46.2%",
     details: [
-      { label: "Gross Margin (NTM)", value: "46.21%" },
-      { label: "Operating Margin", value: "33.64%" },
-      { label: "Net Margin", value: "19.34%" },
-      { label: "Quarterly Earnings (NTM)", value: "14.60%" },
+      { label: "metrics.grossMargin", value: "46.21%" },
+      { label: "metrics.operatingMargin", value: "33.64%" },
+      { label: "metrics.netMargin", value: "19.34%" },
+      { label: "metrics.quarterlyEarnings", value: "14.60%" },
     ],
   },
   {
-    label: "Balance",
+    label: "metrics.balance",
     value: "$1,245.6B",
     details: [
-      { label: "Total Assets", value: "$352.6B" },
-      { label: "Total Debt", value: "$106.8B" },
-      { label: "Debt to Equity", value: "1.69x" },
-      { label: "Current Ratio", value: "1.51x" },
-      { label: "Quick Ratio", value: "1.39x" },
+      { label: "metrics.totalAssets", value: "$352.6B" },
+      { label: "metrics.totalDebt", value: "$106.8B" },
+      { label: "metrics.debtToEquity", value: "1.69x" },
+      { label: "metrics.currentRatio", value: "1.51x" },
+      { label: "metrics.quickRatio", value: "1.39x" },
     ],
   },
   {
-    label: "Dividend",
+    label: "metrics.dividend",
     value: "$0.24/q",
     details: [
-      { label: "Quarterly Dividend", value: "$0.24" },
-      { label: "Annual Dividend", value: "$0.96" },
-      { label: "Dividend Yield", value: "0.43%" },
-      { label: "Payout Ratio", value: "12.69%" },
-      { label: "Next Ex-Date", value: "May 11, 2024" },
+      { label: "metrics.quarterlyDividend", value: "$0.24" },
+      { label: "metrics.annualDividend", value: "$0.96" },
+      { label: "metrics.dividendYield", value: "0.43%" },
+      { label: "metrics.payoutRatio", value: "12.69%" },
+      { label: "metrics.nextExDate", value: "May 11, 2024" },
     ],
   },
   {
-    label: "Valuation",
-    value: "Premium",
+    label: "metrics.valuation",
+    value: "metrics.premium",
     details: [
-      { label: "52-Week High", value: "$309.25" },
-      { label: "52-Week Low", value: "$164.08" },
-      { label: "Average Volume", value: "52.8M" },
-      { label: "Market Position", value: "Tech Leader" },
+      { label: "metrics.high52", value: "$309.25" },
+      { label: "metrics.low52", value: "$164.08" },
+      { label: "metrics.averageVolume", value: "52.8M" },
+      { label: "metrics.marketPosition", value: "metrics.techLeader" },
     ],
   },
 ];
 
-// Generate quarterly data for the past 5 years (20 quarters)
+// Generate quarterly data for the past 40 years (160 quarters)
 const generateQuarterlyData = (baseValue: number, variance: number): StockMetric[] => {
   const data: StockMetric[] = [];
   const now = new Date();
   let value = baseValue;
 
-  for (let i = 19; i >= 0; i--) {
+  for (let i = 159; i >= 0; i--) {
     const quarter = Math.floor(i / 4);
     const q = (i % 4) + 1;
     const year = now.getFullYear() - quarter;
     value += (Math.random() - 0.5) * variance;
     data.push({
       date: `Q${q} ${year}`,
-      value: Math.max(value, baseValue * 0.5),
+      value: Math.max(value, baseValue * 0.1),
     });
   }
   return data;
@@ -123,7 +247,7 @@ const generateQuarterlyData = (baseValue: number, variance: number): StockMetric
 
 export const financialMetrics: FinancialMetric[] = [
   {
-    name: "Revenue",
+    name: "metrics.revenue",
     type: "bar",
     color: "chart-green",
     unit: "B",
@@ -133,7 +257,7 @@ export const financialMetrics: FinancialMetric[] = [
     cagr5Y: 4.41,
   },
   {
-    name: "Revenue by Segment",
+    name: "metrics.revenueBySegment",
     type: "bar",
     color: "chart-orange",
     unit: "B",
@@ -143,7 +267,7 @@ export const financialMetrics: FinancialMetric[] = [
     cagr5Y: 3.28,
   },
   {
-    name: "EBITDA",
+    name: "metrics.ebitda",
     type: "bar",
     color: "chart-orange",
     unit: "B",
@@ -153,7 +277,7 @@ export const financialMetrics: FinancialMetric[] = [
     cagr5Y: 5.87,
   },
   {
-    name: "Gross Profit",
+    name: "metrics.grossProfit",
     type: "line",
     color: "chart-blue",
     unit: "B",
@@ -163,7 +287,7 @@ export const financialMetrics: FinancialMetric[] = [
     cagr5Y: 4.12,
   },
   {
-    name: "Operating Income",
+    name: "metrics.operatingIncome",
     type: "bar",
     color: "chart-orange",
     unit: "B",
@@ -173,7 +297,7 @@ export const financialMetrics: FinancialMetric[] = [
     cagr5Y: 6.42,
   },
   {
-    name: "Net Income",
+    name: "metrics.netIncome",
     type: "bar",
     color: "chart-orange",
     unit: "B",
@@ -183,7 +307,7 @@ export const financialMetrics: FinancialMetric[] = [
     cagr5Y: 5.64,
   },
   {
-    name: "Cash & Equivalents",
+    name: "metrics.cashEquivalents",
     type: "bar",
     color: "chart-orange",
     unit: "B",
@@ -193,7 +317,7 @@ export const financialMetrics: FinancialMetric[] = [
     cagr5Y: 7.89,
   },
   {
-    name: "Free Cash Flow",
+    name: "metrics.freeCashFlow",
     type: "line",
     color: "chart-cyan",
     unit: "B",
@@ -203,7 +327,7 @@ export const financialMetrics: FinancialMetric[] = [
     cagr5Y: 4.38,
   },
   {
-    name: "Shareholders Equity",
+    name: "metrics.shareholdersEquity",
     type: "line",
     color: "chart-purple",
     unit: "B",
@@ -213,7 +337,7 @@ export const financialMetrics: FinancialMetric[] = [
     cagr5Y: 3.94,
   },
   {
-    name: "Total Assets",
+    name: "metrics.totalAssets",
     type: "line",
     color: "chart-blue",
     unit: "B",
@@ -223,7 +347,7 @@ export const financialMetrics: FinancialMetric[] = [
     cagr5Y: 3.21,
   },
   {
-    name: "Market Cap",
+    name: "metrics.marketCap",
     type: "area",
     color: "chart-green",
     unit: "B",
@@ -233,7 +357,7 @@ export const financialMetrics: FinancialMetric[] = [
     cagr5Y: 6.25,
   },
   {
-    name: "EPS",
+    name: "metrics.eps",
     type: "line",
     color: "chart-pink",
     unit: "$",
