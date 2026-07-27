@@ -117,7 +117,7 @@ export default function DCFWidget({ currentPrice = 150.0 }: DCFWidgetProps) {
             <p className={`text-3xl font-bold ${forwardReturn >= 0 ? "text-green-400" : "text-red-400"}`} dir="ltr">
               {forwardReturn >= 0 ? "+" : ""}{forwardReturn.toFixed(2)}%
             </p>
-            <p className="text-xs text-slate-500 mt-2">Based on current price ${currentPrice}</p>
+            <p className="text-xs text-slate-500 mt-2">{t("dcf.basedOnCurrentPrice")}{currentPrice}</p>
           </div>
           <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
             <div className="flex items-center justify-between mb-2">
@@ -133,7 +133,7 @@ export default function DCFWidget({ currentPrice = 150.0 }: DCFWidgetProps) {
             <p className="text-3xl font-bold text-blue-400" dir="ltr">
               ${reverseEntryPrice.toFixed(2)}
             </p>
-            <p className="text-xs text-slate-500 mt-2">Targeting {targetReturn}% return</p>
+            <p className="text-xs text-slate-500 mt-2">{t("dcf.targetingReturn", { target: targetReturn })}</p>
           </div>
         </div>
 
@@ -146,7 +146,7 @@ export default function DCFWidget({ currentPrice = 150.0 }: DCFWidgetProps) {
               <Tooltip 
                 contentStyle={{ backgroundColor: "#0f172a", borderColor: "#1e293b", borderRadius: "8px" }}
                 itemStyle={{ color: "#e2e8f0" }}
-                formatter={(value: number) => [`$${value.toFixed(2)}`, "Projected Price"]}
+                formatter={(value: number) => [`$${value.toFixed(2)}`, t("dcf.projectedPrice")]}
               />
               <Line yAxisId="left" type="monotone" dataKey="price" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4, fill: "#3b82f6", strokeWidth: 2, stroke: "#0f172a" }} />
             </LineChart>

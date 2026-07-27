@@ -78,6 +78,7 @@ export interface PortfolioHolding {
 }
 
 export interface Portfolio {
+  id: string;
   name: string;
   currentValue: number;
   gainLoss: number;
@@ -108,6 +109,69 @@ export const defaultWatchlist: WatchlistTicker[] = [
   { symbol: "XLV", name: "Health Care Select ETF", price: 145.30, changePercent: -0.10, sma200Distance: 4.2 },
   { symbol: "XLF", name: "Financial Select ETF", price: 41.50, changePercent: 0.25, sma200Distance: 6.8 },
 ];
+
+export const mockPortfolio: Portfolio = {
+  id: "my-first-portfolio",
+  name: "My First Portfolio",
+  currentValue: 1250450.00,
+  gainLoss: 154230.50,
+  annualIncome: 45200.00,
+  dividendYield: 3.6,
+  holdings: [
+    { ticker: "AAPL", weight: 25.4, gainLoss: 45.2 },
+    { ticker: "MSFT", weight: 20.1, gainLoss: 32.8 },
+    { ticker: "NVDA", weight: 15.5, gainLoss: 125.4 },
+    { ticker: "SPY", weight: 39.0, gainLoss: 12.5 },
+  ]
+};
+
+export const techHeavyPortfolio: Portfolio = {
+  id: "tech-heavy",
+  name: "Tech Heavy",
+  currentValue: 3450000.00,
+  gainLoss: 890000.50,
+  annualIncome: 12500.00,
+  dividendYield: 0.36,
+  holdings: [
+    { ticker: "MSFT", weight: 15.0, gainLoss: 85.2 },
+    { ticker: "AAPL", weight: 14.5, gainLoss: 65.4 },
+    { ticker: "NVDA", weight: 12.0, gainLoss: 215.8 },
+    { ticker: "GOOGL", weight: 10.5, gainLoss: 45.2 },
+    { ticker: "AMZN", weight: 10.0, gainLoss: 35.6 },
+    { ticker: "META", weight: 8.5, gainLoss: 110.4 },
+    { ticker: "TSLA", weight: 6.0, gainLoss: -15.2 },
+    { ticker: "APP", weight: 5.5, gainLoss: 150.8 },
+    { ticker: "PLTR", weight: 5.0, gainLoss: 95.4 },
+    { ticker: "AVGO", weight: 4.5, gainLoss: 75.2 },
+    { ticker: "ORCL", weight: 4.0, gainLoss: 25.6 },
+    { ticker: "AMD", weight: 4.5, gainLoss: 40.5 }
+  ]
+};
+
+export const dividendKingsPortfolio: Portfolio = {
+  id: "dividend-kings",
+  name: "Dividend Kings",
+  currentValue: 850200.00,
+  gainLoss: 45000.00,
+  annualIncome: 35600.00,
+  dividendYield: 4.18,
+  holdings: [
+    { ticker: "JNJ", weight: 12.5, gainLoss: 15.2 },
+    { ticker: "GPC", weight: 10.0, gainLoss: 8.4 },
+    { ticker: "PEP", weight: 9.5, gainLoss: 12.6 },
+    { ticker: "KMB", weight: 9.0, gainLoss: 5.4 },
+    { ticker: "TGT", weight: 8.5, gainLoss: -4.2 },
+    { ticker: "SWK", weight: 8.0, gainLoss: 2.1 },
+    { ticker: "ED", weight: 7.5, gainLoss: 18.5 },
+    { ticker: "HRL", weight: 7.0, gainLoss: -2.5 },
+    { ticker: "KO", weight: 8.5, gainLoss: 22.4 },
+    { ticker: "PG", weight: 7.5, gainLoss: 14.8 },
+    { ticker: "MMM", weight: 6.0, gainLoss: -8.5 },
+    { ticker: "CL", weight: 6.0, gainLoss: 9.2 }
+  ]
+};
+
+export const portfolios = [mockPortfolio, techHeavyPortfolio, dividendKingsPortfolio];
 
 export const mockCompanyProfile: CompanyProfile = {
   ceo: "Tim Cook",

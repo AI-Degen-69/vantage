@@ -146,7 +146,10 @@
     "multipleHelp": "The multiple you consider appropriate for the stock to trade at",
     "forward": "Return from today's price",
     "reverse": "Entry Price for X% Return",
-    "targetReturn": "Target Return %"
+    "targetReturn": "Target Return %",
+    "basedOnCurrentPrice": "Based on current price $",
+    "targetingReturn": "Targeting {{target}}% return",
+    "projectedPrice": "Projected Price"
   },
   "dipFinder": {
     "title": "Dip Finder",
@@ -168,7 +171,15 @@
     "beforeOpen": "Before Open",
     "afterClose": "After Close",
     "beat": "Beat",
-    "miss": "Miss"
+    "miss": "Miss",
+    "mon": "Mon",
+    "tue": "Tue",
+    "wed": "Wed",
+    "thu": "Thu",
+    "fri": "Fri",
+    "epsEst": "EPS Est",
+    "revEst": "Rev Est",
+    "actual": "Actual"
   },
   "portfolio": {
     "title": "Portfolio",
@@ -193,6 +204,8 @@
     "type": "Type",
     "price": "Price",
     "transacted": "Transacted",
-    "value": "Value"
+    "value": "Value",
+    "symbol": "Symbol",
+    "change": "Change"
   }
 }

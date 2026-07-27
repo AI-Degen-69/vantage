@@ -12,17 +12,23 @@ export const mockEarningsEvents: EarningsEvent[] = [
 
 export default function EarningsCalendar() {
   const { t } = useTranslation();
-  const days = ["Mon", "Tue", "Wed", "Thu", "Fri"];
+  const days = [
+    { key: "Mon", i18nKey: "earningsCalendar.mon" },
+    { key: "Tue", i18nKey: "earningsCalendar.tue" },
+    { key: "Wed", i18nKey: "earningsCalendar.wed" },
+    { key: "Thu", i18nKey: "earningsCalendar.thu" },
+    { key: "Fri", i18nKey: "earningsCalendar.fri" },
+  ];
 
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden">
       <div className="grid grid-cols-5 divide-x divide-border">
-        {days.map((day) => {
-          const events = mockEarningsEvents.filter(e => e.date === day);
+        {days.map((dayObj) => {
+          const events = mockEarningsEvents.filter(e => e.date === dayObj.key);
           return (
-            <div key={day} className="min-h-[400px]">
+            <div key={dayObj.key} className="min-h-[400px]">
               <div className="bg-slate-900/50 p-4 border-b border-border text-center">
-                <span className="font-semibold text-foreground">{day}</span>
+                <span className="font-semibold text-foreground">{t(dayObj.i18nKey)}</span>
               </div>
               <div className="p-4 space-y-4">
                 {events.map((ev, i) => (
@@ -38,17 +44,17 @@ export default function EarningsCalendar() {
                     
                     <div className="space-y-1 text-xs">
                       <div className="flex justify-between text-slate-400">
-                        <span>EPS Est</span>
+                        <span>{t("earningsCalendar.epsEst")}</span>
                         <span dir="ltr">${ev.epsEst.toFixed(2)}</span>
                       </div>
                       {ev.epsActual && (
                         <div className="flex justify-between font-medium">
-                          <span>Actual</span>
+                          <span>{t("earningsCalendar.actual")}</span>
                           <span className={ev.surprise === "beat" ? "text-green-400" : "text-red-400"} dir="ltr">${ev.epsActual.toFixed(2)}</span>
                         </div>
                       )}
                       <div className="flex justify-between text-slate-400 pt-1">
-                        <span>Rev Est</span>
+                        <span>{t("earningsCalendar.revEst")}</span>
                         <span dir="ltr">${ev.revEst.toFixed(2)}B</span>
                       </div>
                     </div>

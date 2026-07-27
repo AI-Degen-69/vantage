@@ -146,7 +146,10 @@
     "multipleHelp": "המכפיל שאתה מחשיב כמתאים למניה להיסחר בו",
     "forward": "תשואה מהמחיר הנוכחי",
     "reverse": "מחיר כניסה לתשואה של X%",
-    "targetReturn": "יעד תשואה %"
+    "targetReturn": "יעד תשואה %",
+    "basedOnCurrentPrice": "מבוסס על מחיר נוכחי $",
+    "targetingReturn": "יעד תשואה של {{target}}%",
+    "projectedPrice": "מחיר צפוי"
   },
   "dipFinder": {
     "title": "מוצא שפל",
@@ -168,7 +171,15 @@
     "beforeOpen": "לפני הפתיחה",
     "afterClose": "אחרי הסגירה",
     "beat": "הכה",
-    "miss": "פספס"
+    "miss": "פספס",
+    "mon": "ב'",
+    "tue": "ג'",
+    "wed": "ד'",
+    "thu": "ה'",
+    "fri": "ו'",
+    "epsEst": "הערכת רווח למניה",
+    "revEst": "הערכת הכנסות",
+    "actual": "בפועל"
   },
   "portfolio": {
     "title": "תיק השקעות",
@@ -193,6 +204,8 @@
     "type": "סוג",
     "price": "מחיר",
     "transacted": "בוצע",
-    "value": "ערך"
+    "value": "ערך",
+    "symbol": "סימול",
+    "change": "שינוי"
   }
 }

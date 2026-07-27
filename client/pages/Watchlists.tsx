@@ -18,10 +18,10 @@ export default function Watchlists() {
               <table className="w-full text-sm text-left">
                 <thead className="bg-slate-900/50 text-xs text-muted-foreground uppercase border-b border-border">
                   <tr>
-                    <th className="px-6 py-4 font-medium">Symbol</th>
-                    <th className="px-6 py-4 font-medium">Name</th>
-                    <th className="px-6 py-4 font-medium text-right">Price</th>
-                    <th className="px-6 py-4 font-medium text-right">Change</th>
+                    <th className="px-6 py-4 font-medium">{t("common.symbol")}</th>
+                    <th className="px-6 py-4 font-medium">{t("common.name")}</th>
+                    <th className="px-6 py-4 font-medium text-right">{t("common.price")}</th>
+                    <th className="px-6 py-4 font-medium text-right">{t("common.change")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
