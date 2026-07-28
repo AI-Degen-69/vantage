@@ -16,6 +16,30 @@ import {
 import { BarChart, Bar, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { SectionCardSkeleton } from "@/components/Skeleton";
 
+/**
+ * Parse a trade `date` string into a millisecond timestamp for sorting.
+ * The desc/asc decision lives at the call site, NOT here — this helper is a
+ * pure extractor. Accepts ISO "YYYY-MM-DD" via Date.UTC to bypass locale
+ * variance, then falls back to Date.parse for `toLocaleDateString()` outputs.
+ * Unparseable values return NEGATIVE_INFINITY so they sink to the bottom of
+ * a desc sort rather than poisoning the comparator with NaN.
+ */
+function parseTradeDateMs(s: string): number {
+  if (!s) return Number.NEGATIVE_INFINITY;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (iso) {
+    const y = +iso[1];
+    const m = +iso[2];
+    const d = +iso[3];
+    // Reject 2024-13-32 / etc. explicitly — Date.UTC would silently roll
+    // overflow into a real adjacent date, masking bad upstream input.
+    if (m < 1 || m > 12 || d < 1 || d > 31) return Number.NEGATIVE_INFINITY;
+    return Date.UTC(y, m - 1, d);
+  }
+  const ms = Date.parse(s);
+  return Number.isNaN(ms) ? Number.NEGATIVE_INFINITY : ms;
+}
+
 export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string }) {
   const { t } = useTranslation();
 
@@ -85,6 +109,13 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
         }))
       : mockInsiderTrades;
   const isInsiderMock = !insiderData || insiderData.length === 0;
+
+  // Show the most recent trades at the top — desk researchers need freshest
+  // signal first. Robust to ISO and locale-formatted dates; unparseable rows
+  // sink to the bottom (handled by parseTradeDateMs).
+  const insidersSorted = [...insiders].sort(
+    (a, b) => parseTradeDateMs(b.date) - parseTradeDateMs(a.date)
+  );
 
   // ---- Analyst trends (normalized upstream: earningsEstimate.avg is plain number) ----
   let epsEstimates = mockAnalystEstimates.filter((e) => e.metric === "EPS");
@@ -268,7 +299,7 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {insiders.slice(0, 5).map((trade, i) => (
+                  {insidersSorted.slice(0, 5).map((trade, i) => (
                     <tr key={i} className="hover:bg-slate-800/50 transition-colors">
                       <td className="py-3 font-medium">{trade.name}</td>
                       <td className="py-3 text-muted-foreground">{trade.date}</td>
