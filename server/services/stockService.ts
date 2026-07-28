@@ -91,11 +91,23 @@ const CHART_ENDPOINT = process.env.FMP_USE_STABLE === '1' ? 'historical-price-eo
  */
 const QUOTE_USE_QUERY_PARAM = process.env.FMP_USE_STABLE === '1';
 
+/**
+ * Determines whether an FMP API key is configured.
+ *
+ * @returns `true` if an FMP API key is available, `false` otherwise.
+ */
 function hasFmp(): boolean {
   return typeof FMP_KEY === 'string' && FMP_KEY.length > 0;
 }
 
-// ---- Generic fetcher ------------------------------------------------------
+/**
+ * Fetches JSON data from a URL within the specified timeout.
+ *
+ * @param url - The URL to request
+ * @param label - Identifier used for warning messages
+ * @param timeoutMs - Maximum request duration in milliseconds
+ * @returns The parsed response data, or `null` when the request fails
+ */
 async function fetchJSON<T = any>(url: string, label: string, timeoutMs = 12000): Promise<T | null> {
   try {
     const ctrl = new AbortController();
@@ -114,19 +126,25 @@ async function fetchJSON<T = any>(url: string, label: string, timeoutMs = 12000)
   }
 }
 
+/**
+ * Builds an FMP API URL with the configured API key and query parameters.
+ *
+ * @param endpoint - The FMP API endpoint path
+ * @param params - Additional query parameters
+ * @returns The complete FMP API URL
+ */
 function fmpUrl(endpoint: string, params: Record<string, string | number> = {}): string {
   const qs = new URLSearchParams({ apikey: FMP_KEY, ...params as any }).toString();
   return `${FMP_BASE}/${endpoint}?${qs}`;
 }
 
 /**
- * Build a single-ticker FMP URL, branching on the active base.
+ * Builds a single-ticker FMP URL using the active endpoint format.
  *
- * `/stable/` accepts only the query-param shape `?symbol=X` for single-ticker
- * endpoints (profile, key-metrics-ttm, ratios-ttm, financial-scores,
- * income-statement, balance-sheet-statement, cash-flow-statement). The legacy
- * `/api/v3/` shape `{endpoint}/{symbol}` 404s on `/stable/`. Pass any extra
- * query params (limit, period, …) via `extra` to keep them branchless.
+ * @param name - The FMP endpoint name
+ * @param symbol - The ticker symbol
+ * @param extra - Additional query parameters
+ * @returns The complete FMP request URL
  */
 function tickerUrl(name: string, symbol: string, extra: Record<string, string | number | boolean> = {}): string {
   if (QUOTE_USE_QUERY_PARAM) {
@@ -239,6 +257,12 @@ function normalizeQuote(raw: any): StockQuote | null {
   };
 }
 
+/**
+ * Normalizes raw income statement data into the shared income statement format.
+ *
+ * @param raw - The raw income statement record to normalize.
+ * @returns An income statement row with normalized fields and default values for missing core metrics.
+ */
 function normalizeIncomeRow(raw: any): IncomeStatementRow {
   const toNum = (v: any) => (v === undefined ? undefined : Number(v));
   return {
@@ -259,6 +283,12 @@ function normalizeIncomeRow(raw: any): IncomeStatementRow {
   };
 }
 
+/**
+ * Converts a raw balance sheet record into a normalized balance sheet row.
+ *
+ * @param raw - The source balance sheet record.
+ * @returns A normalized balance sheet row with numeric financial values.
+ */
 function normalizeBalanceRow(raw: any): BalanceSheetRow {
   const toNum = (v: any) => (v === undefined ? undefined : Number(v));
   return {
@@ -276,6 +306,12 @@ function normalizeBalanceRow(raw: any): BalanceSheetRow {
   };
 }
 
+/**
+ * Normalizes a cash flow statement row into the shared cash flow format.
+ *
+ * @param raw - The source cash flow statement data.
+ * @returns A normalized cash flow statement row.
+ */
 function normalizeCashRow(raw: any): CashFlowRow {
   const toNum = (v: any) => (v === undefined ? undefined : Number(v));
   return {
@@ -292,6 +328,12 @@ function normalizeCashRow(raw: any): CashFlowRow {
   };
 }
 
+/**
+ * Normalizes an earnings calendar record into the shared earnings event format.
+ *
+ * @param raw - The upstream earnings record to normalize
+ * @returns An earnings event with normalized identifiers, dates, timing, and financial values
+ */
 function normalizeEarningEvent(raw: any): EarningsEvent {
   const toNum = (v: any) => (v === undefined || v === null ? null : Number(v));
   return {
@@ -305,6 +347,12 @@ function normalizeEarningEvent(raw: any): EarningsEvent {
   };
 }
 
+/**
+ * Normalizes a Yahoo Finance news item into the shared news format.
+ *
+ * @param raw - A flat or content-wrapped Yahoo Finance news item
+ * @returns A normalized news item with title, publisher, publication time, link, and optional media metadata
+ */
 function normalizeNewsItem(raw: any): NewsItem {
   // Yahoo v4 shape from .search(): flat. Legacy content-wrapped shape sometimes
   // appears when proxying — handle both.
@@ -320,6 +368,12 @@ function normalizeNewsItem(raw: any): NewsItem {
   };
 }
 
+/**
+ * Normalizes an upstream insider transaction into the shared transaction format.
+ *
+ * @param raw - The upstream transaction data to normalize
+ * @returns A normalized insider transaction with numeric shares, value, and price fields
+ */
 function normalizeInsider(raw: any): InsiderTransaction {
   const shares = typeof raw.shares === 'object' && raw.shares?.raw !== undefined
     ? Number(raw.shares.raw)
@@ -341,6 +395,12 @@ function normalizeInsider(raw: any): InsiderTransaction {
   };
 }
 
+/**
+ * Converts a raw chart data record into a normalized chart point.
+ *
+ * @param raw - The source chart data record
+ * @returns A chart point with normalized date, price, volume, and change values
+ */
 function normalizeChartPoint(raw: any) {
   return {
     date: String(raw.date ?? ''),
@@ -355,7 +415,12 @@ function normalizeChartPoint(raw: any) {
   };
 }
 
-// ---- Yahoo helpers ---------------------------------------------------------
+/**
+ * Retrieves one year of daily historical price data for a symbol.
+ *
+ * @param symbol - The ticker symbol to retrieve
+ * @returns The normalized chart series, or `null` when no data is available
+ */
 async function yahooChart(symbol: string): Promise<ChartSeries | null> {
   try {
     // yahoo-finance2 v4 returns {quotes: [{date, open, high, low, close, volume, adjclose}], ...}
@@ -390,6 +455,11 @@ async function yahooChart(symbol: string): Promise<ChartSeries | null> {
     return null;
   }
 }
+/**
+ * Retrieves and normalizes a quote for a symbol from Yahoo Finance.
+ *
+ * @returns A normalized stock quote, or `null` when no quote is available.
+ */
 async function yahooQuote(symbol: string): Promise<StockQuote | null> {
   try {
     // yahoo-finance2 v4 returns camelCase already for the regularMarket* fields.

@@ -35,9 +35,11 @@ export interface IIRResult {
 }
 
 /**
- * Internal Rate of Return via bisection.
- * Returns null signal plus a reason so the UI can render an honest `[MOCK]`
- * when the bracket is malformed (e.g. the cashflows are all-positive).
+ * Computes the annualized internal rate of return for dated cashflows.
+ *
+ * @param cashflows - Dated cashflows, with negative amounts representing investments and positive amounts representing receipts.
+ * @param opts - Optional bisection bounds, convergence tolerance, and iteration limit.
+ * @returns The estimated rate and convergence status, or `null` when the input is insufficient or the bracket does not contain a valid root.
  */
 export function irrBisection(
   cashflows: CashflowPoint[],
@@ -99,7 +101,14 @@ export function irrBisection(
   return { rate: (lo + hi) / 2, iterations: maxIter, reason: "no_convergence" };
 }
 
-/** Compound Annual Growth Rate. (end / start)^(1/years) - 1. */
+/**
+ * Calculates the compound annual growth rate between two values.
+ *
+ * @param startValue - The initial value.
+ * @param endValue - The final value.
+ * @param years - The elapsed time in years.
+ * @returns The annualized growth rate, or `null` when the inputs cannot produce a valid rate.
+ */
 export function cagr(startValue: number, endValue: number, years: number): number | null {
   if (startValue <= 0 || years <= 0 || !Number.isFinite(startValue) || !Number.isFinite(endValue)) return null;
   const ratio = endValue / startValue;
@@ -107,6 +116,11 @@ export function cagr(startValue: number, endValue: number, years: number): numbe
   return Math.pow(ratio, 1 / years) - 1;
 }
 
+/**
+ * Computes returns between consecutive positive closing prices.
+ *
+ * @returns The day-over-day returns for adjacent pairs with positive prices.
+ */
 function dailyReturns(closes: number[]): number[] {
   const out: number[] = [];
   for (let i = 1; i < closes.length; i++) {
@@ -117,12 +131,24 @@ function dailyReturns(closes: number[]): number[] {
   return out;
 }
 
+/**
+ * Computes the arithmetic mean of a numeric array.
+ *
+ * @param xs - The numbers to average
+ * @returns The arithmetic mean, or `0` when the array is empty
+ */
 function mean(xs: number[]): number {
   if (xs.length === 0) return 0;
   return xs.reduce((s, x) => s + x, 0) / xs.length;
 }
 
-/** Annualized volatility of daily returns (stdev × √tradingDays). */
+/**
+ * Computes the annualized volatility of a price series.
+ *
+ * @param closes - The closing prices used to calculate daily returns
+ * @param tradingDaysPerYear - The number of trading days in a year
+ * @returns The annualized volatility, or `null` when fewer than two prices or no valid daily returns are available
+ */
 export function annualizedVolatility(
   closes: number[],
   tradingDaysPerYear: number = TRADING_DAYS_PER_YEAR
@@ -135,7 +161,14 @@ export function annualizedVolatility(
   return Math.sqrt(variance) * Math.sqrt(tradingDaysPerYear);
 }
 
-/** Sharpe ratio using the per-day risk-free approximation. */
+/**
+ * Calculates the annualized Sharpe ratio from closing prices.
+ *
+ * @param closes - The closing prices used to calculate daily returns.
+ * @param riskFreeAnnual - The annual risk-free rate.
+ * @param tradingDaysPerYear - The number of trading days in a year.
+ * @returns The annualized Sharpe ratio, or `null` when insufficient returns exist or their standard deviation is zero.
+ */
 export function sharpeRatio(
   closes: number[],
   riskFreeAnnual: number = DEFAULT_RISK_FREE,
@@ -152,7 +185,14 @@ export function sharpeRatio(
   return (m / std) * Math.sqrt(tradingDaysPerYear);
 }
 
-/** Sortino ratio (downside-deviation denominator only). */
+/**
+ * Computes the annualized Sortino ratio for a closing-price series.
+ *
+ * @param closes - The closing prices used to calculate daily returns
+ * @param riskFreeAnnual - The annual risk-free rate
+ * @param tradingDaysPerYear - The number of trading days in a year
+ * @returns The annualized Sortino ratio, or `null` when it cannot be calculated
+ */
 export function sortinoRatio(
   closes: number[],
   riskFreeAnnual: number = DEFAULT_RISK_FREE,
@@ -172,8 +212,10 @@ export function sortinoRatio(
 }
 
 /**
- * Compute total return over a price-only series (no cashflows needed) for
- * fast UI badges. Equivalent to (final - first) / first.
+ * Computes the price-only total return from the first and last closing prices.
+ *
+ * @param closes - The chronological closing-price series.
+ * @returns The total return, or `null` when fewer than two prices are provided or the first price is not positive.
  */
 export function totalReturn(closes: number[]): number | null {
   if (closes.length < 2) return null;
@@ -222,6 +264,12 @@ export function totalReturn(closes: number[]): number | null {
  */
 const PLAUSIBLE_DATE_MIN_MS = Date.UTC(1990, 0, 1);
 
+/**
+ * Converts a supported trade-date value to a UTC timestamp.
+ *
+ * @param value - A date string, Unix timestamp in seconds or milliseconds, or an empty value
+ * @returns The UTC timestamp in milliseconds, or `null` for invalid or implausibly early dates
+ */
 function _strictToTimestamp(value: string | number | null | undefined): number | null {
   if (value === null || value === undefined || value === "") return null;
   if (typeof value === "number") {
@@ -253,23 +301,32 @@ function _strictToTimestamp(value: string | number | null | undefined): number |
   return ms;
 }
 
+/**
+ * Converts a trade-date value to a UTC timestamp, using a fallback for invalid values.
+ *
+ * @param value - The trade-date value to convert
+ * @param sink - The timestamp to return when conversion fails
+ * @returns The converted UTC timestamp or `sink`
+ */
 function _toTimestamp(value: string | number | null | undefined, sink: number): number {
   return _strictToTimestamp(value) ?? sink;
 }
 
 /**
- * Sort-friendly trade-date parser for DESCENDING (latest first). Unparseable
- * inputs sink to `0` so they appear at the bottom of any recent-first list
- * and the comparator `b - a` never yields NaN.
+ * Parses a trade-date value for descending chronological sorting.
+ *
+ * @param value - The trade-date value to parse
+ * @returns The UTC timestamp in milliseconds, or `0` for invalid values
  */
 export function parseTradeDateMs(value: string | number | null | undefined): number {
   return _toTimestamp(value, 0);
 }
 
 /**
- * Sort-friendly trade-date parser for ASCENDING (oldest first). Unparseable
- * inputs sink to `Number.MAX_SAFE_INTEGER` so they appear at the bottom
- * of an oldest-first list and the comparator `a - b` stays stable.
+ * Converts a trade-date value to UTC milliseconds for ascending date sorting.
+ *
+ * @param value - The trade-date value to parse
+ * @returns The UTC timestamp, or `Number.MAX_SAFE_INTEGER` for invalid values
  */
 export function parseTradeDateAsc(value: string | number | null | undefined): number {
   return _toTimestamp(value, Number.MAX_SAFE_INTEGER);
@@ -286,10 +343,10 @@ export function parseTradeDate(value: string | number | null | undefined): numbe
 }
 
 /**
- * Format as a short locale-aware label ("Aug 15" in en-US, "15 באוג׳" in he-IL).
- * Ideal for in-row tables (insider trades, earnings events) where the year
- * is redundant. Returns null on invalid input so callers render their own
- * placeholder ("Recent", "—", etc.).
+ * Formats a valid trade date as a locale-aware short month-and-day label.
+ *
+ * @param value - The trade date to format.
+ * @returns The localized month-and-day label, or `null` for an invalid date.
  */
 export function formatTradeDateShort(value: string | number | null | undefined): string | null {
   const ms = parseTradeDate(value);

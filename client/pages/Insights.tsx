@@ -17,7 +17,12 @@ const TABS: { id: InsightsTabId; i18nKey: string }[] = [
   { id: "leisure", i18nKey: "insights.tabs.leisure" },
 ];
 
-/** Format marketCap as a human-readable string. null/undefined → em-dash. */
+/**
+ * Formats a market capitalization value using a compact human-readable unit.
+ *
+ * @param mc - The market capitalization value to format
+ * @returns A formatted market capitalization string, or an em dash when the value is missing or not finite
+ */
 function formatMarketCap(mc: number | undefined): string {
   if (mc === undefined || mc === null || !Number.isFinite(mc)) return "—";
   if (mc >= 1e12) return `$${(mc / 1e12).toFixed(2)}T`;
@@ -26,6 +31,11 @@ function formatMarketCap(mc: number | undefined): string {
   return `$${mc.toLocaleString()}`;
 }
 
+/**
+ * Displays searchable market insights with tabbed stock universes and live quote data.
+ *
+ * @returns The rendered insights page.
+ */
 export default function Insights() {
   const { t } = useTranslation();
   const navigate = useNavigate();

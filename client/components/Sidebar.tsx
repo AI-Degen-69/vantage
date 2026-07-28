@@ -31,6 +31,9 @@ const navItems = [
   },
 ];
 
+/**
+ * Renders the application sidebar navigation and language switcher.
+ */
 export default function Sidebar() {
   const location = useLocation();
   const { t } = useTranslation();

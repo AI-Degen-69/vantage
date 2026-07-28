@@ -1,6 +1,9 @@
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 
+/**
+ * Renders a language switcher for English and Hebrew.
+ */
 export default function LanguageSwitcher() {
   const { i18n } = useTranslation();
   const currentLang = i18n.resolvedLanguage || 'en';

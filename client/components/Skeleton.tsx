@@ -10,9 +10,7 @@ interface SkeletonProps {
 }
 
 /**
- * Lightweight placeholder block.
- * Uses the `shimmer` keyframe registered in tailwind.config.ts so we don't
- * rely on the arbitrary-value form.
+ * Renders an animated placeholder block for loading states.
  */
 export function Skeleton({ className, rounded = "rounded-md", style }: SkeletonProps) {
   return (
@@ -44,7 +42,9 @@ export function MetricCardSkeleton() {
   );
 }
 
-/** Header block skeleton (price + meta row). */
+/**
+ * Renders a skeleton placeholder for a header price and its metadata row.
+ */
 export function HeaderPriceSkeleton() {
   return (
     <div className="flex flex-col items-center gap-3 mb-3">
@@ -57,7 +57,11 @@ export function HeaderPriceSkeleton() {
   );
 }
 
-/** Generic section card skeleton (used for CompanyProfile's right column). */
+/**
+ * Renders a section card placeholder with a configurable content block height.
+ *
+ * @param height - The height of the card's main placeholder block in pixels.
+ */
 export function SectionCardSkeleton({ height = 200 }: { height?: number }) {
   return (
     <div className="bg-card border border-border rounded-xl p-6 space-y-4">

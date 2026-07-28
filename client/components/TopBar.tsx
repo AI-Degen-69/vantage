@@ -4,10 +4,23 @@ import { useEffect, useState } from "react";
 import { useIndexQuotes } from "@/hooks/useStockData";
 import type { IndexQuote } from "@shared/api";
 
+/**
+ * Provides the styling classes for an index quote pill container.
+ *
+ * @returns The Tailwind CSS classes used to style the pill container.
+ */
 function pillClassName() {
   return "flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/50";
 }
 
+/**
+ * Renders a market index pill with its label, percentage change, and data status.
+ *
+ * @param label - The index name displayed in the pill.
+ * @param quote - The current index quote, when available.
+ * @param loading - Whether the quote data is still loading.
+ * @param language - The interface language used for accessibility labeling.
+ */
 function Pill({
   label,
   quote,
@@ -49,6 +62,11 @@ function Pill({
   );
 }
 
+/**
+ * Displays how recently market data was fetched.
+ *
+ * @param updatedAt - The timestamp of the most recent data update, or `null` when unavailable
+ */
 function Freshness({ updatedAt }: { updatedAt: number | null }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -74,6 +92,9 @@ function Freshness({ updatedAt }: { updatedAt: number | null }) {
   );
 }
 
+/**
+ * Renders the application header with navigation context, market index summaries, and data freshness.
+ */
 export default function TopBar() {
   const { t } = useTranslation();
   const location = useLocation();

@@ -1,6 +1,9 @@
 import { useTranslation } from "react-i18next";
 import Portfolio from "@/components/Portfolio";
 
+/**
+ * Renders the portfolios page with a translated heading and portfolio content.
+ */
 export default function Portfolios() {
   const { t } = useTranslation();
 

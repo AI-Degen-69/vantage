@@ -108,14 +108,10 @@ export interface Portfolio {
 // Demo cashflow synthesizer
 // ---------------------------------------------------------------------------
 /**
- * Build a 12-month trailing cashflow series for a portfolio:
- *  - 12 monthly buys (negative) summing to ~ -currentValue * 0.95.
- *  - A positive terminal cashflow at "today" representing the unrealized exit
- *    (= currentValue + cumulative gainLoss), so the IRR equation has a real
- *    root on the bracket (-0.99, 1.0).
- *  - 4 quarterly dividend payments (positive) summing to `annualIncome`.
+ * Generates a synthetic 12-month portfolio cashflow series for IRR calculations.
  *
- * Pre-condition: currentValue > 0. The math is rounded to 2dp.
+ * @param asOf - The date used for the terminal cashflow and trailing-period dates.
+ * @returns Cashflows containing monthly investments, quarterly dividends, and the current portfolio value, sorted by date.
  */
 function synthesizeCashflows(
   currentValue: number,

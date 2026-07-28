@@ -75,7 +75,10 @@ if (process.env.FIX_PNPM_SKIP === "1") process.exit(0);
 // 1. Compute every plausible %LocalAppData%\pnpm path. We can't trust
 //    LOCALAPPDATA to be set, so we compute it three independent ways and
 //    filter to the ones existsSync() agrees actually exist.
-// ---------------------------------------------------------------------------
+/**
+ * Lists plausible local pnpm installation directories on Windows.
+ * @returns {string[]} Unique candidate pnpm root paths.
+ */
 function localPnpmRoots() {
   const roots = new Set();
   const profile = process.env.USERPROFILE || homedir() || (process.env.HOME ?? "");
@@ -96,7 +99,11 @@ function localPnpmRoots() {
 //    A healthy install gets left alone — we don't want to silently nuke
 //    a working pnpm by relying on Corepack, which is brittle on Windows
 //    non-admin shells.
-// ---------------------------------------------------------------------------
+/**
+ * Detect whether a local pnpm installation contains signs of a broken executable.
+ * @param {string} localRoot - The local pnpm installation directory to inspect.
+ * @return {boolean} `true` if a broken-install marker or undersized pnpm executable is found, `false` otherwise.
+ */
 function rootLooksBroken(localRoot) {
   const globalRoot = join(localRoot, "global");
   if (!existsSync(globalRoot)) return false;
@@ -126,7 +133,11 @@ function rootLooksBroken(localRoot) {
 // 3. Rename any Local\pnpm directory that LOOKS BROKEN →
 //    AppData\Local\pnpm.disabled-<utc-stamp>. Idempotent: a missing dir
 //    or a non-broken dir is treated as "no action needed".
-// ---------------------------------------------------------------------------
+/**
+ * Quarantines detected broken pnpm installation directories by renaming them.
+ * @param {string} stamp - Suffix used to identify each quarantined directory.
+ * @returns {{quarantined: string[], skipped: string[]}} The renamed directories and directories that were skipped.
+ */
 function quarantineAll(stamp) {
   const quarantined = [];
   const skipped = [];
@@ -150,7 +161,10 @@ function quarantineAll(stamp) {
 
 // ---------------------------------------------------------------------------
 // 3. probe pnpm with `pnpm --version`.
-// ---------------------------------------------------------------------------
+/**
+ * Checks whether pnpm is available and reports its version.
+ * @returns {{ok: true, version: string}|{ok: false, reason: string}} The detected pnpm version or the reason the check failed.
+ */
 function probePnpm() {
   try {
     const out = execSync("pnpm --version", {
@@ -170,7 +184,10 @@ function probePnpm() {
 
 // ---------------------------------------------------------------------------
 // 4. read the project's pinned pnpm major.minor.patch from package.json.
-// ---------------------------------------------------------------------------
+/**
+ * Determines the pnpm version specified by the project's package manager configuration.
+ * @returns {string} The configured pnpm version, or `10.14.0` when it is unavailable or invalid.
+ */
 function pinnedPnpmVersion() {
   try {
     const pkg = JSON.parse(readFileSync("package.json", "utf8"));
@@ -186,7 +203,12 @@ function pinnedPnpmVersion() {
 // 5a. try Corepack. On Windows non-admin shells the global enable writes
 //     shims into C:\Program Files\nodejs and hits EPERM. We capture
 //     stdout/stderr so the operator can see exactly what failed.
-// ---------------------------------------------------------------------------
+/**
+ * Executes a Corepack command and forwards its output to the current process.
+ * @param {string[]} args - Arguments to pass to Corepack.
+ * @return {import("child_process").SpawnSyncReturns<string>} The completed process result.
+ * @throws {Error} If Corepack cannot be invoked or exits with a non-zero status.
+ */
 function runCorepack(args) {
   const r = spawnSync("corepack", args, {
     stdio: ["ignore", "pipe", "pipe"],
@@ -205,7 +227,10 @@ function runCorepack(args) {
 // ---------------------------------------------------------------------------
 // 5b. fall back to `npm i -g pnpm@<pinned>`. Writes to the user's npm
 //     prefix (Roaming\npm on Windows by default) — known writable here.
-// ---------------------------------------------------------------------------
+/**
+ * Installs the specified pnpm version globally with npm.
+ * @param {string} version - The pnpm version to install.
+ */
 function npmInstallGlobalPnpm(version) {
   log(`Falling back to: npm i -g pnpm@${version}`);
   const r = spawnSync("npm", ["i", "-g", `pnpm@${version}`], {
@@ -231,6 +256,9 @@ try {
   fail(`unexpected error: ${e?.stack ?? e?.message ?? e}`);
 }
 
+/**
+ * Repairs a broken Windows pnpm installation and activates the project's pinned pnpm version.
+ */
 async function main() {
 const initial = probePnpm();
 const stamp = new Date().toISOString().replace(/[:.]/g, "-");

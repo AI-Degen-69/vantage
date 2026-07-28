@@ -14,6 +14,12 @@ const WINDOW_SIZE: Record<SmaWindow, number> = {
   "200day": 200,
 };
 
+/**
+ * Renders a watchlist dashboard showing each symbol's distance from the selected simple moving average window.
+ *
+ * @remarks
+ * Displays live, partial, or fallback values and provides a selector for SMA windows from 20 to 200 days.
+ */
 export default function DipFinder() {
   const { t } = useTranslation();
   const [smaWindow, setSmaWindow] = useState<SmaWindow>("200day");

@@ -6,6 +6,9 @@ import { useBatchQuotes, useEarningsCalendar } from "@/hooks/useStockData";
 import { formatTradeDateShort } from "@/lib/finance";
 import { useMemo } from "react";
 
+/**
+ * Displays the watchlist with current prices, daily changes, upcoming earnings, and related news.
+ */
 export default function Watchlists() {
   const { t, i18n } = useTranslation();
 

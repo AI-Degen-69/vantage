@@ -27,6 +27,14 @@ const CURRENCY_OPTIONS: { value: Currency; symbol: string; labelKey: string }[] 
   { value: "GBP", symbol: "\u00A3", labelKey: "common.gbp" },
 ];
 
+/**
+ * Formats a numeric value as currency for display.
+ *
+ * @param value - The amount to format.
+ * @param currency - The currency in which to display the amount.
+ * @param compact - Whether to omit decimal places.
+ * @returns The formatted currency value, or `—` when the value is unavailable or invalid.
+ */
 function fmtMoney(value: number | null | undefined, currency: Currency, compact = false): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "\u2014";
   const fractionDigits = compact ? 0 : 2;
@@ -45,12 +53,24 @@ function fmtMoney(value: number | null | undefined, currency: Currency, compact 
   }
 }
 
+/**
+ * Formats a numeric ratio as a percentage string.
+ *
+ * @param value - The ratio to format.
+ * @param digits - The number of decimal places to display.
+ * @returns The formatted percentage, or `—` when `value` is unavailable or not finite.
+ */
 function fmtPct(value: number | null | undefined, digits = 2): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "\u2014";
   return `${(value * 100).toFixed(digits)}%`;
 }
 
-/** Close→close series for `useMultiChart` results. */
+/**
+ * Extracts valid positive closing prices from historical chart data.
+ *
+ * @param chart - Chart data containing historical closing prices.
+ * @returns An array of finite closing prices greater than zero.
+ */
 function historicalCloses(chart: { historical?: { close: number }[] } | null | undefined): number[] {
   if (!chart || !chart.historical) return [];
   return chart.historical
@@ -58,6 +78,11 @@ function historicalCloses(chart: { historical?: { close: number }[] } | null | u
     .filter((n) => Number.isFinite(n) && n > 0);
 }
 
+/**
+ * Displays portfolio holdings, performance metrics, currency-converted values, and upcoming earnings events.
+ *
+ * @returns The rendered portfolio dashboard
+ */
 export default function Portfolio() {
   const { t } = useTranslation();
   const [selectedPortfolioId, setSelectedPortfolioId] = useState(portfolios[0].id);

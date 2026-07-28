@@ -20,6 +20,11 @@ import {
   handleFxRates,
 } from "./routes/stock-data";
 
+/**
+ * Creates and configures the Express application with middleware and API routes.
+ *
+ * @returns The configured Express application
+ */
 export function createServer() {
   const app = express();
 

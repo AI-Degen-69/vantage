@@ -4,6 +4,11 @@ import DCFWidget from "@/components/DCFWidget";
 import { SectionCardSkeleton } from "@/components/Skeleton";
 import { useStockQuote } from "@/hooks/useStockData";
 
+/**
+ * Displays a discounted cash flow valuation chart for the selected stock ticker.
+ *
+ * @returns The charts page with a loading placeholder or valuation widget.
+ */
 export default function Charts() {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();

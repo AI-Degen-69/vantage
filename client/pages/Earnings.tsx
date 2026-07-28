@@ -5,11 +5,21 @@ import EarningsCalendar from "@/components/EarningsCalendar";
 
 type MarketCapFilter = "all" | "large" | "mid" | "small";
 
+/**
+ * Formats a date as an ISO calendar date.
+ *
+ * @param date - The date to format
+ * @returns The date in `YYYY-MM-DD` format
+ */
 function formatISO(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-/** Monday-of-this-week and Friday-of-this-week as YYYY-MM-DD strings. */
+/**
+ * Determines the Monday-to-Friday date range for the current week.
+ *
+ * @returns An object containing the Monday date in `from` and Friday date in `to`, formatted as `YYYY-MM-DD`.
+ */
 function currentWeekRange(): { from: string; to: string } {
   const today = new Date();
   const day = today.getDay(); // 0=Sun..6=Sat
@@ -22,7 +32,14 @@ function currentWeekRange(): { from: string; to: string } {
   return { from: formatISO(monday), to: formatISO(friday) };
 }
 
-/** Shift the {from,to} range by N weeks (positive = future, negative = past). */
+/**
+ * Shifts a date range by a specified number of weeks.
+ *
+ * @param from - The range start date in ISO date format
+ * @param to - The range end date in ISO date format
+ * @param weeks - The number of weeks to shift; positive values move forward and negative values move backward
+ * @returns The shifted date range in ISO date format
+ */
 function shiftRange(from: string, to: string, weeks: number): { from: string; to: string } {
   const f = new Date(from);
   const t = new Date(to);
@@ -31,6 +48,13 @@ function shiftRange(from: string, to: string, weeks: number): { from: string; to
   return { from: formatISO(f), to: formatISO(t) };
 }
 
+/**
+ * Formats a date range using abbreviated month names and numeric days.
+ *
+ * @param from - The range's start date
+ * @param to - The range's end date
+ * @returns The formatted date range
+ */
 function formatHumanRange(from: string, to: string): string {
   const f = new Date(from);
   const t = new Date(to);
@@ -39,6 +63,11 @@ function formatHumanRange(from: string, to: string): string {
   return `${fmt(f)} – ${fmt(t)}`;
 }
 
+/**
+ * Renders the earnings calendar with week navigation and filtering controls.
+ *
+ * @returns The earnings calendar page.
+ */
 export default function EarningsPage() {
   const { t } = useTranslation();
   const initial = useMemo(() => currentWeekRange(), []);

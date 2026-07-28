@@ -140,7 +140,9 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
 // ----------------------------------------------------------------------------
 // App
-// ----------------------------------------------------------------------------
+/**
+ * Configures shared application providers and renders the application's routes.
+ */
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>

@@ -27,6 +27,14 @@ interface ChartModalProps {
 
 type TimeframeType = "1Y" | "3Y" | "5Y";
 
+/**
+ * Displays a modal containing a selectable timeframe chart and optional growth metrics for a financial metric.
+ *
+ * @param metric - The financial metric whose data and growth values are displayed.
+ * @param isOpen - Whether the modal is visible.
+ * @param onClose - Callback invoked when the modal is closed.
+ * @param ticker - The company ticker used for the logo and modal header.
+ */
 export default function ChartModal({ metric, isOpen, onClose, ticker = "AAPL" }: ChartModalProps) {
   const { t } = useTranslation();
   const [timeframe, setTimeframe] = useState<TimeframeType>("1Y");

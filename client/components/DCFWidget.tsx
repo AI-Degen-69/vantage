@@ -7,6 +7,11 @@ interface DCFWidgetProps {
   currentPrice: number;
 }
 
+/**
+ * Renders an interactive five-year earnings projection and valuation widget.
+ *
+ * @param currentPrice - The current price used to calculate the forward return.
+ */
 export default function DCFWidget({ currentPrice = 150.0 }: DCFWidgetProps) {
   const { t } = useTranslation();
   const [mode, setMode] = useState<"earnings" | "cashFlow">("earnings");

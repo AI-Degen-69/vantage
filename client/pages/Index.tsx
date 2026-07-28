@@ -9,6 +9,9 @@ import { HeaderPriceSkeleton, MetricCardSkeleton } from "@/components/Skeleton";
 import { financialMetrics, FinancialMetric } from "@/lib/mockData";
 import { useStockQuote, useStockProfile, useStockFinancials } from "@/hooks/useStockData";
 
+/**
+ * Displays a localized stock overview with quote information, company details, financial metrics, and interactive charts for the selected ticker.
+ */
 export default function Index() {
   const { t } = useTranslation();
   const { ticker: urlTicker } = useParams<{ ticker?: string }>();

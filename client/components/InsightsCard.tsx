@@ -13,6 +13,15 @@ interface InsightsCardProps {
   metricId: string; // Refers to the financialMetric name to pull historical data
 }
 
+/**
+ * Displays a financial metric card with its current value, trend badge, sparkline, and detailed chart modal.
+ *
+ * @param title - The metric title displayed on the card
+ * @param value - The current metric value displayed on the card
+ * @param badgeText - Optional text displayed alongside the metric value
+ * @param badgeType - The badge style indicating a positive, negative, or neutral trend
+ * @param metricId - Identifies the metric whose historical data is displayed
+ */
 export default function InsightsCard({ title, value, badgeText, badgeType = "neutral", metricId }: InsightsCardProps) {
   const { t } = useTranslation();
   const [isModalOpen, setIsModalOpen] = useState(false);

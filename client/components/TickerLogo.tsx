@@ -19,16 +19,13 @@ const sizeMap: Record<LogoSize, { box: string; text: string; rounded: string }> 
 };
 
 /**
- * Renders a ticker logo with a graceful initials fallback.
+ * Displays a ticker logo with initials as a fallback while the logo image loads.
  *
- * Behavior:
- *  1. Renders an initials pill immediately so SSR / first paint is never blank.
- *  2. Loads the logo.dev image (via /api/company-logo proxy) in the background.
- *  3. If the image loads (`onLoad`), the initials pill is replaced.
- *  4. If the image fails (`onError`), the initials pill stays.
- *
- * Replaces the prior pattern of `<img src=… onError={hide}>` which left a blank
- * box on missing logos (see Issue C8).
+ * @param ticker - The ticker symbol used to derive initials and request the logo.
+ * @param size - The logo tile size.
+ * @param variant - The visual style variant.
+ * @param className - Additional CSS classes for the logo tile.
+ * @param ariaLabel - Accessible label for the logo tile.
  */
 export default function TickerLogo({
   ticker,

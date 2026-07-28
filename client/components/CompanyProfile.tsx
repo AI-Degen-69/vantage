@@ -17,6 +17,12 @@ import { formatTradeDateLocale, parseTradeDateMs } from "@/lib/finance";
 import { BarChart, Bar, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { SectionCardSkeleton } from "@/components/Skeleton";
 
+/**
+ * Renders a company profile and insights page for a stock ticker.
+ *
+ * @param ticker - The stock ticker to display; defaults to `AAPL`.
+ * @returns The company profile page, loading skeleton, or mock-backed profile content.
+ */
 export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string }) {
   const { t } = useTranslation();
 
@@ -450,6 +456,13 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
   );
 }
 
+/**
+ * Renders a labeled key-value display block.
+ *
+ * @param label - The text displayed above the value
+ * @param value - The value to display
+ * @param accentClass - Optional CSS classes applied to the value
+ */
 function KV({
   label,
   value,
@@ -495,7 +508,13 @@ function Chip({
   );
 }
 
-/** Boolean flag chip — no value, just the colored badge. */
+/**
+ * Renders a colored badge for a boolean-style label, optionally including a value.
+ *
+ * @param label - The badge label
+ * @param tone - The badge color theme
+ * @param value - An optional value displayed alongside the label
+ */
 function FlagBadge({
   label,
   tone,
@@ -523,6 +542,9 @@ function FlagBadge({
   );
 }
 
+/**
+ * Renders a shimmering placeholder for a section header.
+ */
 function SkeletonHeader() {
   return (
     <div className="h-7 w-48 bg-slate-800/60 rounded-md relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.4s_infinite] before:bg-gradient-to-r before:from-transparent before:via-slate-700/40 before:to-transparent" />

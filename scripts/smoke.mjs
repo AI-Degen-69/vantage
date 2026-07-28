@@ -5,6 +5,12 @@
 //     ./scripts/smoke.mjs
 import { stockService } from "../server/services/stockService.ts";
 
+/**
+ * Records the outcome of a smoke-test condition and marks the process as failed when it is false.
+ * @param {*} cond - The condition to evaluate.
+ * @param {string} msg - The message describing the check.
+ * @param {*} [ctx] - Optional context to include when the check fails.
+ */
 function assert(cond, msg, ctx) {
   if (cond) {
     console.log(`  ✓ ${msg}`);

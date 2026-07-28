@@ -80,6 +80,13 @@ export const mockEarningsEvents = [
   { ticker: "WDAY", date: "Thu", epsEst: 1.58, revEst: 1.97, time: "After Close", marketCap: 65_000_000_000 },
 ];
 
+/**
+ * Determines whether a market capitalization matches the selected filter.
+ *
+ * @param mc - The market capitalization to evaluate.
+ * @param filter - The market-capacity bucket to apply.
+ * @returns `true` if the market capitalization matches the filter, `false` otherwise.
+ */
 function inMarketCapBucket(mc: number | undefined, filter: MarketCapFilter): boolean {
   if (filter === "all") return true;
   if (mc === undefined) return false; // no marketCap data → only shown under "All"
@@ -89,6 +96,15 @@ function inMarketCapBucket(mc: number | undefined, filter: MarketCapFilter): boo
   return true;
 }
 
+/**
+ * Displays a filtered earnings calendar for a selected date range.
+ *
+ * @param from - Start date of the earnings data range
+ * @param to - End date of the earnings data range
+ * @param marketCap - Market-cap bucket used to filter events
+ * @param watchlistOnly - Whether to show only watchlist events
+ * @returns The rendered earnings calendar
+ */
 export default function EarningsCalendar({ from, to, marketCap, watchlistOnly }: EarningsCalendarProps) {
   const { t } = useTranslation();
 
