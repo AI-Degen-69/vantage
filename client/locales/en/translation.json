@@ -38,6 +38,8 @@
     "news2": "<strong>Apple faces labor concerns in Asia</strong> – Recent reports highlight working conditions at suppliers in the region.",
     "viewMore": "View More",
     "financialMetricsTitle": "Financial Metrics",
+    "metricsUnavailable": "Live financial data unavailable for {{ticker}}. Real fundamentals require a paid market-data plan.",
+    "metricsRetry": "Refresh",
     "latest": "Latest:",
     "bar": "Bar",
     "area": "Area",

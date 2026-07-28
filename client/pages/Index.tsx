@@ -18,9 +18,17 @@ export default function Index() {
 
   const { data: quoteData, isLoading: quoteLoading } = useStockQuote(ticker);
   const { data: overviewData, isLoading: overviewLoading } = useStockProfile(ticker);
-  const { data: financialsData } = useStockFinancials(ticker);
+  // isFetched becomes true once the first query attempt settles (success
+  // OR failure). We need it to distinguish "still loading" from "loaded
+  // with no data" — otherwise the metrics grid shows skeletons forever
+  // when FMP returns null (which happens on the free tier for many tickers).
+  const {
+    data: financialsData,
+    isFetched: financialsFetched,
+    refetch: refetchFinancials,
+  } = useStockFinancials(ticker);
 
-  const { metrics, isMetricsMock } = useMemo(() => {
+  const metrics = useMemo(() => {
     // When no real financials land for the active ticker, do NOT silently
     // surface financialMetrics (which is hardcoded AAPL data) for a
     // non-AAPL ticker. Render empty so the `metrics.length === 0` branch
@@ -121,7 +129,7 @@ export default function Index() {
         },
       ];
     }
-    return { metrics: metricsResult, isMetricsMock: isMock };
+    return metricsResult;
   }, [financialsData]);
 
   // Today vs previous-close delta (NOT a true post-market price — FMP free
@@ -238,18 +246,41 @@ export default function Index() {
           </button>
         </div>
 
-        {/* Charts Grid - 4x2 */}
+        {/* Charts Grid - 4x2 — three render states driven by query fetch status */}
         <h2 className="text-2xl font-semibold text-foreground mb-6">
           {t("index.financialMetricsTitle")}
-          {isMetricsMock && (
-            <span className="text-xs text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded ml-2 align-middle">
-              [MOCK]
-            </span>
-          )}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          {metrics.length === 0 ? (
-            Array.from({ length: 8 }).map((_, i) => <MetricCardSkeleton key={i} />)
+          {/* Cache-key switch (e.g. /stock/AAPL → /stock/MSFT) resets isFetched
+              to false even though we may have stale data on disk; the skeleton
+              flash masks the cache-miss transition so don't add an enabled:
+              guard here without also handling that path. */}
+          {!financialsFetched ? (
+            <>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <MetricCardSkeleton key={i} />
+              ))}
+            </>
+          ) : metrics.length === 0 ? (
+            <div className="col-span-full bg-card border border-border rounded-xl px-6 py-10 text-center">
+              <p className="text-sm text-muted-foreground">
+                {t("index.metricsUnavailable", { ticker })}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  // .catch(() => null) future-proofs against the void-discard
+                  // shape — if anyone later awaits this or chains .then(), the
+                  // pipeline still won't surface an unhandled rejection. The
+                  // FMP free tier frequently returns the same empty array on
+                  // refetch, so this button is honest about a likely no-op.
+                  refetchFinancials().catch(() => null);
+                }}
+                className="mt-4 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+              >
+                {t("index.metricsRetry")}
+              </button>
+            </div>
           ) : (
             metrics.map((metric, idx) => {
               const latestVal = metric.data[metric.data.length - 1]?.value || 0;
