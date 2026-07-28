@@ -1,4 +1,4 @@
-# Project Knowledge — builder-io-qualtrim-design
+# Project Knowledge — builder-io-vantage-design
 
 ## What This Is
 
@@ -130,7 +130,7 @@ The `dev` script is `vite`, which boots the integrated server (see
 
 ## Branch & Working-State Notes
 
-- Working branch: `feature/qualtrim-design` (uncommitted modifications in many
+- Working branch: `feature/vantage-design` (uncommitted modifications in many
   files, plus untracked `docs/`, `server/services/`, and `.freebuff/` —
   ignore those last two; they are tooling artifacts).
 - Recent diffs show FMP integration being wired in across

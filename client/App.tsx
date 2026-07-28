@@ -58,7 +58,7 @@ const SplashPage = () => {
   const navigate = useNavigate();
   return (
     <div className="flex flex-col items-center justify-center h-full max-w-md mx-auto text-center px-4">
-      <h1 className="text-4xl font-bold text-foreground mb-6 tracking-widest">QUALTRIM</h1>
+      <h1 className="text-4xl font-bold text-foreground mb-6 tracking-widest">VANTAGE</h1>
       <p className="text-muted-foreground mb-8 text-lg">
         {t("splash.subtitle", "Your personalized Bloomberg terminal for long-term investors.")}
       </p>
@@ -68,7 +68,7 @@ const SplashPage = () => {
             type="email"
             placeholder={t("splash.email", "Email address")}
             className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg text-foreground focus:outline-none focus:border-blue-500 transition-colors"
-            defaultValue="demo@qualtrim.com"
+            defaultValue="demo@vantage.com"
           />
         </div>
         <div>

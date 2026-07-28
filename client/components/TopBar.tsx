@@ -102,7 +102,7 @@ export default function TopBar() {
       {/* Left section: Wordmark + Breadcrumb */}
       <div className="flex items-center gap-4">
         <Link to="/" className="text-xl font-bold tracking-widest text-white">
-          QUALTRIM
+          VANTAGE
         </Link>
         <div className="h-4 w-[1px] bg-slate-700 mx-2" />
         <span className="text-sm font-medium text-slate-300">
