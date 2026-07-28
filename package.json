@@ -3,7 +3,11 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node scripts/fix-pnpm.mjs || exit 0",
     "dev": "vite",
+    "dev:direct": "node scripts/dev.mjs",
+    "fix:pnpm": "node scripts/fix-pnpm.mjs",
+    "fix:pnpm:restore": "node scripts/restore-pnpm.mjs",
     "build": "npm run build:client && npm run build:server",
     "build:client": "vite build",
     "build:server": "vite build --config vite.config.server.ts",
