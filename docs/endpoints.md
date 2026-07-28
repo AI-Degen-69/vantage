@@ -1,4 +1,4 @@
-# Upstream API Reference — Qualtrim
+# Upstream API Reference — Vantage
 
 Authoritative reference for the endpoints called by `server/services/stockService.ts`.
 Refreshed alongside Phase 0 of the Completion Plan. See `knowledge.md` for the

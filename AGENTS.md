@@ -1,4 +1,4 @@
-# Qualtrim
+# Vantage
 
 A bilingual EN/HE long-term-investor terminal for U.S. equities. Live prices from FMP (with Yahoo Finance fallback), weekly earnings calendar, SMA/dip finder, DCF calculator, FX-aware portfolios, and per-ticker intelligence (insider trading, analyst estimates, news, financials).
 
