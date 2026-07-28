@@ -1,0 +1,413 @@
+# Instincts generated from https://github.com/AI-Degen-69/qualtrim-design
+# Generated: 2026-07-28T17:19:12.027Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: qualtrim-design-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/AI-Degen-69/qualtrim-design
+---
+
+# Qualtrim Design Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: feat, fix, chore
+
+## Evidence
+
+- 3 commits analyzed
+- Detected conventional commit pattern
+- Examples: feat: implement Qualtrim-style bilingual stock analysis UI, fix: translate hardcoded UI text and update mock portfolios
+
+---
+id: qualtrim-design-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/AI-Degen-69/qualtrim-design
+---
+
+# Qualtrim Design Commit Length
+
+## Action
+
+Write moderate-length commit messages (~62 characters)
+
+## Evidence
+
+- Average commit message length: 62 chars
+- Based on 3 commits
+
+---
+id: qualtrim-design-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/AI-Degen-69/qualtrim-design
+---
+
+# Qualtrim Design Naming Files
+
+## Action
+
+Use PascalCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: PascalCase
+
+---
+id: qualtrim-design-import-alias
+trigger: "when importing modules"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/AI-Degen-69/qualtrim-design
+---
+
+# Qualtrim Design Import Alias
+
+## Action
+
+Use path aliases (@/, ~/) instead of relative imports
+
+## Evidence
+
+- Import analysis shows alias pattern
+- Example: import { x } from '@/lib/x'
+
+---
+id: qualtrim-design-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/AI-Degen-69/qualtrim-design
+---
+
+# Qualtrim Design Export Style
+
+## Action
+
+Prefer mixed exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: mixed
+
+---
+id: qualtrim-design-workflow-i18n-update-and-ui-text-translation
+trigger: "when doing i18n update and ui text translation"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/AI-Degen-69/qualtrim-design
+---
+
+# Qualtrim Design Workflow I18n Update And Ui Text Translation
+
+## Action
+
+Follow the i18n-update-and-ui-text-translation workflow:
+1. Identify new or hardcoded UI strings in component and page files.
+2. Update or add keys in translation files (client/locales/en/translation.json, client/locales/he/translation.json).
+3. Refactor UI components/pages to use translation keys instead of hardcoded strings.
+4. Optionally update mock data to reflect new/translated content.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: client/components/*.tsx, client/pages/*.tsx, client/locales/en/translation.json
+
+---
+id: qualtrim-design-workflow-feature-development-with-shared-ui-and-api
+trigger: "when doing feature development with shared ui and api"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/AI-Degen-69/qualtrim-design
+---
+
+# Qualtrim Design Workflow Feature Development With Shared Ui And Api
+
+## Action
+
+Follow the feature-development-with-shared-ui-and-api workflow:
+1. Implement or update UI components and pages.
+2. Update or add shared logic (client/lib, shared/api.ts).
+3. Update or add server routes and services.
+4. Update translation files for new UI text.
+5. Update documentation (e.g., endpoints.md, AGENTS.md).
+6. Update package.json and lockfile if dependencies or project identity change.
+7. Validate with tests and smoke scripts.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: client/components/*.tsx, client/pages/*.tsx, client/lib/*.ts
+
+---
+id: qualtrim-design-instinct-file-naming
+trigger: "When creating a new file for components, classes, or utilities"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: AI-Degen-69/qualtrim-design
+---
+
+# Qualtrim Design Instinct File Naming
+
+## Action
+
+Name files using PascalCase (e.g., MyComponent.tsx)
+
+## Evidence
+
+- Pattern in files: client/components/*.tsx
+- Naming conventions: files = PascalCase
+
+---
+id: qualtrim-design-instinct-function-naming
+trigger: "When defining a new function"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: AI-Degen-69/qualtrim-design
+---
+
+# Qualtrim Design Instinct Function Naming
+
+## Action
+
+Name functions using camelCase
+
+## Evidence
+
+- Naming conventions: functions = camelCase
+
+---
+id: qualtrim-design-instinct-class-naming
+trigger: "When defining a new class"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: AI-Degen-69/qualtrim-design
+---
+
+# Qualtrim Design Instinct Class Naming
+
+## Action
+
+Name classes using PascalCase
+
+## Evidence
+
+- Naming conventions: classes = PascalCase
+
+---
+id: qualtrim-design-instinct-constant-naming
+trigger: "When declaring a constant"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: AI-Degen-69/qualtrim-design
+---
+
+# Qualtrim Design Instinct Constant Naming
+
+## Action
+
+Name constants using SCREAMING_SNAKE_CASE
+
+## Evidence
+
+- Naming conventions: constants = SCREAMING_SNAKE_CASE
+
+---
+id: qualtrim-design-instinct-import-alias
+trigger: "When importing modules"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: AI-Degen-69/qualtrim-design
+---
+
+# Qualtrim Design Instinct Import Alias
+
+## Action
+
+Use alias import style instead of relative paths
+
+## Evidence
+
+- importStyle: alias
+
+---
+id: qualtrim-design-instinct-export-mixed
+trigger: "When exporting modules or functions"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: AI-Degen-69/qualtrim-design
+---
+
+# Qualtrim Design Instinct Export Mixed
+
+## Action
+
+Use a mixed export style (both default and named exports as appropriate)
+
+## Evidence
+
+- exportStyle: mixed
+
+---
+id: qualtrim-design-instinct-error-boundary
+trigger: "When handling errors in UI components"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: AI-Degen-69/qualtrim-design
+---
+
+# Qualtrim Design Instinct Error Boundary
+
+## Action
+
+Use error boundaries for error handling
+
+## Evidence
+
+- errorHandling: error-boundaries = true
+
+---
+id: qualtrim-design-instinct-git-commit-format
+trigger: "When writing a commit message"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: AI-Degen-69/qualtrim-design
+---
+
+# Qualtrim Design Instinct Git Commit Format
+
+## Action
+
+Use conventional commit format with prefixes: feat, fix, chore
+
+## Evidence
+
+- Pattern in commits: feat: implement Qualtrim-style bilingual stock analysis UI
+- fix: translate hardcoded UI text and update mock portfolios
+- chore: rename project to qualtrim-design + ship upstream-layer fixes
+
+---
+id: qualtrim-design-instinct-git-commit-length
+trigger: "When writing a commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: AI-Degen-69/qualtrim-design
+---
+
+# Qualtrim Design Instinct Git Commit Length
+
+## Action
+
+Keep commit message length around 62 characters on average
+
+## Evidence
+
+- commits: averageLength = 62
+
+---
+id: qualtrim-design-instinct-i18n-workflow
+trigger: "When adding new UI text or translating hardcoded UI strings"
+confidence: 0.95
+domain: workflow
+source: repo-analysis
+source_repo: AI-Degen-69/qualtrim-design
+---
+
+# Qualtrim Design Instinct I18n Workflow
+
+## Action
+
+Update translation files and refactor UI to use translation keys
+
+## Evidence
+
+- Workflow: i18n-update-and-ui-text-translation
+- Files: client/components/*.tsx, client/pages/*.tsx, client/locales/en/translation.json, client/locales/he/translation.json
+
+---
+id: qualtrim-design-instinct-feature-workflow
+trigger: "When developing a new feature that affects client, server, or shared logic"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: AI-Degen-69/qualtrim-design
+---
+
+# Qualtrim Design Instinct Feature Workflow
+
+## Action
+
+Coordinate updates across UI, shared logic, server routes/services, translation files, documentation, and package metadata
+
+## Evidence
+
+- Workflow: feature-development-with-shared-ui-and-api
+- Files: client/components/*.tsx, server/routes/*.ts, shared/api.ts, docs/*.md, package.json
+
+---
+id: qualtrim-design-instinct-testing-location
+trigger: "When adding or updating tests"
+confidence: 0.7
+domain: testing
+source: repo-analysis
+source_repo: AI-Degen-69/qualtrim-design
+---
+
+# Qualtrim Design Instinct Testing Location
+
+## Action
+
+Place test files alongside source files (mixed test location)
+
+## Evidence
+
+- architecture: testLocation = mixed
+
+---
+id: qualtrim-design-instinct-testing-validation
+trigger: "When completing a feature or workflow"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: AI-Degen-69/qualtrim-design
+---
+
+# Qualtrim Design Instinct Testing Validation
+
+## Action
+
+Validate changes with tests and smoke scripts (e.g., scripts/smoke.mjs)
+
+## Evidence
+
+- Workflow: feature-development-with-shared-ui-and-api, step: Validate with tests and smoke scripts
+- File: scripts/smoke.mjs
+
