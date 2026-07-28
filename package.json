@@ -6,7 +6,7 @@
     "predev": "node scripts/fix-pnpm.mjs || exit 0",
     "dev": "vite",
     "dev:direct": "node scripts/dev.mjs",
-    "fix:pnpm": "node scripts/fix-pnpm.mjs",
+    "fix:pnpm": "node scripts/fix-pnpm.mjs --apply",
     "fix:pnpm:restore": "node scripts/restore-pnpm.mjs",
     "build": "npm run build:client && npm run build:server",
     "build:client": "vite build",

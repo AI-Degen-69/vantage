@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Maximize2 } from "lucide-react";
 import ChartModal from "./ChartModal";
-import { financialMetrics } from "@/lib/mockData";
+import { FinancialMetric } from "@/lib/mockData";
 import { useTranslation } from "react-i18next";
 import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 
@@ -11,6 +11,7 @@ interface InsightsCardProps {
   badgeText?: string;
   badgeType?: "positive" | "negative" | "neutral";
   metricId: string; // Refers to the financialMetric name to pull historical data
+  metricData: FinancialMetric; // The actual metric data with historical series
 }
 
 /**
@@ -21,11 +22,11 @@ interface InsightsCardProps {
  * @param badgeText - Optional text displayed alongside the metric value
  * @param badgeType - The badge style indicating a positive, negative, or neutral trend
  * @param metricId - Identifies the metric whose historical data is displayed
+ * @param metricData - The metric's historical data for sparkline and chart modal
  */
-export default function InsightsCard({ title, value, badgeText, badgeType = "neutral", metricId }: InsightsCardProps) {
+export default function InsightsCard({ title, value, badgeText, badgeType = "neutral", metricId, metricData }: InsightsCardProps) {
   const { t } = useTranslation();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const metricData = financialMetrics.find((m) => m.name === metricId) || financialMetrics[0];
 
   const getBadgeColor = () => {
     switch (badgeType) {
@@ -35,16 +36,35 @@ export default function InsightsCard({ title, value, badgeText, badgeType = "neu
     }
   };
 
+  const handleOpenModal = () => setIsModalOpen(true);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleOpenModal();
+    }
+  };
+
   // Extract a small sparkline dataset (last 20 items)
   const sparklineData = metricData.data.slice(-20);
 
   return (
     <>
-      <div 
+      <div
         className="bg-card border border-border rounded-xl p-4 flex flex-col hover:border-slate-600 transition-colors cursor-pointer relative group"
-        onClick={() => setIsModalOpen(true)}
+        onClick={handleOpenModal}
+        onKeyDown={handleKeyDown}
+        role="button"
+        tabIndex={0}
       >
-        <button className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-white z-10" aria-label={t("common.edit")}>
+        <button
+          className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-white z-10"
+          aria-label="Expand chart"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleOpenModal();
+          }}
+        >
           <Maximize2 className="h-4 w-4" />
         </button>
 

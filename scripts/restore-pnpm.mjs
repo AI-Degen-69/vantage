@@ -52,10 +52,17 @@ const backups = entries
   .filter((n) => n.startsWith("pnpm.disabled-"))
   .map((n) => ({ name: n, full: join(parent, n) }));
 
-// Sort by mtime (newest first) so we restore the most recent repair.
+// Sort by embedded timestamp (newest first) so we restore the most recent repair.
 backups.sort((a, b) => {
-  try { return statSync(b.full).mtimeMs - statSync(a.full).mtimeMs; }
-  catch { return 0; }
+  // Extract timestamp from pnpm.disabled-<timestamp> or pnpm.disabled-<timestamp>-<N>
+  const extractTimestamp = (name) => {
+    const match = name.match(/^pnpm\.disabled-([^-]+(?:-[^-]+)*?)(?:-\d+)?$/);
+    return match ? match[1] : "";
+  };
+  const tsA = extractTimestamp(a.name);
+  const tsB = extractTimestamp(b.name);
+  // Descending order (newest first)
+  return tsB.localeCompare(tsA);
 });
 
 if (backups.length === 0) {
@@ -70,18 +77,32 @@ if (existsSync(localRoot)) {
   );
 }
 
-const toRestore = restoreAll ? backups : [backups[0]];
-let ok = 0, failCount = 0;
-for (const b of toRestore) {
-  try {
-    renameSync(b.full, localRoot);
-    log(`restored ${b.name} -> ${localRoot}`);
-    ok++;
-  } catch (e) {
-    log(`(could not restore ${b.name}: ${e.message})`);
-    failCount++;
+if (restoreAll) {
+  // In --all mode, only restore the most recent backup to localRoot.
+  // Remaining backups are left in place (they can be manually removed if desired).
+  if (backups.length > 0) {
+    try {
+      renameSync(backups[0].full, localRoot);
+      log(`restored most recent backup: ${backups[0].name} -> ${localRoot}`);
+      if (backups.length > 1) {
+        log(`${backups.length - 1} older backup(s) remain in place:`);
+        for (let i = 1; i < backups.length; i++) {
+          log(`  - ${backups[i].name}`);
+        }
+        log(`(Remove them manually if no longer needed.)`);
+      }
+    } catch (e) {
+      fail(`could not restore ${backups[0].name}: ${e.message}`);
+    }
   }
+  log(`done. Re-run 'node scripts/fix-pnpm.mjs' if you need to repair again.`);
+} else {
+  // Default mode: restore only the most recent backup
+  try {
+    renameSync(backups[0].full, localRoot);
+    log(`restored ${backups[0].name} -> ${localRoot}`);
+  } catch (e) {
+    fail(`could not restore ${backups[0].name}: ${e.message}`);
+  }
+  log(`done. Re-run 'node scripts/fix-pnpm.mjs' if you need to repair again.`);
 }
-
-if (failCount > 0) fail(`${failCount} backup(s) failed to restore`, 1);
-log(`done. ${ok} backup(s) restored. Re-run 'node scripts/fix-pnpm.mjs' if you need to repair again.`);

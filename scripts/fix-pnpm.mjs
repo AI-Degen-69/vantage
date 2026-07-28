@@ -262,18 +262,42 @@ try {
 async function main() {
 const initial = probePnpm();
 const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-const { quarantined, skipped } = quarantineAll(stamp);
+
+// Determine if we should apply the fix or just warn
+const applyFix = process.argv.includes("--apply") || process.env.FIX_PNPM_APPLY === "1";
+
+let quarantined = [];
+let skipped = [];
+
+if (applyFix) {
+  const result = quarantineAll(stamp);
+  quarantined = result.quarantined;
+  skipped = result.skipped;
+} else {
+  // Detection-only mode: check for broken installs but don't mutate
+  for (const dir of localPnpmRoots()) {
+    if (!existsSync(dir)) {
+      skipped.push(dir);
+    } else if (rootLooksBroken(dir)) {
+      warn(`Broken pnpm installation detected at: ${dir}`);
+      warn(`To automatically repair, run: FIX_PNPM_APPLY=1 pnpm fix:pnpm`);
+      warn(`Or run: pnpm fix:pnpm`);
+    } else {
+      skipped.push(dir);
+    }
+  }
+}
 
 // Fast path: pnpm is healthy AND no broken installs found. Exit silently
 // so `predev` adds < 100 ms to a normal `pnpm dev` invocation.
-if (initial.ok && quarantined.length === 0) {
+if (initial.ok && quarantined.length === 0 && !applyFix) {
   // (Quietly. Operators who want a heartbeat can run `pnpm fix:pnpm` directly.)
   return;
 }
 
-if (quarantined.length === 0) {
+if (quarantined.length === 0 && applyFix) {
   log(`No Local\\pnpm directory present (or already quarantined). Paths checked: ${skipped.length}.`);
-} else {
+} else if (quarantined.length > 0) {
   for (const dir of quarantined) log(`Quarantined broken install -> ${dir}`);
 }
 
@@ -282,30 +306,35 @@ if (initial.ok && quarantined.length > 0) {
     `pnpm was reachable (${initial.version}) but a broken Local\\pnpm was hiding ` +
     `on PATH. Quarantined; the next PATH lookup will land on the live copy below.`
   );
-} else {
+} else if (!initial.ok && applyFix) {
   warn(`pnpm not callable: ${initial.reason || "(no output)"}`);
 }
 
-const pinned = pinnedPnpmVersion();
-let corepackWorked = false;
-try {
-  log(`Activating pnpm@${pinned} via Corepack...`);
-  runCorepack(["prepare", `pnpm@${pinned}`, "--activate"]);
-  corepackWorked = true;
-  log(`corepack prepare ok`);
-  // `corepack enable` is the step that EPERMs on Program Files — skip it.
-  // The Corepack-managed shim ends up in the user's npm prefix anyway.
-} catch (e) {
-  warn(`Corepack failed (${e.message}). On Windows non-admin shells this is the usual EPERM on C:\\Program Files\\nodejs. Falling back to npm i -g pnpm@${pinned}.`);
-  npmInstallGlobalPnpm(pinned);
-}
+// Only install/activate pnpm if we actually applied the fix or if pnpm is broken
+if (applyFix || !initial.ok) {
+  const pinned = pinnedPnpmVersion();
+  let corepackWorked = false;
+  try {
+    log(`Activating pnpm@${pinned} via Corepack...`);
+    runCorepack(["prepare", `pnpm@${pinned}`, "--activate"]);
+    corepackWorked = true;
+    log(`corepack prepare ok`);
+    // `corepack enable` is the step that EPERMs on Program Files — skip it.
+    // The Corepack-managed shim ends up in the user's npm prefix anyway.
+  } catch (e) {
+    warn(`Corepack failed (${e.message}). On Windows non-admin shells this is the usual EPERM on C:\\Program Files\\nodejs. Falling back to npm i -g pnpm@${pinned}.`);
+    npmInstallGlobalPnpm(pinned);
+  }
 
-const finalProbe = probePnpm();
-if (!finalProbe.ok) fail(`pnpm still un-callable after repair: ${finalProbe.reason}`);
-const via = corepackWorked ? "Corepack" : "npm i -g";
-log(`pnpm ${finalProbe.version} ready (via ${via}).`);
-log(`Next:  pnpm install             # refresh node_modules if needed`);
-log(`Then:  pnpm dev                 # via package.json predev + vite`);
-log(`Or:    node scripts/dev.mjs     # skip pnpm entirely, vite-direct`);
-log(`Restore: rename the .disabled-${stamp} backup(s) back to "pnpm" if needed.`);
+  const finalProbe = probePnpm();
+  if (!finalProbe.ok) fail(`pnpm still un-callable after repair: ${finalProbe.reason}`);
+  const via = corepackWorked ? "Corepack" : "npm i -g";
+  log(`pnpm ${finalProbe.version} ready (via ${via}).`);
+  log(`Next:  pnpm install             # refresh node_modules if needed`);
+  log(`Then:  pnpm dev                 # via package.json predev + vite`);
+  log(`Or:    node scripts/dev.mjs     # skip pnpm entirely, vite-direct`);
+  if (quarantined.length > 0) {
+    log(`Restore: rename the .disabled-${stamp} backup(s) back to "pnpm" if needed.`);
+  }
+}
 }  // end main()

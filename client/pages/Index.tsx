@@ -41,13 +41,13 @@ export default function Index() {
     const inc = financialsData?.income ?? [];
     const bal = financialsData?.balance ?? [];
     if (inc.length > 0) {
-      const incAsc = [...inc].sort((a, b) => (a.date > b.date ? -1 : 1));
-      const balAsc = [...bal].sort((a, b) => (a.date > b.date ? -1 : 1));
+      const incAsc = [...inc].sort((a, b) => (a.date < b.date ? -1 : 1));
+      const balAsc = [...bal].sort((a, b) => (a.date < b.date ? -1 : 1));
 
       const safeYoy = (arr: typeof inc, key: keyof typeof inc[number]) => {
         if (arr.length < 2) return 0;
-        const current = arr[0][key] as number;
-        const prev = arr[1][key] as number;
+        const prev = arr[arr.length - 2][key] as number;
+        const current = arr[arr.length - 1][key] as number;
         if (!prev) return 0;
         return ((current - prev) / Math.abs(prev)) * 100;
       };
@@ -109,8 +109,8 @@ export default function Index() {
           unit: "B",
           yoy:
             balAsc.length >= 2
-              ? ((balAsc[0].cashAndCashEquivalents - balAsc[1].cashAndCashEquivalents) /
-                  Math.abs(balAsc[1].cashAndCashEquivalents)) *
+              ? ((balAsc[balAsc.length - 1].cashAndCashEquivalents - balAsc[balAsc.length - 2].cashAndCashEquivalents) /
+                  Math.abs(balAsc[balAsc.length - 2].cashAndCashEquivalents)) *
                 100
               : 0,
           data: balAsc.map((d) => ({ date: d.calendarYear, value: d.cashAndCashEquivalents / 1e9 })),
@@ -122,7 +122,7 @@ export default function Index() {
           unit: "B",
           yoy:
             balAsc.length >= 2
-              ? ((balAsc[0].totalAssets - balAsc[1].totalAssets) / Math.abs(balAsc[1].totalAssets)) * 100
+              ? ((balAsc[balAsc.length - 1].totalAssets - balAsc[balAsc.length - 2].totalAssets) / Math.abs(balAsc[balAsc.length - 2].totalAssets)) * 100
               : 0,
           data: balAsc.map((d) => ({ date: d.calendarYear, value: (d.totalAssets ?? 0) / 1e9 })),
           type: "bar",
@@ -294,6 +294,7 @@ export default function Index() {
                   badgeText={`${yoyChange >= 0 ? "+" : ""}${yoyChange.toFixed(2)}%`}
                   badgeType={yoyChange >= 0 ? "positive" : "negative"}
                   metricId={metric.name}
+                  metricData={metric}
                 />
               );
             })

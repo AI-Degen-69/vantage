@@ -104,6 +104,15 @@ export default function Portfolio() {
   const { data: batch, isLoading: quotesLoading } = useBatchQuotes(symbols);
   const quotes = (batch?.quotes ?? []) as (StockQuote | null)[];
 
+  // Build a map from ticker symbol to quote for safe lookup
+  const quoteMap = useMemo(() => {
+    const map = new Map<string, StockQuote | null>();
+    quotes.forEach((q) => {
+      if (q) map.set(q.symbol, q);
+    });
+    return map;
+  }, [quotes]);
+
   // For the dividend overlay we'll surface the next earnings / payday event.
   const { from: today, to: plusEightWeeks } = useMemo(() => {
     const f = new Date();
@@ -149,7 +158,7 @@ export default function Portfolio() {
   // ---- Per-holding analytics --------------------------------------------
   const holdingsData = useMemo(() => {
     return activePortfolio.holdings.map((holding, i) => {
-      const liveQuote = quotes[i];
+      const liveQuote = quoteMap.get(holding.ticker) ?? null;
       const livePrice = liveQuote?.price ?? null;
       const liveChange = liveQuote?.changesPercentage ?? null;
       const chart = chartResults[i]?.data ?? null;
@@ -171,7 +180,7 @@ export default function Portfolio() {
         totalReturn: totalRet,
       };
     });
-  }, [activePortfolio, quotes, chartResults]);
+  }, [activePortfolio, quoteMap, chartResults]);
 
   // Sort the holdings table by the chosen risk metric.
   const sortedHoldings = useMemo(() => {

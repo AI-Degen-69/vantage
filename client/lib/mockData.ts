@@ -120,7 +120,9 @@ function synthesizeCashflows(
   asOf: Date = new Date()
 ): PortfolioCashflow[] {
   const flows: PortfolioCashflow[] = [];
-  const monthlyInvestment = -(currentValue * 0.95) / 12;
+  // Total invested = currentValue - gainLoss (backing out the gain to get original principal)
+  const totalInvested = currentValue - gainLoss;
+  const monthlyInvestment = -totalInvested / 12;
   const quarterlyDividend = annualIncome / 4;
 
   // 12 monthly buys, ordered oldest first
@@ -143,10 +145,12 @@ function synthesizeCashflows(
       amount: Number(quarterlyDividend.toFixed(2)),
     });
   }
-  // Terminal: the closing inflow that establishes the "current portfolio
-  // value at today". This is intentionally NOT (currentValue + gainLoss) so
-  // that derivedGainLoss (= sum of cashflows) is computed honestly from the
-  // data; the implied gain % lines up with the IRR-derived CAGR.
+  // Terminal: the closing inflow that reflects currentValue
+  // Sum of flows will be: -totalInvested + (4 * quarterlyDividend) + currentValue
+  // = -totalInvested + annualIncome + currentValue
+  // = -(currentValue - gainLoss) + annualIncome + currentValue
+  // = gainLoss + annualIncome
+  // This reconciles with the declared gainLoss when annualIncome is accounted for separately.
   flows.push({
     date: asOf.toISOString().slice(0, 10),
     amount: Number(currentValue.toFixed(2)),

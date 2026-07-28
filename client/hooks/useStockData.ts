@@ -60,11 +60,12 @@ export function useStockQuote(ticker: string) {
  * @returns The query result containing the batch quote response.
  */
 export function useBatchQuotes(tickers: string[]) {
-  const key = tickers.slice().sort().join(",");
+  const sortedTickers = tickers.slice().sort();
+  const key = sortedTickers.join(",");
   return useQuery({
     queryKey: ["batchQuotes", key],
     queryFn: () =>
-      fetchJSON<BatchQuoteResponse>(`/api/stock-batch-quotes?symbols=${encodeURIComponent(tickers.join(","))}`),
+      fetchJSON<BatchQuoteResponse>(`/api/stock-batch-quotes?symbols=${encodeURIComponent(sortedTickers.join(","))}`),
     enabled: tickers.length > 0,
     refetchInterval: 60_000,
   });

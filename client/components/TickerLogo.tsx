@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
 export type LogoSize = "sm" | "md" | "lg";
@@ -39,6 +39,11 @@ export default function TickerLogo({
   const upper = ticker.toUpperCase();
   const initials = upper.slice(0, 2);
   const { box, text, rounded } = sizeMap[size];
+
+  useEffect(() => {
+    setImageLoaded(false);
+    setImageFailed(false);
+  }, [ticker]);
 
   const surface =
     variant === "subtle"

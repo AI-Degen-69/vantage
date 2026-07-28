@@ -15,6 +15,8 @@ import type {
   StockQuote,
 } from "@shared/api";
 
+const MAX_SYMBOLS = 50;
+
 export const handleStockQuote: RequestHandler = async (req, res) => {
   const symbol = String(req.query.symbol || "");
   if (!symbol) return res.status(400).json({ error: "symbol parameter required" });
@@ -26,6 +28,9 @@ export const handleBatchQuotes: RequestHandler = async (req, res) => {
   const symbolsRaw = String(req.query.symbols || "");
   if (!symbolsRaw) return res.status(400).json({ error: "symbols parameter required" });
   const symbols = symbolsRaw.split(",").map((s) => s.trim()).filter(Boolean);
+  if (symbols.length > MAX_SYMBOLS) {
+    return res.status(400).json({ error: `Too many symbols requested. Maximum is ${MAX_SYMBOLS}, received ${symbols.length}` });
+  }
   const result: BatchQuoteResponse = await stockService.getBatchQuotes(symbols);
   res.json(result);
 };
@@ -136,6 +141,9 @@ export const handleSmaDistances: RequestHandler = async (req, res) => {
     ? listRaw.map((s) => String(s))
     : String(listRaw).split(",").map((s) => s.trim());
   const symbols = list.filter(Boolean);
+  if (symbols.length > MAX_SYMBOLS) {
+    return res.status(400).json({ error: `Too many symbols requested. Maximum is ${MAX_SYMBOLS}, received ${symbols.length}` });
+  }
   const windowRaw = Number(req.query.window ?? 200);
   const windowSize = Number.isFinite(windowRaw) ? windowRaw : 200;
   const data: SmaDistanceResponse = await stockService.getSmaDistancesFor(symbols, windowSize);
