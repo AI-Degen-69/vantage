@@ -91,11 +91,17 @@ export default function ChartModal({ metric, isOpen, onClose, ticker = "AAPL" }:
         return (
           <ResponsiveContainer width="100%" height={400}>
             <BarChart {...commonProps}>
+              <defs>
+                <linearGradient id={`colorValue-bar-${metric.name}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={chartColor} stopOpacity={0.8}/>
+                  <stop offset="95%" stopColor={chartColor} stopOpacity={0.2}/>
+                </linearGradient>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="date" stroke="#9ca3af" />
               <YAxis stroke="#9ca3af" />
               <Tooltip content={<CustomTooltip />} cursor={false} />
-              <Bar dataKey="value" fill={chartColor} radius={[8, 8, 0, 0]} />
+              <Bar dataKey="value" fill={`url(#colorValue-bar-${metric.name})`} radius={[8, 8, 0, 0]} isAnimationActive={true} animationDuration={1000} />
             </BarChart>
           </ResponsiveContainer>
         );
@@ -103,6 +109,12 @@ export default function ChartModal({ metric, isOpen, onClose, ticker = "AAPL" }:
         return (
           <ResponsiveContainer width="100%" height={400}>
             <AreaChart {...commonProps}>
+              <defs>
+                <linearGradient id={`colorValue-area-${metric.name}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={chartColor} stopOpacity={0.4}/>
+                  <stop offset="95%" stopColor={chartColor} stopOpacity={0.0}/>
+                </linearGradient>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="date" stroke="#9ca3af" />
               <YAxis stroke="#9ca3af" />
@@ -111,8 +123,10 @@ export default function ChartModal({ metric, isOpen, onClose, ticker = "AAPL" }:
                 type="monotone"
                 dataKey="value"
                 stroke={chartColor}
-                fill={chartColor}
-                fillOpacity={0.2}
+                fill={`url(#colorValue-area-${metric.name})`}
+                fillOpacity={1}
+                isAnimationActive={true}
+                animationDuration={1000}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -132,6 +146,8 @@ export default function ChartModal({ metric, isOpen, onClose, ticker = "AAPL" }:
                 stroke={chartColor}
                 dot={false}
                 strokeWidth={2}
+                isAnimationActive={true}
+                animationDuration={1000}
               />
             </LineChart>
           </ResponsiveContainer>

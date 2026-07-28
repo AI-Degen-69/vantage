@@ -77,6 +77,20 @@ export interface PortfolioHolding {
   gainLoss: number;
 }
 
+/**
+ * A signed cashflow point on a portfolio's timeline. Negative = invested,
+ * positive = received (sale + dividends). Date is ISO YYYY-MM-DD.
+ *
+ * `cashflows` is the raw material for IRR — when a real portfolio is wired
+ * in this becomes the user's transaction history; today it's synthesized
+ * from the mockPortfolio/currentValue + mockPortfolio/annualIncome so we
+ * can demo the math end-to-end before any real account data exists.
+ */
+export interface PortfolioCashflow {
+  date: string;
+  amount: number;
+}
+
 export interface Portfolio {
   id: string;
   name: string;
@@ -84,15 +98,67 @@ export interface Portfolio {
   gainLoss: number;
   annualIncome: number;
   dividendYield: number;
+  baseCurrency: "USD";
   holdings: PortfolioHolding[];
+  /** Synthetic 12-month trailing series; used by IRR computation in Portfolio.tsx. */
+  cashflows: PortfolioCashflow[];
 }
 
-export interface WatchlistTicker {
-  symbol: string;
-  name: string;
-  price: number;
-  changePercent: number;
-  sma200Distance: number; // Percentage distance from 200-day SMA
+// ---------------------------------------------------------------------------
+// Demo cashflow synthesizer
+// ---------------------------------------------------------------------------
+/**
+ * Build a 12-month trailing cashflow series for a portfolio:
+ *  - 12 monthly buys (negative) summing to ~ -currentValue * 0.95.
+ *  - A positive terminal cashflow at "today" representing the unrealized exit
+ *    (= currentValue + cumulative gainLoss), so the IRR equation has a real
+ *    root on the bracket (-0.99, 1.0).
+ *  - 4 quarterly dividend payments (positive) summing to `annualIncome`.
+ *
+ * Pre-condition: currentValue > 0. The math is rounded to 2dp.
+ */
+function synthesizeCashflows(
+  currentValue: number,
+  annualIncome: number,
+  gainLoss: number,
+  asOf: Date = new Date()
+): PortfolioCashflow[] {
+  const flows: PortfolioCashflow[] = [];
+  const monthlyInvestment = -(currentValue * 0.95) / 12;
+  const quarterlyDividend = annualIncome / 4;
+
+  // 12 monthly buys, ordered oldest first
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(asOf);
+    d.setMonth(d.getMonth() - i);
+    d.setDate(1);
+    flows.push({
+      date: d.toISOString().slice(0, 10),
+      amount: Number(monthlyInvestment.toFixed(2)),
+    });
+  }
+  // 4 quarterly dividends spread across the same 12-month window
+  for (let q = 0; q < 4; q++) {
+    const d = new Date(asOf);
+    d.setMonth(d.getMonth() - (9 - q * 3));
+    d.setDate(15);
+    flows.push({
+      date: d.toISOString().slice(0, 10),
+      amount: Number(quarterlyDividend.toFixed(2)),
+    });
+  }
+  // Terminal: the closing inflow that establishes the "current portfolio
+  // value at today". This is intentionally NOT (currentValue + gainLoss) so
+  // that derivedGainLoss (= sum of cashflows) is computed honestly from the
+  // data; the implied gain % lines up with the IRR-derived CAGR.
+  flows.push({
+    date: asOf.toISOString().slice(0, 10),
+    amount: Number(currentValue.toFixed(2)),
+  });
+
+  // Sort oldest → newest for IRR's NPV expansion to be well-defined.
+  flows.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  return flows;
 }
 
 // Curated Market Leaders & ETFs Watchlist
@@ -117,12 +183,14 @@ export const mockPortfolio: Portfolio = {
   gainLoss: 154230.50,
   annualIncome: 45200.00,
   dividendYield: 3.6,
+  baseCurrency: "USD",
   holdings: [
     { ticker: "AAPL", weight: 25.4, gainLoss: 45.2 },
     { ticker: "MSFT", weight: 20.1, gainLoss: 32.8 },
     { ticker: "NVDA", weight: 15.5, gainLoss: 125.4 },
     { ticker: "SPY", weight: 39.0, gainLoss: 12.5 },
-  ]
+  ],
+  cashflows: synthesizeCashflows(1250450.00, 45200.00, 154230.50)
 };
 
 export const techHeavyPortfolio: Portfolio = {
@@ -132,6 +200,7 @@ export const techHeavyPortfolio: Portfolio = {
   gainLoss: 890000.50,
   annualIncome: 12500.00,
   dividendYield: 0.36,
+  baseCurrency: "USD",
   holdings: [
     { ticker: "MSFT", weight: 15.0, gainLoss: 85.2 },
     { ticker: "AAPL", weight: 14.5, gainLoss: 65.4 },
@@ -145,7 +214,8 @@ export const techHeavyPortfolio: Portfolio = {
     { ticker: "AVGO", weight: 4.5, gainLoss: 75.2 },
     { ticker: "ORCL", weight: 4.0, gainLoss: 25.6 },
     { ticker: "AMD", weight: 4.5, gainLoss: 40.5 }
-  ]
+  ],
+  cashflows: synthesizeCashflows(3450000.00, 12500.00, 890000.50)
 };
 
 export const dividendKingsPortfolio: Portfolio = {
@@ -155,6 +225,7 @@ export const dividendKingsPortfolio: Portfolio = {
   gainLoss: 45000.00,
   annualIncome: 35600.00,
   dividendYield: 4.18,
+  baseCurrency: "USD",
   holdings: [
     { ticker: "JNJ", weight: 12.5, gainLoss: 15.2 },
     { ticker: "GPC", weight: 10.0, gainLoss: 8.4 },
@@ -168,10 +239,19 @@ export const dividendKingsPortfolio: Portfolio = {
     { ticker: "PG", weight: 7.5, gainLoss: 14.8 },
     { ticker: "MMM", weight: 6.0, gainLoss: -8.5 },
     { ticker: "CL", weight: 6.0, gainLoss: 9.2 }
-  ]
+  ],
+  cashflows: synthesizeCashflows(850200.00, 35600.00, 45000.00)
 };
 
 export const portfolios = [mockPortfolio, techHeavyPortfolio, dividendKingsPortfolio];
+
+export interface WatchlistTicker {
+  symbol: string;
+  name: string;
+  price: number;
+  changePercent: number;
+  sma200Distance: number; // Percentage distance from 200-day SMA
+}
 
 export const mockCompanyProfile: CompanyProfile = {
   ceo: "Tim Cook",

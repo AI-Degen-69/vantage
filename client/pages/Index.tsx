@@ -1,39 +1,146 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
 import ChartModal from "@/components/ChartModal";
 import InsightsCard from "@/components/InsightsCard";
 import CompanyProfile from "@/components/CompanyProfile";
+import TickerLogo from "@/components/TickerLogo";
+import { HeaderPriceSkeleton, MetricCardSkeleton } from "@/components/Skeleton";
 import { financialMetrics, FinancialMetric } from "@/lib/mockData";
-import { useStockQuote, useStockOverview } from "@/hooks/useStockData";
+import { useStockQuote, useStockProfile, useStockFinancials } from "@/hooks/useStockData";
 
 export default function Index() {
   const { t } = useTranslation();
   const { ticker: urlTicker } = useParams<{ ticker?: string }>();
   const [selectedMetric, setSelectedMetric] = useState<FinancialMetric | null>(null);
-  const [expandedStats, setExpandedStats] = useState<{ [key: number]: boolean }>({});
 
-  // Use ticker from URL or default to AAPL
   const ticker = urlTicker?.toUpperCase() || "AAPL";
 
-  // Fetch real stock data from API
-  const { data: quoteData, loading: quoteLoading } = useStockQuote(ticker);
-  const { data: overviewData, loading: overviewLoading } = useStockOverview(ticker);
+  const { data: quoteData, isLoading: quoteLoading } = useStockQuote(ticker);
+  const { data: overviewData, isLoading: overviewLoading } = useStockProfile(ticker);
+  const { data: financialsData } = useStockFinancials(ticker);
 
-  // Removed QuickStats and renderSmallChart functions
+  const { metrics, isMetricsMock } = useMemo(() => {
+    let metricsResult = financialMetrics.slice(0, 8);
+    let isMock = true;
+
+    const inc = financialsData?.income ?? [];
+    const bal = financialsData?.balance ?? [];
+    if (inc.length > 0) {
+      isMock = false;
+      const incAsc = [...inc].sort((a, b) => (a.date > b.date ? -1 : 1));
+      const balAsc = [...bal].sort((a, b) => (a.date > b.date ? -1 : 1));
+
+      const safeYoy = (arr: typeof inc, key: keyof typeof inc[number]) => {
+        if (arr.length < 2) return 0;
+        const current = arr[0][key] as number;
+        const prev = arr[1][key] as number;
+        if (!prev) return 0;
+        return ((current - prev) / Math.abs(prev)) * 100;
+      };
+
+      metricsResult = [
+        {
+          name: "insights.revenue",
+          unit: "B",
+          yoy: safeYoy(incAsc, "revenue"),
+          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.revenue / 1e9 })),
+          type: "bar",
+          color: "blue",
+        },
+        {
+          name: "insights.ebitda",
+          unit: "B",
+          yoy: safeYoy(incAsc, "ebitda"),
+          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.ebitda / 1e9 })),
+          type: "bar",
+          color: "blue",
+        },
+        {
+          name: "insights.grossProfit",
+          unit: "B",
+          yoy: safeYoy(incAsc, "grossProfit"),
+          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.grossProfit / 1e9 })),
+          type: "bar",
+          color: "blue",
+        },
+        {
+          name: "insights.operatingIncome",
+          unit: "B",
+          yoy: safeYoy(incAsc, "operatingIncome"),
+          data: (incAsc.filter((row) => row.operatingIncome !== undefined) as typeof inc).map((d) => ({
+            date: d.calendarYear,
+            value: (d.operatingIncome ?? 0) / 1e9,
+          })),
+          type: "bar",
+          color: "blue",
+        },
+        {
+          name: "insights.netIncome",
+          unit: "B",
+          yoy: safeYoy(incAsc, "netIncome"),
+          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.netIncome / 1e9 })),
+          type: "bar",
+          color: "blue",
+        },
+        {
+          name: "insights.eps",
+          unit: "$",
+          yoy: safeYoy(incAsc, "eps"),
+          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.eps })),
+          type: "line",
+          color: "blue",
+        },
+        {
+          name: "insights.cashAndEquivalents",
+          unit: "B",
+          yoy:
+            balAsc.length >= 2
+              ? ((balAsc[0].cashAndCashEquivalents - balAsc[1].cashAndCashEquivalents) /
+                  Math.abs(balAsc[1].cashAndCashEquivalents)) *
+                100
+              : 0,
+          data: balAsc.map((d) => ({ date: d.calendarYear, value: d.cashAndCashEquivalents / 1e9 })),
+          type: "bar",
+          color: "green",
+        },
+        {
+          name: "insights.totalAssets",
+          unit: "B",
+          yoy:
+            balAsc.length >= 2
+              ? ((balAsc[0].totalAssets - balAsc[1].totalAssets) / Math.abs(balAsc[1].totalAssets)) * 100
+              : 0,
+          data: balAsc.map((d) => ({ date: d.calendarYear, value: (d.totalAssets ?? 0) / 1e9 })),
+          type: "bar",
+          color: "purple",
+        },
+      ];
+    }
+    return { metrics: metricsResult, isMetricsMock: isMock };
+  }, [financialsData]);
+
+  // Today vs previous-close delta (NOT a true post-market price — FMP free
+  // tier doesn't carry after-hours quote). When a paid key/upgrade adds a
+  // dedicated extended-hours field, replace this with that value.
+  // Note: surfacing as "Today vs Prev Close" rather than "After Hours" so the
+  // label matches the math.
+  const todayVsPrevClose = useMemo(() => {
+    if (!quoteData?.price || !quoteData?.previousClose) return null;
+    const delta = quoteData.price - quoteData.previousClose;
+    return {
+      price: quoteData.price,
+      delta,
+      deltaPct: (delta / quoteData.previousClose) * 100,
+    };
+  }, [quoteData]);
+
+  const earningsDate = useMemo(() => {
+    if (!quoteData?.earningsAnnouncement) return null;
+    const d = new Date(quoteData.earningsAnnouncement);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toISOString().slice(0, 10);
+  }, [quoteData?.earningsAnnouncement]);
 
   return (
     <div className="w-full bg-background dark">
@@ -41,45 +148,38 @@ export default function Index() {
         {/* Centered Header Section */}
         <div className="mb-12 text-center">
           <div className="flex items-center justify-center gap-4 mb-4">
-            <img
-              src={`/api/company-logo?ticker=${ticker}`}
-              alt={`${ticker} logo`}
-              className="w-12 h-12 rounded-md"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
+            <TickerLogo ticker={ticker} size="md" />
             <div>
               <h1 className="text-3xl font-bold text-foreground">
-                {overviewData ? overviewData["Name"] || ticker : ticker}
+                {overviewData?.companyName || overviewLoading ? ticker : ticker}
               </h1>
-              <p className="text-sm text-muted-foreground">{ticker} | NASDAQ</p>
+              <p className="text-sm text-muted-foreground">
+                {ticker} | {overviewData?.exchange ?? "—"}
+              </p>
             </div>
           </div>
 
           {/* Stock Price */}
           <div className="mb-3">
             {quoteLoading ? (
-              <div className="text-center text-slate-400">{t("index.loadingPrice")}</div>
-            ) : quoteData ? (
+              <HeaderPriceSkeleton />
+            ) : quoteData?.price ? (
               <div className="flex items-baseline justify-center gap-3">
                 <span className="text-5xl font-bold text-foreground" dir="ltr">
-                  ${quoteData.price}
+                  ${quoteData.price.toFixed(2)}
                 </span>
                 <span className="flex items-center gap-1" dir="ltr">
-                  <span className={`text-lg font-semibold ${
-                    typeof quoteData.change === "string"
-                      ? (parseFloat(quoteData.change) >= 0 ? "text-chart-green" : "text-red-400")
-                      : (quoteData.change >= 0 ? "text-chart-green" : "text-red-400")
-                  }`}>
-                    {typeof quoteData.change === "string" ? quoteData.change : quoteData.change}
+                  <span
+                    className={`text-lg font-semibold ${quoteData.change >= 0 ? "text-chart-green" : "text-red-400"}`}
+                  >
+                    {quoteData.change >= 0 ? "+" : ""}
+                    {quoteData.change.toFixed(2)}
                   </span>
-                  <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                    typeof quoteData.changePercent === "string"
-                      ? (parseFloat(quoteData.changePercent) >= 0 ? "bg-chart-green/20 text-chart-green" : "bg-red-400/20 text-red-400")
-                      : (quoteData.changePercent >= 0 ? "bg-chart-green/20 text-chart-green" : "bg-red-400/20 text-red-400")
-                  }`}>
-                    {quoteData.changePercent}%
+                  <span
+                    className={`px-2 py-1 rounded text-xs font-semibold ${quoteData.changesPercentage >= 0 ? "bg-chart-green/20 text-chart-green" : "bg-red-400/20 text-red-400"}`}
+                  >
+                    {quoteData.changesPercentage >= 0 ? "+" : ""}
+                    {quoteData.changesPercentage.toFixed(2)}%
                   </span>
                 </span>
               </div>
@@ -88,10 +188,31 @@ export default function Index() {
             )}
           </div>
 
-          {/* After Hours & Earnings */}
-          <div className="flex justify-center gap-6 text-sm text-muted-foreground">
-            <span>{t("index.afterHours")} <span className="text-red-400" dir="ltr">$308.40</span> <span className="text-red-400" dir="ltr">-$0.42 -0.14%</span></span>
-            <span>{t("index.earnings")} <span className="text-blue-400" dir="ltr">Jul 30, 2024</span></span>
+          {/* Today vs Prev Close — fed by live quote */}
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-muted-foreground">
+            <span>
+              {t("index.change")}{" "}
+              {todayVsPrevClose ? (
+                <span
+                  className={todayVsPrevClose.delta >= 0 ? "text-green-400" : "text-red-400"}
+                  dir="ltr"
+                >
+                  {todayVsPrevClose.delta >= 0 ? "+" : ""}
+                  {todayVsPrevClose.delta.toFixed(2)} ({todayVsPrevClose.delta >= 0 ? "+" : ""}
+                  {todayVsPrevClose.deltaPct.toFixed(2)}%)
+                </span>
+              ) : (
+                <span className="text-slate-500" dir="ltr">—</span>
+              )}
+            </span>
+            <span>
+              {t("index.earnings")}{" "}
+              {earningsDate ? (
+                <span className="text-blue-400" dir="ltr">{earningsDate}</span>
+              ) : (
+                <span className="text-slate-500" dir="ltr">—</span>
+              )}
+            </span>
           </div>
         </div>
 
@@ -108,30 +229,43 @@ export default function Index() {
               <span dangerouslySetInnerHTML={{ __html: t("index.news2") }} />
             </li>
           </ul>
-          <button className="mt-4 text-blue-400 hover:text-blue-300 text-sm font-medium">{t("index.viewMore")}</button>
+          <button className="mt-4 text-blue-400 hover:text-blue-300 text-sm font-medium">
+            {t("index.viewMore")}
+          </button>
         </div>
 
         {/* Charts Grid - 4x2 */}
-        <h2 className="text-2xl font-semibold text-foreground mb-6">{t("index.financialMetricsTitle")}</h2>
+        <h2 className="text-2xl font-semibold text-foreground mb-6">
+          {t("index.financialMetricsTitle")}
+          {isMetricsMock && (
+            <span className="text-xs text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded ml-2 align-middle">
+              [MOCK]
+            </span>
+          )}
+        </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          {financialMetrics.slice(0, 8).map((metric, idx) => {
-            const latestVal = metric.data[metric.data.length - 1].value;
-            const yoyChange = metric.yoy || 0;
-            return (
-              <InsightsCard
-                key={idx}
-                title={t(metric.name)}
-                value={`${latestVal.toFixed(2)}${metric.unit === "$" ? "" : metric.unit}`}
-                badgeText={`${yoyChange >= 0 ? "+" : ""}${yoyChange.toFixed(2)}%`}
-                badgeType={yoyChange >= 0 ? "positive" : "negative"}
-                metricId={metric.name}
-              />
-            );
-          })}
+          {metrics.length === 0 ? (
+            Array.from({ length: 8 }).map((_, i) => <MetricCardSkeleton key={i} />)
+          ) : (
+            metrics.map((metric, idx) => {
+              const latestVal = metric.data[metric.data.length - 1]?.value || 0;
+              const yoyChange = metric.yoy || 0;
+              return (
+                <InsightsCard
+                  key={idx}
+                  title={t(metric.name) === metric.name ? metric.name.split(".")[1] : t(metric.name)}
+                  value={`${latestVal.toFixed(2)}${metric.unit === "$" ? "" : metric.unit}`}
+                  badgeText={`${yoyChange >= 0 ? "+" : ""}${yoyChange.toFixed(2)}%`}
+                  badgeType={yoyChange >= 0 ? "positive" : "negative"}
+                  metricId={metric.name}
+                />
+              );
+            })
+          )}
         </div>
 
         {/* Company Profile Section */}
-        <CompanyProfile />
+        <CompanyProfile ticker={ticker} />
       </div>
 
       {/* Chart Modal */}

@@ -1,25 +1,28 @@
 import { RequestHandler } from "express";
 
-const LOGO_DEV_PUBLIC_KEY = "pk_CyCNK430RpK33Qe6o3xFlw";
+const LOGO_DEV_PUBLIC_KEY = process.env.LOGO_DEV_TOKEN || "";
 
 export const handleCompanyLogo: RequestHandler = async (req, res) => {
   try {
-    const { ticker } = req.query;
-
-    if (!ticker || typeof ticker !== "string") {
-      return res.status(400).json({ error: "ticker parameter required" });
+    const ticker = String(req.query.ticker || "");
+    if (!ticker) return res.status(400).json({ error: "ticker parameter required" });
+    if (!LOGO_DEV_PUBLIC_KEY) {
+      return res.status(503).json({ error: "LOGO_DEV_TOKEN not configured on server" });
     }
 
-    const url = `https://img.logo.dev/ticker/${ticker.toUpperCase()}?token=${LOGO_DEV_PUBLIC_KEY}`;
-
+    const url = `https://img.logo.dev/ticker/${encodeURIComponent(ticker.toUpperCase())}?token=${LOGO_DEV_PUBLIC_KEY}`;
     const response = await fetch(url);
 
     if (!response.ok) {
-      return res.status(response.status).json({ error: "Failed to fetch logo" });
+      // Logo.dev returns 404 for unknown tickers — surface status as 200 + empty body so the
+      // client's <TickerLogo> can fall back to initials without an error.
+      res.setHeader("Content-Type", "application/json");
+      return res.status(200).json({ error: `logo not found: ${response.status}` });
     }
 
     const buffer = await response.arrayBuffer();
-    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Content-Type", response.headers.get("content-type") || "image/png");
+    res.setHeader("Cache-Control", "public, max-age=86400"); // cache logo 24h
     res.send(Buffer.from(buffer));
   } catch (error) {
     console.error("Error fetching company logo:", error);

@@ -114,7 +114,7 @@ export default function DCFWidget({ currentPrice = 150.0 }: DCFWidgetProps) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
           <div className="bg-slate-800/50 rounded-xl p-6 border border-slate-700">
             <p className="text-sm text-slate-400 mb-2">{t("dcf.forward")}</p>
-            <p className={`text-3xl font-bold ${forwardReturn >= 0 ? "text-green-400" : "text-red-400"}`} dir="ltr">
+            <p className={`text-3xl font-bold whitespace-nowrap ${forwardReturn >= 0 ? "text-green-400" : "text-red-400"}`} dir="ltr">
               {forwardReturn >= 0 ? "+" : ""}{forwardReturn.toFixed(2)}%
             </p>
             <p className="text-xs text-slate-500 mt-2">{t("dcf.basedOnCurrentPrice")}{currentPrice}</p>

@@ -1,6 +1,6 @@
-# Fusion Starter
+# Qualtrim
 
-A production-ready full-stack React application template with integrated Express server, featuring React Router 6 SPA mode, TypeScript, Vitest, Zod and modern tooling.
+A bilingual EN/HE long-term-investor terminal for U.S. equities. Live prices from FMP (with Yahoo Finance fallback), weekly earnings calendar, SMA/dip finder, DCF calculator, FX-aware portfolios, and per-ticker intelligence (insider trading, analyst estimates, news, financials).
 
 While the starter comes with a express server, only create endpoint when strictly neccesary, for example to encapsulate logic that must leave in the server, such as private keys handling, or certain DB operations, db...
 

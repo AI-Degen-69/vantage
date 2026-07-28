@@ -2,9 +2,26 @@ import { useTranslation } from "react-i18next";
 import { defaultWatchlist, mockNews } from "@/lib/mockData";
 import DipFinder from "@/components/DipFinder";
 import { Link } from "react-router-dom";
+import { useBatchQuotes } from "@/hooks/useStockData";
+import { useMemo } from "react";
 
 export default function Watchlists() {
   const { t } = useTranslation();
+
+  const symbols = useMemo(() => defaultWatchlist.map(w => w.symbol), []);
+  const { data: batch } = useBatchQuotes(symbols);
+  const quotes = batch?.quotes;
+
+  const watchlistData = useMemo(() => {
+    return defaultWatchlist.map(stock => {
+      const q = (quotes || []).find((q) => q?.symbol === stock.symbol);
+      return {
+        ...stock,
+        price: q ? q.price : stock.price,
+        changePercent: q ? q.changesPercentage : stock.changePercent
+      };
+    });
+  }, [quotes]);
 
   return (
     <div className="w-full bg-background dark min-h-screen p-8">
@@ -14,8 +31,13 @@ export default function Watchlists() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Watchlist - Left 2 columns */}
           <div className="lg:col-span-2 space-y-8">
-            <div className="bg-card border border-border rounded-xl overflow-hidden">
-              <table className="w-full text-sm text-left">
+            <div className="bg-card border border-border rounded-xl overflow-hidden relative">
+              {(!quotes || quotes.length === 0) && (
+                <div className="absolute top-2 right-2 text-xs text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded">
+                  [MOCK]
+                </div>
+              )}
+              <table className="w-full text-sm text-start">
                 <thead className="bg-slate-900/50 text-xs text-muted-foreground uppercase border-b border-border">
                   <tr>
                     <th className="px-6 py-4 font-medium">{t("common.symbol")}</th>
@@ -25,8 +47,8 @@ export default function Watchlists() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {defaultWatchlist.map(stock => (
-                    <tr key={stock.symbol} className="hover:bg-slate-800/30 transition-colors">
+                  {watchlistData.map(stock => (
+                    <tr key={stock.symbol} className="hover:bg-slate-800/30 transition-colors border-b border-border last:border-0">
                       <td className="px-6 py-4 font-bold">
                         <Link to={`/stock/${stock.symbol}`} className="hover:text-blue-400 transition-colors">
                           {stock.symbol}

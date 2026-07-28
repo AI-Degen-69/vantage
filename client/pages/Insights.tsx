@@ -2,55 +2,10 @@ import { useState, useMemo } from "react";
 import { Search, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { useInsightsTab, useBatchQuotes } from "@/hooks/useStockData";
+import type { InsightsTabId, StockQuote } from "@shared/api";
 
-interface Stock {
-  symbol: string;
-  name: string;
-  company: string;
-  price: number;
-  change: number;
-  changePercent: number;
-  marketCap: string;
-}
-
-const sp500Stocks: Stock[] = [
-  { symbol: "NVDA", name: "Nvidia Corp", company: "Nvidia Corp", price: 912.60, change: 24.35, changePercent: 2.74, marketCap: "Market Cap: $2.13T" },
-  { symbol: "AAPL", name: "Apple Inc", company: "Apple Inc.", price: 210.85, change: 8.42, changePercent: 4.16, marketCap: "Market Cap: $3.57T" },
-  { symbol: "MSFT", name: "Microsoft Corp", company: "Microsoft Corp", price: 432.67, change: 12.54, changePercent: 3.00, marketCap: "Market Cap: $3.07T" },
-  { symbol: "AMZN", name: "Amazon.com Inc", company: "Amazon.com Inc.", price: 221.85, change: 11.23, changePercent: 5.33, marketCap: "Market Cap: $2.31T" },
-  { symbol: "GOOGL", name: "Alphabet Inc Class A", company: "Alphabet Inc Class A", price: 388.83, change: 15.42, changePercent: 4.13, marketCap: "Market Cap: $1.28T" },
-  { symbol: "AVGO", name: "Broadcom Inc", company: "Broadcom Inc", price: 421.54, change: 9.87, changePercent: 2.39, marketCap: "Market Cap: $249.6B" },
-  { symbol: "GOOG", name: "Alphabet Inc Class C", company: "Alphabet Inc Class C", price: 384.23, change: 14.56, changePercent: 3.93, marketCap: "Market Cap: $1.23T" },
-  { symbol: "META", name: "Meta Platforms Inc Class A", company: "Meta Platforms Inc Class A", price: 485.34, change: 18.92, changePercent: 4.07, marketCap: "Market Cap: $1.21T" },
-  { symbol: "TSLA", name: "Tesla Inc", company: "Tesla Inc.", price: 440.36, change: -12.45, changePercent: -2.75, marketCap: "Market Cap: $1.53T" },
-  { symbol: "BRKA", name: "Berkshire Hathaway Inc Class B", company: "Berkshire Hathaway Inc Class B", price: 427.92, change: 8.63, changePercent: 2.06, marketCap: "Market Cap: $810.4B" },
-  { symbol: "MU", name: "Micron Technology Inc", company: "Micron Technology Inc", price: 228.41, change: 5.32, changePercent: 2.38, marketCap: "Market Cap: $313.0B" },
-  { symbol: "LLY", name: "Eli Lilly + Co", company: "Eli Lilly + Co", price: 1040.73, change: 32.15, changePercent: 3.18, marketCap: "Market Cap: $989.5B" },
-  { symbol: "JPM", name: "JPMorgan Chase + Co", company: "JPMorgan Chase + Co", price: 299.28, change: 7.45, changePercent: 2.55, marketCap: "Market Cap: $387.0B" },
-  { symbol: "AMD", name: "Advanced Micro Devices", company: "Advanced Micro Devices", price: 195.54, change: -4.23, changePercent: -2.11, marketCap: "Market Cap: $318.0B" },
-  { symbol: "XOM", name: "Exxon Mobil Corp", company: "Exxon Mobil Corp", price: 140.00, change: 2.34, changePercent: 1.70, marketCap: "Market Cap: $613.4B" },
-  { symbol: "INTC", name: "Intel Corp", company: "Intel Corp", price: 121.77, change: -5.23, changePercent: -4.11, marketCap: "Market Cap: $512.0B" },
-  { symbol: "JNJ", name: "Johnson + Johnson", company: "Johnson + Johnson", price: 231.29, change: 3.45, changePercent: 1.51, marketCap: "Market Cap: $554.7T" },
-  { symbol: "V", name: "Visa Inc Class A Shares", company: "Visa Inc Class A Shares", price: 277.41, change: 6.23, changePercent: 2.29, marketCap: "Market Cap: $627.7B" },
-  { symbol: "WMT", name: "Walmart Inc", company: "Walmart Inc", price: 119.34, change: 2.15, changePercent: 1.83, marketCap: "Market Cap: $344.8B" },
-  { symbol: "CSCO", name: "Cisco Systems Inc", company: "Cisco Systems Inc", price: 51.67, change: 0.92, changePercent: 1.80, marketCap: "Market Cap: $217.1B" },
-  { symbol: "CostCo", name: "Costco Wholesale Corp", company: "Costco Wholesale Corp", price: 1003.69, change: 28.45, changePercent: 2.92, marketCap: "Market Cap: $443.2B" },
-  { symbol: "CAT", name: "Caterpillar Inc", company: "Caterpillar Inc", price: 309.92, change: 8.12, changePercent: 2.68, marketCap: "Market Cap: $415.1B" },
-  { symbol: "NFLX", name: "Netflix Inc", company: "Netflix Inc", price: 57.23, change: -3.12, changePercent: -5.17, marketCap: "Market Cap: $267.8B" },
-  { symbol: "CVX", name: "Chevron Corp", company: "Chevron Corp", price: 182.42, change: 1.23, changePercent: 0.68, marketCap: "Market Cap: $363.3B" },
-  { symbol: "UNH", name: "UnitedHealth Group Inc", company: "UnitedHealth Group Inc", price: 384.01, change: 12.45, changePercent: 3.35, marketCap: "Market Cap: $362.7B" },
-  { symbol: "BAC", name: "Bank Of America Corp", company: "Bank Of America Corp", price: 51.10, change: -0.45, changePercent: -0.87, marketCap: "Market Cap: $362.4B" },
-  { symbol: "AMAT", name: "Applied Materials Inc", company: "Applied Materials Inc", price: 446.25, change: 18.34, changePercent: 4.28, marketCap: "Market Cap: $343.5B" },
-  { symbol: "PG", name: "Procter + Gamble Co", company: "Procter + Gamble Co", price: 147.52, change: 3.21, changePercent: 2.23, marketCap: "Market Cap: $343.2B" },
-  { symbol: "ORCL", name: "Oracle Corp", company: "Oracle Corp", price: 190.78, change: 7.15, changePercent: 3.90, marketCap: "Market Cap: $346.6B" },
-  { symbol: "ABBV", name: "AbbVie Inc", company: "AbbVie Inc", price: 215.41, change: 4.23, changePercent: 2.00, marketCap: "Market Cap: $380.5B" },
-  { symbol: "KO", name: "Coca-Cola Co", company: "Coca-Cola Co", price: 81.62, change: 1.84, changePercent: 2.30, marketCap: "Market Cap: $348.2B" },
-  { symbol: "PLTR", name: "Palantir Technologies Inc A", company: "Palantir Technologies Inc A", price: 132.51, change: 4.56, changePercent: 3.56, marketCap: "Market Cap: $321.4B" },
-  { symbol: "HD", name: "Home Depot Inc", company: "Home Depot Inc", price: 217.85, change: 6.23, changePercent: 2.95, marketCap: "Market Cap: $315.5B" },
-  { symbol: "GE", name: "General Electric", company: "General Electric", price: 317.21, change: 8.45, changePercent: 2.73, marketCap: "Market Cap: $314.3B" },
-];
-
-const tabs = [
+const TABS: { id: InsightsTabId; i18nKey: string }[] = [
   { id: "sp500", i18nKey: "insights.tabs.sp500" },
   { id: "trending", i18nKey: "insights.tabs.trending" },
   { id: "growth", i18nKey: "insights.tabs.growth" },
@@ -62,27 +17,65 @@ const tabs = [
   { id: "leisure", i18nKey: "insights.tabs.leisure" },
 ];
 
+/** Format marketCap as a human-readable string. null/undefined → em-dash. */
+function formatMarketCap(mc: number | undefined): string {
+  if (mc === undefined || mc === null || !Number.isFinite(mc)) return "—";
+  if (mc >= 1e12) return `$${(mc / 1e12).toFixed(2)}T`;
+  if (mc >= 1e9) return `$${(mc / 1e9).toFixed(1)}B`;
+  if (mc >= 1e6) return `$${(mc / 1e6).toFixed(1)}M`;
+  return `$${mc.toLocaleString()}`;
+}
+
 export default function Insights() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("sp500");
+  const [activeTab, setActiveTab] = useState<InsightsTabId>("sp500");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const filteredStocks = useMemo(() => {
-    return sp500Stocks.filter(
-      (stock) =>
-        stock.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        stock.name.toLowerCase().includes(searchQuery.toLowerCase())
+  const { data: tabData, isLoading: tabLoading, isFetching: tabFetching } = useInsightsTab(activeTab);
+
+  // Pull live quotes for whatever universe the server returned.
+  const symbols = useMemo(() => tabData?.entries.map((e) => e.symbol) ?? [], [tabData]);
+  const { data: quoteData, isLoading: quotesLoading, isFetching: quotesFetching } = useBatchQuotes(symbols);
+
+  // merge: universe row + matched live quote (by symbol) → UI card model.
+  const merged = useMemo(() => {
+    const bySymbol = new Map<string, StockQuote>();
+    for (const q of quoteData?.quotes ?? []) {
+      if (q && q.symbol) bySymbol.set(q.symbol.toUpperCase(), q);
+    }
+    return (tabData?.entries ?? []).map((entry) => {
+      const live = bySymbol.get(entry.symbol.toUpperCase()) ?? null;
+      return {
+        symbol: entry.symbol,
+        name: entry.name,
+        sector: entry.sector ?? "",
+        price: live?.price,
+        change: live?.change,
+        changePercent: live?.changesPercentage,
+        marketCap: live?.marketCap,
+      };
+    });
+  }, [tabData, quoteData]);
+
+  const filtered = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return merged.filter(
+      (row) => row.symbol.toLowerCase().includes(q) || row.name.toLowerCase().includes(q)
     );
-  }, [searchQuery]);
+  }, [merged, searchQuery]);
+
+  // Card-level [LIVE] / [MOCK] comes from whether ANY quote landed.
+  const liveCount = merged.filter((r) => r.price !== undefined).length;
+  const totalCount = merged.length;
+  const isLive = liveCount === totalCount && totalCount > 0;
+  const isAnyLive = liveCount > 0;
 
   return (
     <div className="w-full bg-background dark min-h-screen">
-      {/* Header Section */}
+      {/* Header */}
       <div className="bg-slate-800/50 border-b border-slate-700 px-8 py-12">
         <h1 className="text-4xl font-bold text-center text-foreground mb-8">{t("insights.title")}</h1>
-
-        {/* Search Bar */}
         <div className="max-w-2xl mx-auto">
           <div className="relative flex items-center bg-slate-700/50 border border-slate-600 rounded-lg overflow-hidden">
             <Search className="w-4 h-4 ms-4 text-slate-400 shrink-0" />
@@ -102,8 +95,8 @@ export default function Insights() {
 
       {/* Tabs */}
       <div className="bg-slate-800/30 border-b border-slate-700 overflow-x-auto">
-        <div className="flex px-8 space-x-1">
-          {tabs.map((tab) => (
+        <div className="flex px-8 space-x-1 items-center">
+          {TABS.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -116,58 +109,101 @@ export default function Insights() {
               {t(tab.i18nKey)}
             </button>
           ))}
-          <button className="px-4 py-3 text-slate-400 hover:text-foreground font-medium text-sm whitespace-nowrap ms-auto">
-            {t("index.more")}
-          </button>
+          <div className="ms-auto flex items-center gap-2 py-2">
+            <span
+              className={`text-[10px] font-medium uppercase tracking-wide px-2 py-1 rounded ${
+                isLive
+                  ? "text-emerald-300 bg-emerald-500/10"
+                  : isAnyLive
+                  ? "text-amber-300 bg-amber-500/10"
+                  : "text-yellow-400 bg-yellow-500/10"
+              }`}
+              title={
+                isLive
+                  ? "All prices live"
+                  : isAnyLive
+                  ? `${liveCount}/${totalCount} prices live`
+                  : "Showing curated names only — no live prices yet"
+              }
+            >
+              {isLive
+                ? t("insights.tabBadgeLive")
+                : isAnyLive
+                ? `${liveCount}/${totalCount} LIVE`
+                : t("insights.tabBadgeMock")}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Stock Grid */}
+      {/* Grid */}
       <div className="px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {filteredStocks.map((stock) => (
-            <div
-              key={stock.symbol}
-              onClick={() => navigate(`/stock/${stock.symbol}`)}
-              className="bg-card rounded-lg p-4 border border-slate-700 hover:border-slate-600 hover:bg-slate-700/30 transition-all cursor-pointer group"
-            >
-              {/* Header with Logo and Price */}
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-slate-700 rounded flex items-center justify-center text-xs font-bold text-foreground group-hover:bg-blue-600 transition-colors">
-                    {stock.symbol.substring(0, 2)}
+        {(tabLoading || quotesLoading) && merged.length === 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div
+                key={i}
+                className="bg-card rounded-lg p-4 border border-slate-700 h-[150px]"
+                aria-label="loading"
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {filtered.map((row) => {
+              const live = row.price !== undefined && Number.isFinite(row.price);
+              const pct = row.changePercent;
+              const cls = pct === undefined ? "text-slate-500" : pct >= 0 ? "text-green-400" : "text-red-400";
+              const sign = pct === undefined || pct < 0 ? "" : "+";
+              return (
+                <div
+                  key={row.symbol}
+                  onClick={() => navigate(`/stock/${row.symbol}`)}
+                  className="bg-card rounded-lg p-4 border border-slate-700 hover:border-slate-600 hover:bg-slate-700/30 transition-all cursor-pointer group"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-slate-700 rounded flex items-center justify-center text-xs font-bold text-foreground group-hover:bg-blue-600 transition-colors">
+                        {row.symbol.substring(0, 2)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{row.symbol}</p>
+                        {row.sector && (
+                          <p className="text-[10px] text-slate-500 uppercase tracking-wide truncate max-w-[120px]">
+                            {row.sector}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right rtl:text-left">
+                      <p className="text-sm font-bold text-foreground" dir="ltr">
+                        {live ? `$${row.price!.toFixed(2)}` : "—"}
+                      </p>
+                      <p className={`text-xs font-semibold ${cls}`} dir="ltr">
+                        {pct === undefined ? "—" : `${sign}${pct.toFixed(2)}%`}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{stock.symbol}</p>
-                  </div>
-                </div>
-                <div className="text-right rtl:text-left">
-                  <p className="text-sm font-bold text-foreground" dir="ltr">${stock.price.toFixed(2)}</p>
-                  <p
-                    className={`text-xs font-semibold ${
-                      stock.changePercent >= 0 ? "text-green-400" : "text-red-400"
-                    }`}
-                    dir="ltr"
-                  >
-                    {stock.changePercent >= 0 ? "+" : ""}
-                    {stock.changePercent.toFixed(2)}%
+                  <p className="text-xs text-slate-400 mb-2 truncate">{row.name}</p>
+                  <p className="text-xs text-slate-500 flex items-center gap-1">
+                    <span>{t("insights.marketCap")}:</span>
+                    <span dir="ltr">{formatMarketCap(row.marketCap)}</span>
                   </p>
                 </div>
-              </div>
+              );
+            })}
+          </div>
+        )}
 
-              {/* Company Info */}
-              <p className="text-xs text-slate-400 mb-2 truncate">{stock.name}</p>
-              <p className="text-xs text-slate-500 flex items-center gap-1">
-                <span>{t("insights.marketCap")}:</span>
-                <span dir="ltr">{stock.marketCap.replace("Market Cap: ", "")}</span>
-              </p>
-            </div>
-          ))}
-        </div>
-
-        {filteredStocks.length === 0 && (
+        {filtered.length === 0 && !tabLoading && (
           <div className="text-center py-12">
             <p className="text-slate-400">{t("insights.noMatch", { query: searchQuery })}</p>
+          </div>
+        )}
+
+        {(tabFetching || quotesFetching) && merged.length > 0 && (
+          <div className="text-center text-xs text-slate-500 mt-4">
+            {t("common.search")}…
           </div>
         )}
       </div>

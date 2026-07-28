@@ -1,49 +1,134 @@
 import { useTranslation } from "react-i18next";
+import { useState, useMemo } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import EarningsCalendar from "@/components/EarningsCalendar";
-import { ChevronLeft, ChevronRight, Filter } from "lucide-react";
 
-export default function Earnings() {
+type MarketCapFilter = "all" | "large" | "mid" | "small";
+
+function formatISO(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+/** Monday-of-this-week and Friday-of-this-week as YYYY-MM-DD strings. */
+function currentWeekRange(): { from: string; to: string } {
+  const today = new Date();
+  const day = today.getDay(); // 0=Sun..6=Sat
+  const diff = today.getDate() - day + (day === 0 ? -6 : 1); // back to Monday
+  const monday = new Date(today);
+  monday.setDate(diff);
+  monday.setHours(0, 0, 0, 0);
+  const friday = new Date(monday);
+  friday.setDate(monday.getDate() + 4);
+  return { from: formatISO(monday), to: formatISO(friday) };
+}
+
+/** Shift the {from,to} range by N weeks (positive = future, negative = past). */
+function shiftRange(from: string, to: string, weeks: number): { from: string; to: string } {
+  const f = new Date(from);
+  const t = new Date(to);
+  f.setDate(f.getDate() + weeks * 7);
+  t.setDate(t.getDate() + weeks * 7);
+  return { from: formatISO(f), to: formatISO(t) };
+}
+
+function formatHumanRange(from: string, to: string): string {
+  const f = new Date(from);
+  const t = new Date(to);
+  const fmt = (d: Date) =>
+    d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return `${fmt(f)} – ${fmt(t)}`;
+}
+
+export default function EarningsPage() {
   const { t } = useTranslation();
+  const initial = useMemo(() => currentWeekRange(), []);
+  const [offset, setOffset] = useState(0); // 0 = this week
+  const [marketCap, setMarketCap] = useState<MarketCapFilter>("all");
+  const [watchlistOnly, setWatchlistOnly] = useState(false);
+
+  const { from, to } = useMemo(
+    () => shiftRange(initial.from, initial.to, offset),
+    [initial.from, initial.to, offset]
+  );
+
+  const isThisWeek = offset === 0;
+  const hasPrev = offset > -8; // up to 8 weeks back
+  const hasNext = offset < 4; // up to 4 weeks forward
 
   return (
     <div className="w-full bg-background dark min-h-screen p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-foreground">{t("sidebar.earnings")}</h1>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
-            {t("earningsCalendar.updateEarnings")}
-          </button>
         </div>
 
-        <div className="flex items-center justify-between bg-slate-900/50 p-4 rounded-xl border border-border">
+        <div className="flex items-center justify-between bg-slate-900/50 p-4 rounded-xl border border-border gap-4 flex-wrap">
           {/* Week Navigation */}
           <div className="flex items-center gap-2">
-            <button className="p-2 hover:bg-slate-800 rounded-md transition-colors text-slate-400">
+            <button
+              disabled={!hasPrev}
+              onClick={() => setOffset((o) => o - 1)}
+              title={t("earningsCalendar.prevWeek")}
+              className="p-2 hover:bg-slate-800 rounded-md transition-colors text-slate-400 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+            >
               <ChevronLeft className="w-5 h-5" />
             </button>
-            <button className="px-4 py-1.5 bg-slate-800 text-sm font-medium rounded-md hover:text-white transition-colors">
+            <button
+              onClick={() => setOffset(0)}
+              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                isThisWeek
+                  ? "bg-blue-600 text-white"
+                  : "bg-slate-800 text-slate-300 hover:text-white"
+              }`}
+            >
               {t("earningsCalendar.today")}
             </button>
-            <button className="p-2 hover:bg-slate-800 rounded-md transition-colors text-slate-400">
+            <button
+              disabled={!hasNext}
+              onClick={() => setOffset((o) => o + 1)}
+              title={t("earningsCalendar.nextWeek")}
+              className="p-2 hover:bg-slate-800 rounded-md transition-colors text-slate-400 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+            >
               <ChevronRight className="w-5 h-5" />
             </button>
-            <span className="ml-4 text-sm font-medium">May 20 - May 24, 2024</span>
+            <span className="ml-4 text-sm font-medium" dir="ltr">
+              {t("earningsCalendar.weekOf", { range: formatHumanRange(from, to) })}
+            </span>
           </div>
 
           {/* Filters */}
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-md text-sm border border-slate-700">
-              <Filter className="w-4 h-4 text-slate-400" />
-              <span>{t("earningsCalendar.marketCap")}</span>
+              <span className="text-slate-400">{t("earningsCalendar.marketCap")}</span>
+              <select
+                value={marketCap}
+                onChange={(e) => setMarketCap(e.target.value as MarketCapFilter)}
+                className="bg-transparent focus:outline-none text-foreground cursor-pointer"
+              >
+                <option value="all">{t("earningsCalendar.marketCapAll")}</option>
+                <option value="large">{t("earningsCalendar.marketCapLarge")}</option>
+                <option value="mid">{t("earningsCalendar.marketCapMid")}</option>
+                <option value="small">{t("earningsCalendar.marketCapSmall")}</option>
+              </select>
             </div>
-            <label className="flex items-center gap-2 text-sm text-slate-300">
-              <input type="checkbox" className="rounded border-slate-700 bg-slate-800 focus:ring-blue-500" />
+            <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={watchlistOnly}
+                onChange={(e) => setWatchlistOnly(e.target.checked)}
+                className="rounded border-slate-700 bg-slate-800 focus:ring-blue-500 cursor-pointer"
+              />
               {t("earningsCalendar.filterByWatchlist")}
             </label>
           </div>
         </div>
 
-        <EarningsCalendar />
+        <EarningsCalendar
+          from={from}
+          to={to}
+          marketCap={marketCap}
+          watchlistOnly={watchlistOnly}
+        />
       </div>
     </div>
   );

@@ -44,7 +44,7 @@ export default function InsightsCard({ title, value, badgeText, badgeType = "neu
           <div className="flex items-end gap-3">
             <span className="text-3xl font-bold text-foreground tracking-tight">{value}</span>
             {badgeText && (
-              <span className={`text-xs font-semibold px-2 py-0.5 rounded border ${getBadgeColor()} mb-1`} dir="ltr">
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded border whitespace-nowrap ${getBadgeColor()} mb-1`} dir="ltr">
                 {badgeText}
               </span>
             )}
@@ -61,7 +61,7 @@ export default function InsightsCard({ title, value, badgeText, badgeType = "neu
                   <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                 </linearGradient>
               </defs>
-              <Area type="monotone" dataKey="value" stroke="#3b82f6" fillOpacity={1} fill={`url(#gradient-${metricId})`} strokeWidth={2} />
+              <Area type="monotone" dataKey="value" stroke="#3b82f6" fillOpacity={1} fill={`url(#gradient-${metricId})`} strokeWidth={2} isAnimationActive={true} animationDuration={1000} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
