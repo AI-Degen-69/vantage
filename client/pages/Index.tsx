@@ -34,12 +34,10 @@ export default function Index() {
     // non-AAPL ticker. Render empty so the `metrics.length === 0` branch
     // below shows MetricCardSkeleton instead.
     let metricsResult: typeof financialMetrics = [];
-    let isMock = true;
 
     const inc = financialsData?.income ?? [];
     const bal = financialsData?.balance ?? [];
     if (inc.length > 0) {
-      isMock = false;
       const incAsc = [...inc].sort((a, b) => (a.date > b.date ? -1 : 1));
       const balAsc = [...bal].sort((a, b) => (a.date > b.date ? -1 : 1));
 
