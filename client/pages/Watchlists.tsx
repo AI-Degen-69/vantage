@@ -3,17 +3,8 @@ import { defaultWatchlist, mockNews } from "@/lib/mockData";
 import DipFinder from "@/components/DipFinder";
 import { Link } from "react-router-dom";
 import { useBatchQuotes, useEarningsCalendar } from "@/hooks/useStockData";
+import { formatTradeDateShort } from "@/lib/finance";
 import { useMemo } from "react";
-
-/** Format an ISO earnings date + FMP "bmo"/"amc" code into a short label. */
-function formatEarningsDate(iso: string, time: string): { dateLabel: string; timeLabel: string } {
-  const d = new Date(iso);
-  const dateLabel = Number.isNaN(d.getTime())
-    ? iso
-    : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-  const timeKey = time === "bmo" ? "earningsCalendar.beforeOpen" : "earningsCalendar.afterClose";
-  return { dateLabel, timeLabel: timeKey };
-}
 
 export default function Watchlists() {
   const { t, i18n } = useTranslation();
@@ -111,7 +102,15 @@ export default function Watchlists() {
                   <p className="text-xs text-muted-foreground">{i18n.language?.startsWith("he") ? "אין אירועים ב-14 ימים הקרובים" : "No upcoming earnings in the next 14 days."}</p>
                 ) : (
                   watchlistEarnings.map((e) => {
-                    const { dateLabel, timeLabel } = formatEarningsDate(e.date, e.time);
+                    // formatTradeDateShort returns the locale-aware "Mon Day"
+                    // label ("Aug 15" in en-US, "15 באוג׳" in he-IL); fall
+                    // back to the raw ISO if upstream handed us something
+                    // the utility can't render. The bmo→beforeOpen /
+                    // amc→afterClose mapping is earnings-specific and stays
+                    // inline.
+                    const dateLabel = formatTradeDateShort(e.date) ?? e.date;
+                    const timeLabel =
+                      e.time === "bmo" ? "earningsCalendar.beforeOpen" : "earningsCalendar.afterClose";
                     const name = defaultWatchlist.find((w) => w.symbol === e.symbol)?.name ?? e.symbol;
                     return (
                       <div
