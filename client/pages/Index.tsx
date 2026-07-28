@@ -21,7 +21,11 @@ export default function Index() {
   const { data: financialsData } = useStockFinancials(ticker);
 
   const { metrics, isMetricsMock } = useMemo(() => {
-    let metricsResult = financialMetrics.slice(0, 8);
+    // When no real financials land for the active ticker, do NOT silently
+    // surface financialMetrics (which is hardcoded AAPL data) for a
+    // non-AAPL ticker. Render empty so the `metrics.length === 0` branch
+    // below shows MetricCardSkeleton instead.
+    let metricsResult: typeof financialMetrics = [];
     let isMock = true;
 
     const inc = financialsData?.income ?? [];
@@ -151,7 +155,7 @@ export default function Index() {
             <TickerLogo ticker={ticker} size="md" />
             <div>
               <h1 className="text-3xl font-bold text-foreground">
-                {overviewData?.companyName || overviewLoading ? ticker : ticker}
+                {overviewData?.companyName ?? ticker}
               </h1>
               <p className="text-sm text-muted-foreground">
                 {ticker} | {overviewData?.exchange ?? "—"}

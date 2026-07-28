@@ -2,15 +2,45 @@ import { useTranslation } from "react-i18next";
 import { defaultWatchlist, mockNews } from "@/lib/mockData";
 import DipFinder from "@/components/DipFinder";
 import { Link } from "react-router-dom";
-import { useBatchQuotes } from "@/hooks/useStockData";
+import { useBatchQuotes, useEarningsCalendar } from "@/hooks/useStockData";
 import { useMemo } from "react";
 
+/** Format an ISO earnings date + FMP "bmo"/"amc" code into a short label. */
+function formatEarningsDate(iso: string, time: string): { dateLabel: string; timeLabel: string } {
+  const d = new Date(iso);
+  const dateLabel = Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const timeKey = time === "bmo" ? "earningsCalendar.beforeOpen" : "earningsCalendar.afterClose";
+  return { dateLabel, timeLabel: timeKey };
+}
+
 export default function Watchlists() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const symbols = useMemo(() => defaultWatchlist.map(w => w.symbol), []);
+
+  // Earliest-today → +14 days covers the next two earnings windows for any
+  // watchlist symbol without spamming the calendar endpoint.
+  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const horizon = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 14);
+    return d.toISOString().slice(0, 10);
+  }, []);
+
   const { data: batch } = useBatchQuotes(symbols);
+  const { data: earnings, isLoading: earningsLoading } = useEarningsCalendar(today, horizon);
   const quotes = batch?.quotes;
+
+  const watchlistEarnings = useMemo(() => {
+    if (!earnings) return [];
+    const symbolSet = new Set(symbols);
+    return earnings
+      .filter((e) => symbolSet.has(e.symbol))
+      .sort((a, b) => (a.date < b.date ? -1 : 1))
+      .slice(0, 5);
+  }, [earnings, symbols]);
 
   const watchlistData = useMemo(() => {
     return defaultWatchlist.map(stock => {
@@ -75,24 +105,34 @@ export default function Watchlists() {
             <div className="bg-card border border-border rounded-xl p-6">
               <h3 className="text-xl font-bold mb-4">{t("dipFinder.upcomingEarnings")}</h3>
               <div className="space-y-4">
-                <div className="flex justify-between items-center border-b border-border pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded bg-slate-800 flex items-center justify-center font-bold text-xs">NVDA</div>
-                    <div>
-                      <p className="font-semibold text-sm">NVIDIA</p>
-                      <p className="text-xs text-muted-foreground">May 22, After Close</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center border-b border-border pb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded bg-slate-800 flex items-center justify-center font-bold text-xs">CRM</div>
-                    <div>
-                      <p className="font-semibold text-sm">Salesforce</p>
-                      <p className="text-xs text-muted-foreground">May 29, After Close</p>
-                    </div>
-                  </div>
-                </div>
+                {earningsLoading ? (
+                  <p className="text-xs text-muted-foreground">…</p>
+                ) : watchlistEarnings.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">{i18n.language?.startsWith("he") ? "אין אירועים ב-14 ימים הקרובים" : "No upcoming earnings in the next 14 days."}</p>
+                ) : (
+                  watchlistEarnings.map((e) => {
+                    const { dateLabel, timeLabel } = formatEarningsDate(e.date, e.time);
+                    const name = defaultWatchlist.find((w) => w.symbol === e.symbol)?.name ?? e.symbol;
+                    return (
+                      <div
+                        key={`${e.symbol}-${e.date}`}
+                        className="flex justify-between items-center border-b border-border pb-3 last:border-0 last:pb-0"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded bg-slate-800 flex items-center justify-center font-bold text-xs">
+                            {e.symbol}
+                          </div>
+                          <div>
+                            <p className="font-semibold text-sm">{name}</p>
+                            <p className="text-xs text-muted-foreground" dir="ltr">
+                              {dateLabel}, {t(timeLabel)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
 
