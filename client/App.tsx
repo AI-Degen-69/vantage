@@ -8,6 +8,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Sidebar from "@/components/Sidebar";
 import Index from "./pages/Index";
 import Insights from "./pages/Insights";
+import EarningsPage from "./pages/Earnings";
+import ChartsPage from "./pages/Charts";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,8 +50,8 @@ export default function App() {
             <Route path="/stock/:ticker" element={<AppLayout><Index /></AppLayout>} />
             <Route path="/insights" element={<AppLayout><Insights /></AppLayout>} />
             <Route path="/watchlists" element={<AppLayout><PlaceholderPage /></AppLayout>} />
-            <Route path="/charts" element={<AppLayout><PlaceholderPage /></AppLayout>} />
-            <Route path="/earnings" element={<AppLayout><PlaceholderPage /></AppLayout>} />
+            <Route path="/charts" element={<AppLayout><ChartsPage /></AppLayout>} />
+            <Route path="/earnings" element={<AppLayout><EarningsPage /></AppLayout>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

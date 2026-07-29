@@ -12,9 +12,8 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from "recharts";
-import { FinancialMetric } from "@/lib/mockData";
+import { FinancialMetric } from "@/hooks/useStockData";
 import { cn } from "@/lib/utils";
 
 interface ChartModalProps {
@@ -224,7 +223,7 @@ export default function ChartModal({ metric, isOpen, onClose, ticker = "AAPL" }:
                 <div key={idx} className="text-center group cursor-help">
                   <p className="text-sm text-muted-foreground mb-1">{item.label}</p>
                   <p className="text-2xl font-semibold text-chart-green">
-                    {item.value ? `${item.value.toFixed(2)}%` : "-"}
+                    {item.value != null ? `${item.value.toFixed(2)}%` : "-"}
                   </p>
                   <div className="mt-2 invisible group-hover:visible text-xs text-muted-foreground bg-card p-2 rounded absolute z-10 w-max border border-border">
                     {item.description}

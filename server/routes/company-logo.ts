@@ -1,7 +1,5 @@
 import { RequestHandler } from "express";
 
-const LOGO_DEV_PUBLIC_KEY = "pk_CyCNK430RpK33Qe6o3xFlw";
-
 export const handleCompanyLogo: RequestHandler = async (req, res) => {
   try {
     const { ticker } = req.query;
@@ -10,7 +8,12 @@ export const handleCompanyLogo: RequestHandler = async (req, res) => {
       return res.status(400).json({ error: "ticker parameter required" });
     }
 
-    const url = `https://img.logo.dev/ticker/${ticker.toUpperCase()}?token=${LOGO_DEV_PUBLIC_KEY}`;
+    const token = process.env.LOGO_DEV_TOKEN;
+    if (!token) {
+      return res.status(503).json({ error: "Logo.dev token not configured (LOGO_DEV_TOKEN)" });
+    }
+
+    const url = `https://img.logo.dev/ticker/${ticker.toUpperCase()}?token=${token}&size=128&format=png`;
 
     const response = await fetch(url);
 
