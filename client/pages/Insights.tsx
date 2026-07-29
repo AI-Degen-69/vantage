@@ -1,5 +1,12 @@
 import { useState, useMemo } from "react";
-import { Search, Settings } from "lucide-react";
+import {
+  Search,
+  Loader2,
+  TrendingUp,
+  TrendingDown,
+  X,
+  ChevronDown,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useInsightsTab, useBatchQuotes } from "@/hooks/useStockData";
@@ -41,6 +48,32 @@ export default function Insights() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<InsightsTabId>("sp500");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedSector, setSelectedSector] = useState<string>("all");
+  const [marketCapRange, setMarketCapRange] = useState<MarketCapRange>("all");
+  const [priceChangeRange, setPriceChangeRange] = useState<PriceChangeRange>("all");
+  const [showSectorDropdown, setShowSectorDropdown] = useState(false);
+
+  const { data, isLoading, isError } = useInsightsStocks(activeTab);
+
+  const stocks: InsightsStock[] = data?.stocks ?? [];
+
+  // Extract unique non-null sectors
+  const sectors = useMemo(() => {
+    const set = new Set<string>();
+    stocks.forEach((s) => {
+      if (s.sector) set.add(s.sector);
+    });
+    return Array.from(set).sort();
+  }, [stocks]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (searchQuery) count++;
+    if (selectedSector !== "all") count++;
+    if (marketCapRange !== "all") count++;
+    if (priceChangeRange !== "all") count++;
+    return count;
+  }, [searchQuery, selectedSector, marketCapRange, priceChangeRange]);
 
   const { data: tabData, isLoading: tabLoading, isFetching: tabFetching } = useInsightsTab(activeTab);
 

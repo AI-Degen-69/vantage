@@ -13,9 +13,8 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
 } from "recharts";
-import { FinancialMetric } from "@/lib/mockData";
+import { FinancialMetric } from "@/hooks/useStockData";
 import { cn } from "@/lib/utils";
 
 interface ChartModalProps {

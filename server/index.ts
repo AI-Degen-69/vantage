@@ -41,6 +41,8 @@ export function createServer() {
 
   app.get("/api/demo", handleDemo);
   app.get("/api/company-logo", handleCompanyLogo);
+
+  // Stock data routes
   app.get("/api/stock-quote", handleStockQuote);
   app.get("/api/stock-batch-quotes", handleBatchQuotes);
   app.get("/api/stock-overview", handleStockOverview);

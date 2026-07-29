@@ -155,6 +155,36 @@ export default function Index() {
     return d.toISOString().slice(0, 10);
   }, [quoteData?.earningsAnnouncement]);
 
+  const quickStats = stockData?.quickStats ?? [];
+  const financialMetrics = stockData?.financialMetrics ?? [];
+  const quote = stockData?.quote;
+  const news = stockData?.news ?? [];
+
+  const formatNewsDate = (datetime: number) => {
+    const diff = Date.now() - datetime * 1000;
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    if (hours < 1) return "Just now";
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d ago`;
+    return new Date(datetime * 1000).toLocaleDateString();
+  };
+
+  const categoryColor: Record<string, string> = {
+    earnings: "text-chart-green bg-chart-green/10 border-chart-green/30",
+    "merger & acquisition": "text-purple-400 bg-purple-400/10 border-purple-400/30",
+    "analyst": "text-blue-400 bg-blue-400/10 border-blue-400/30",
+    "guidance": "text-amber-400 bg-amber-400/10 border-amber-400/30",
+    "general": "text-slate-400 bg-slate-400/10 border-slate-400/30",
+  };
+
+  const getCategoryStyle = (category: string) => {
+    const key = Object.keys(categoryColor).find((k) =>
+      category.toLowerCase().includes(k)
+    );
+    return key ? categoryColor[key] : categoryColor["general"];
+  };
+
   return (
     <div className="w-full bg-background dark">
       <div className="max-w-7xl mx-auto px-4 py-8">

@@ -25,5 +25,12 @@ dist-ssr
 
 .config/
 
+<<<<<<< HEAD
+# Environment variables — never commit API keys
+.env
+.env.local
+.env.*.local
+=======
 # Environment variables
 .env
+>>>>>>> github/main
