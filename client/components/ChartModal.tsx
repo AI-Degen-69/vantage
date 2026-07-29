@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { X, Download } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import {
   LineChart,
   Line,
@@ -25,7 +26,16 @@ interface ChartModalProps {
 
 type TimeframeType = "1Y" | "3Y" | "5Y";
 
+/**
+ * Displays a modal containing a selectable timeframe chart and optional growth metrics for a financial metric.
+ *
+ * @param metric - The financial metric whose data and growth values are displayed.
+ * @param isOpen - Whether the modal is visible.
+ * @param onClose - Callback invoked when the modal is closed.
+ * @param ticker - The company ticker used for the logo and modal header.
+ */
 export default function ChartModal({ metric, isOpen, onClose, ticker = "AAPL" }: ChartModalProps) {
+  const { t } = useTranslation();
   const [timeframe, setTimeframe] = useState<TimeframeType>("1Y");
   const [filteredData, setFilteredData] = useState(metric.data);
 
@@ -63,7 +73,24 @@ export default function ChartModal({ metric, isOpen, onClose, ticker = "AAPL" }:
   const renderChart = () => {
     const commonProps = {
       data: filteredData,
-      margin: { top: 5, right: 30, left: 0, bottom: 5 },
+      margin: { top: 20, right: 30, left: 20, bottom: 20 },
+    };
+
+    const CustomTooltip = ({ active, payload, label }: any) => {
+      if (active && payload && payload.length) {
+        return (
+          <div className="bg-gray-800 border border-gray-700 p-3 rounded-lg text-xs text-white shadow-lg text-left rtl:text-right">
+            <p className="text-gray-400 mb-2" dir="ltr">{label}</p>
+            <p className="font-bold text-lg flex gap-1" style={{ color: chartColor }}>
+              <span>{t(metric.name)}:</span>
+              <span dir="ltr">
+                {payload[0].value.toFixed(2)}{metric.unit}
+              </span>
+            </p>
+          </div>
+        );
+      }
+      return null;
     };
 
     switch (metric.type) {
@@ -71,18 +98,17 @@ export default function ChartModal({ metric, isOpen, onClose, ticker = "AAPL" }:
         return (
           <ResponsiveContainer width="100%" height={400}>
             <BarChart {...commonProps}>
+              <defs>
+                <linearGradient id={`colorValue-bar-${metric.name}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={chartColor} stopOpacity={0.8}/>
+                  <stop offset="95%" stopColor={chartColor} stopOpacity={0.2}/>
+                </linearGradient>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="date" stroke="#9ca3af" />
               <YAxis stroke="#9ca3af" />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#1f2937",
-                  border: "1px solid #374151",
-                  color: "#ffffff",
-                  borderRadius: "8px",
-                }}
-              />
-              <Bar dataKey="value" fill={chartColor} radius={[8, 8, 0, 0]} />
+              <Tooltip content={<CustomTooltip />} cursor={false} />
+              <Bar dataKey="value" fill={`url(#colorValue-bar-${metric.name})`} radius={[8, 8, 0, 0]} isAnimationActive={true} animationDuration={1000} />
             </BarChart>
           </ResponsiveContainer>
         );
@@ -90,23 +116,24 @@ export default function ChartModal({ metric, isOpen, onClose, ticker = "AAPL" }:
         return (
           <ResponsiveContainer width="100%" height={400}>
             <AreaChart {...commonProps}>
+              <defs>
+                <linearGradient id={`colorValue-area-${metric.name}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={chartColor} stopOpacity={0.4}/>
+                  <stop offset="95%" stopColor={chartColor} stopOpacity={0.0}/>
+                </linearGradient>
+              </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="date" stroke="#9ca3af" />
               <YAxis stroke="#9ca3af" />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#1f2937",
-                  border: "1px solid #374151",
-                  color: "#ffffff",
-                  borderRadius: "8px",
-                }}
-              />
+              <Tooltip content={<CustomTooltip />} cursor={false} />
               <Area
                 type="monotone"
                 dataKey="value"
                 stroke={chartColor}
-                fill={chartColor}
-                fillOpacity={0.2}
+                fill={`url(#colorValue-area-${metric.name})`}
+                fillOpacity={1}
+                isAnimationActive={true}
+                animationDuration={1000}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -119,20 +146,15 @@ export default function ChartModal({ metric, isOpen, onClose, ticker = "AAPL" }:
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
               <XAxis dataKey="date" stroke="#9ca3af" />
               <YAxis stroke="#9ca3af" />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#1f2937",
-                  border: "1px solid #374151",
-                  color: "#ffffff",
-                  borderRadius: "8px",
-                }}
-              />
+              <Tooltip content={<CustomTooltip />} cursor={false} />
               <Line
                 type="monotone"
                 dataKey="value"
                 stroke={chartColor}
                 dot={false}
                 strokeWidth={2}
+                isAnimationActive={true}
+                animationDuration={1000}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -157,7 +179,7 @@ export default function ChartModal({ metric, isOpen, onClose, ticker = "AAPL" }:
               }}
             />
             <div>
-              <h2 className="text-xl font-semibold text-foreground">{metric.name}</h2>
+              <h2 className="text-xl font-semibold text-foreground">{t(metric.name)}</h2>
               <p className="text-sm text-muted-foreground">{ticker}</p>
             </div>
           </div>
@@ -192,7 +214,7 @@ export default function ChartModal({ metric, isOpen, onClose, ticker = "AAPL" }:
             className="flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors"
           >
             <Download className="w-4 h-4" />
-            <span>Download</span>
+            <span>{t("chart.download")}</span>
           </button>
         </div>
 
@@ -205,25 +227,25 @@ export default function ChartModal({ metric, isOpen, onClose, ticker = "AAPL" }:
             <div className="grid grid-cols-3 gap-4 p-6">
               {[
                 {
-                  label: "1Y (YoY)",
+                  label: t("chart.yoy1Y"),
                   value: metric.yoy,
-                  description: "Year-over-year growth: absolute change in the most recent 12-month period"
+                  description: t("chart.descYoY")
                 },
                 {
-                  label: "3Y (CAGR)",
+                  label: t("chart.cagr3Y"),
                   value: metric.cagr3Y,
-                  description: "Compound annual growth rate: annualized average growth over 3 years"
+                  description: t("chart.descCagr3Y")
                 },
                 {
-                  label: "5Y (CAGR)",
+                  label: t("chart.cagr5Y"),
                   value: metric.cagr5Y,
-                  description: "Compound annual growth rate: annualized average growth over 5 years"
+                  description: t("chart.descCagr5Y")
                 },
               ].map((item, idx) => (
                 <div key={idx} className="text-center group cursor-help">
                   <p className="text-sm text-muted-foreground mb-1">{item.label}</p>
-                  <p className="text-2xl font-semibold text-chart-green">
-                    {item.value != null ? `${item.value.toFixed(2)}%` : "-"}
+                  <p className="text-2xl font-semibold text-chart-green" dir="ltr">
+                    {item.value ? `${item.value.toFixed(2)}%` : "-"}
                   </p>
                   <div className="mt-2 invisible group-hover:visible text-xs text-muted-foreground bg-card p-2 rounded absolute z-10 w-max border border-border">
                     {item.description}

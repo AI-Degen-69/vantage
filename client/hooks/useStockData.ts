@@ -1,297 +1,268 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueries } from "@tanstack/react-query";
+import type {
+  AnalystTrends,
+  BatchQuoteResponse,
+  ChartSeries,
+  CompanyProfile,
+  EarningsEvent,
+  FinancialStatements,
+  FxCurrency,
+  FxRatesResponse,
+  IndexQuote,
+  InsightsTabId,
+  InsightsTabResponse,
+  InsiderTransaction,
+  NewsItem,
+  SmaDistanceResponse,
+  StockMetrics,
+  StockQuote,
+} from "@shared/api";
 
-// ── Earnings Calendar types ─────────────────────────────────────────────────────
-
-export interface EarningsEvent {
-  date: string;
-  symbol: string;
-  name: string | null;
-  epsActual: number | null;
-  epsEstimate: number | null;
-  revenueActual: number | null;
-  revenueEstimate: number | null;
-  hour: "bmo" | "amc" | "dmh" | "";
-  quarter: number;
-  year: number;
-  marketCap: number | null;
-  exchange: string | null;
-}
-
-
-export interface StockQuote {
-  symbol: string;
-  price: number | null;
-  change: number | null;
-  changePercent: number | null;
-  afterHoursPrice?: number | null;
-  afterHoursChange?: number | null;
-  afterHoursChangePercent?: number | null;
-}
-
-export interface StockTimeSeries {
-  quarters: Array<{ date: string; close: number }>;
-}
-
-export interface QuickStat {
-  label: string;
-  value: string;
-  subtitle?: string;
-  details?: Array<{
-    label: string;
-    value: string;
-  }>;
-}
-
-export interface FinancialMetric {
-  name: string;
-  type: "bar" | "line" | "area";
-  color: string;
-  unit: string;
-  data: Array<{ date: string; value: number }>;
-  yoy?: number | null;
-  cagr3Y?: number | null;
-  cagr5Y?: number | null;
-}
-
-export interface NewsItem {
-  id: number;
-  headline: string;
-  summary: string;
-  source: string;
-  url: string;
-  category: string;
-  datetime: number;
-  related: string;
-  image: string | null;
-}
-
-export interface StockData {
-  symbol: string;
-  name: string | null;
-  exchange: string | null;
-  quote: {
-    price: number | null;
-    change: number | null;
-    changePercent: number | null;
-    afterHoursPrice: number | null;
-    afterHoursChange: number | null;
-    afterHoursChangePercent: number | null;
-  };
-  profile: {
-    sector: string | null;
-    industry: string | null;
-    website: string | null;
-    employees: number | null;
-    description: string | null;
-    ceo: string | null;
-    country: string | null;
-  };
-  priceChange: {
-    ytd: number | null;
-    "1Y": number | null;
-    "3Y": number | null;
-  } | null;
-  quickStats: QuickStat[];
-  financialMetrics: FinancialMetric[];
-  priceHistory: Array<{
-    date: string;
-    open: number;
-    high: number;
-    low: number;
-    close: number;
-    volume: number;
-  }>;
-  analystEstimates: Array<{
-    date: string;
-    estimatedEpsAvg: number | null;
-    estimatedRevenueAvg: number | null;
-    earningsGrowth: number | null;
-  }>;
-  insiderTrades: any[];
-  earnings: any[];
-  ratios: {
-    peTtm: number | null;
-    peNtm: number | null;
-    pegRatio: number | null;
-    priceToBook: number | null;
-    priceToSales: number | null;
-    evToEbitda: number | null;
-    roe: number | null;
-    roa: number | null;
-    profitMargin: number | null;
-    operatingMargin: number | null;
-    grossMargin: number | null;
-    piotroskiScore: number | null;
-    fcfYield: number | null;
-    dividendYield: number | null;
-    payoutRatio: number | null;
-    beta: number | null;
-  };
-  sectorPE: Record<string, number>;
-  news: NewsItem[];
+interface IndexQuotesResponse {
+  dow: IndexQuote | null;
+  sp500: IndexQuote | null;
+  nasdaq: IndexQuote | null;
 }
 
 /**
- * Fetch aggregated stock data (quote, profile, stats, metrics, ratios, etc.)
- * Single endpoint powers the entire stock detail page.
+ * Fetches JSON data from a URL.
+ *
+ * @param url - The URL to request
+ * @param init - Optional request configuration
+ * @returns The parsed response data
+ * @throws An error when the response status indicates failure
  */
-export function useStockData(ticker: string) {
-  return useQuery<StockData>({
-    queryKey: ["stock-data", ticker?.toUpperCase()],
-    queryFn: async () => {
-      const res = await fetch(`/api/stock-data?symbol=${ticker}`);
-      if (!res.ok) throw new Error("Failed to fetch stock data");
-      return res.json();
-    },
-    enabled: !!ticker,
-    staleTime: 5 * 60 * 1000, // 5 min
-    retry: 1,
-  });
+async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, init);
+  if (!res.ok) throw new Error(`Request failed (${res.status}): ${url}`);
+  return res.json() as Promise<T>;
 }
 
 /**
- * Fetch real-time stock quote.
+ * Retrieves the latest quote for a stock ticker.
+ *
+ * @param ticker - The stock ticker symbol
+ * @returns The query result containing the stock quote, or `null` when no quote is available
  */
 export function useStockQuote(ticker: string) {
-  return useQuery<StockQuote>({
-    queryKey: ["stock-quote", ticker?.toUpperCase()],
-    queryFn: async () => {
-      const res = await fetch(`/api/stock-quote?symbol=${ticker}`);
-      if (!res.ok) throw new Error("Unavailable via API");
-      return res.json();
-    },
+  return useQuery({
+    queryKey: ["stockQuote", ticker],
+    queryFn: () => fetchJSON<StockQuote | null>(`/api/stock-quote?symbol=${encodeURIComponent(ticker)}`),
     enabled: !!ticker,
-    staleTime: 60 * 1000, // 1 min
-    retry: 1,
+    refetchInterval: 60_000,
   });
 }
 
 /**
- * Fetch time series (historical price data).
+ * Fetches quotes for multiple stock tickers.
+ *
+ * @param tickers - The stock ticker symbols to fetch.
+ * @returns The query result containing the batch quote response.
  */
-export function useStockTimeSeries(ticker: string) {
-  return useQuery<StockTimeSeries>({
-    queryKey: ["stock-time-series", ticker?.toUpperCase()],
-    queryFn: async () => {
-      const res = await fetch(`/api/stock-time-series?symbol=${ticker}`);
-      if (!res.ok) throw new Error("Unavailable via API");
-      return res.json();
-    },
+export function useBatchQuotes(tickers: string[]) {
+  const sortedTickers = tickers.slice().sort();
+  const key = sortedTickers.join(",");
+  return useQuery({
+    queryKey: ["batchQuotes", key],
+    queryFn: () =>
+      fetchJSON<BatchQuoteResponse>(`/api/stock-batch-quotes?symbols=${encodeURIComponent(sortedTickers.join(","))}`),
+    enabled: tickers.length > 0,
+    refetchInterval: 60_000,
+  });
+}
+
+/**
+ * Fetches the Dow, S&P 500, and Nasdaq index quotes.
+ *
+ * @returns The query result containing the index quotes.
+ */
+export function useIndexQuotes() {
+  return useQuery({
+    queryKey: ["indexQuotes"],
+    queryFn: () => fetchJSON<IndexQuotesResponse>(`/api/index-quotes`),
+    refetchInterval: 5 * 60_000,
+  });
+}
+
+/**
+ * Fetches curated ticker data for an Insights tab.
+ *
+ * @param tab - The Insights tab whose data to retrieve
+ * @returns The query result containing the tab's Insights data
+ */
+export function useInsightsTab(tab: InsightsTabId) {
+  return useQuery({
+    queryKey: ["insightsTab", tab],
+    queryFn: () => fetchJSON<InsightsTabResponse>(`/api/insights-tab?tab=${encodeURIComponent(tab)}`),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/**
+ * Retrieves each symbol's distance from its simple moving average.
+ *
+ * @param symbols - Symbols to include in the response
+ * @param windowSize - Number of periods used to calculate the moving average
+ * @returns The query result containing SMA distance data
+ */
+export function useSmaDistances(symbols: string[], windowSize: number = 200) {
+  const key = symbols.slice().sort().join(",") + `|w=${windowSize}`;
+  return useQuery({
+    queryKey: ["smaDistances", key],
+    queryFn: () =>
+      fetchJSON<SmaDistanceResponse>(
+        `/api/sma-distances?symbols=${encodeURIComponent(symbols.join(","))}&window=${windowSize}`
+      ),
+    enabled: symbols.length > 0,
+    staleTime: 5 * 60_000,
+  });
+}
+
+/**
+ * Retrieves exchange rates for the requested currencies.
+ *
+ * @param currencies - The currencies to include in the exchange-rate response.
+ * @returns The query result containing the requested foreign-exchange rates.
+ */
+export function useFxRates(currencies: FxCurrency[] = ["USD", "ILS", "EUR"]) {
+  const key = currencies.slice().sort().join(",");
+  return useQuery({
+    queryKey: ["fxRates", key],
+    queryFn: () =>
+      fetchJSON<FxRatesResponse>(`/api/fx-rates?currencies=${encodeURIComponent(currencies.join(","))}`),
+    staleTime: 60 * 60_000, // 1h — FX doesn't move intraday
+  });
+}
+
+/**
+ * Retrieves the company profile for a stock ticker.
+ *
+ * @param ticker - The stock ticker symbol.
+ * @returns The company profile, or `null` when no profile is available.
+ */
+export function useStockProfile(ticker: string) {
+  return useQuery({
+    queryKey: ["stockProfile", ticker],
+    queryFn: () => fetchJSON<CompanyProfile | null>(`/api/stock-overview?symbol=${encodeURIComponent(ticker)}`),
     enabled: !!ticker,
-    staleTime: 5 * 60 * 1000, // 5 min
-    retry: 1,
   });
 }
 
+
 /**
- * Fetch company overview.
+ * Fetches financial statements for a stock ticker.
+ *
+ * @param ticker - The stock ticker symbol
+ * @returns The query result containing the stock's financial statements
  */
-export function useStockOverview(ticker: string) {
-  return useQuery<Record<string, any>>({
-    queryKey: ["stock-overview", ticker?.toUpperCase()],
-    queryFn: async () => {
-      const res = await fetch(`/api/stock-overview?symbol=${ticker}`);
-      if (!res.ok) throw new Error("Unavailable via API");
-      return res.json();
-    },
+export function useStockFinancials(ticker: string) {
+  return useQuery({
+    queryKey: ["stockFinancials", ticker],
+    queryFn: () => fetchJSON<FinancialStatements>(`/api/stock-financials?symbol=${encodeURIComponent(ticker)}`),
     enabled: !!ticker,
-    staleTime: 30 * 60 * 1000, // 30 min
-    retry: 1,
-  });
-}
-
-// ── Earnings Calendar hooks ──────────────────────────────────────────────────────
-
-/**
- * Fetch upcoming earnings calendar from Finnhub.
- */
-export function useEarningsCalendar(from?: string, to?: string) {
-  const today = new Date();
-  const defaultFrom = today.toISOString().split("T")[0];
-  const defaultTo = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)
-    .toISOString()
-    .split("T")[0];
-
-  return useQuery<{ from: string; to: string; earnings: EarningsEvent[] }>({
-    queryKey: ["earnings-calendar", from || defaultFrom, to || defaultTo],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (from) params.set("from", from);
-      if (to) params.set("to", to);
-      const res = await fetch(`/api/earnings/calendar?${params.toString()}`);
-      if (!res.ok) throw new Error("Failed to fetch earnings calendar");
-      return res.json();
-    },
-    staleTime: 30 * 60 * 1000, // 30 min (cached server-side too)
-    retry: 1,
-  });
-}
-
-// ── Insights hooks ────────────────────────────────────────────────────────────
-
-export interface InsightsStock {
-  symbol: string;
-  name: string;
-  price: number | null;
-  change: number | null;
-  changePercent: number | null;
-  marketCap: number | null;
-  exchange: string | null;
-  sector: string | null;
-  industry: string | null;
-}
-
-/**
- * Fetch batch stock quotes for an insights universe tab.
- */
-export function useInsightsStocks(tab: string = "sp500") {
-  return useQuery<{ tab: string; stocks: InsightsStock[]; source: string }>({
-    queryKey: ["insights-stocks", tab],
-    queryFn: async () => {
-      const res = await fetch(`/api/insights/stocks?tab=${tab}`);
-      if (!res.ok) throw new Error("Failed to fetch insights stocks");
-      return res.json();
-    },
-    staleTime: 2 * 60 * 1000, // 2 min
-    retry: 1,
   });
 }
 
 /**
- * Fetch chart price history for a given symbol and period.
+ * Retrieves financial metrics, valuation ratios, and investment scores for a stock.
+ *
+ * @param ticker - The stock ticker symbol.
+ * @returns A query result containing the stock metrics data.
  */
-export function useChartHistory(symbol: string, period: string = "1y") {
-  return useQuery<{
-    symbol: string;
-    period: string;
-    dataPoints: number;
-    quote: { price: number | null; change: number | null; changePercent: number | null } | null;
-    history: Array<{ date: string; open: number; high: number; low: number; close: number; volume: number }>;
-  }>({
-    queryKey: ["chart-history", symbol?.toUpperCase(), period],
-    queryFn: async () => {
-      const res = await fetch(`/api/chart-history?symbol=${symbol}&period=${period}`);
-      if (!res.ok) throw new Error("Failed to fetch chart history");
-      return res.json();
-    },
-    enabled: !!symbol,
-    staleTime: 2 * 60 * 1000, // 2 min
-    retry: 1,
+export function useStockMetrics(ticker: string) {
+  return useQuery({
+    queryKey: ["stockMetrics", ticker],
+    queryFn: () => fetchJSON<StockMetrics>(`/api/stock-metrics?symbol=${encodeURIComponent(ticker)}`),
+    enabled: !!ticker,
   });
 }
 
 /**
- * Fetch available universe tabs.
+ * Retrieves analyst trend data for a stock ticker.
+ *
+ * @param ticker - The stock ticker symbol
+ * @returns The query result containing analyst trend data
  */
-export function useInsightsUniverses() {
-  return useQuery<{ tabs: Array<{ id: string; label: string }> }>({
-    queryKey: ["insights-universes"],
-    queryFn: async () => {
-      const res = await fetch(`/api/insights/universes`);
-      if (!res.ok) throw new Error("Failed to fetch universes");
-      return res.json();
-    },
-    staleTime: 60 * 60 * 1000, // 1 hour (static list)
-    retry: 1,
+export function useStockAnalyst(ticker: string) {
+  return useQuery({
+    queryKey: ["stockAnalyst", ticker],
+    queryFn: () => fetchJSON<AnalystTrends>(`/api/stock-analyst?symbol=${encodeURIComponent(ticker)}`),
+    enabled: !!ticker,
   });
 }
+
+/**
+ * Retrieves insider transaction data for a stock ticker.
+ *
+ * @param ticker - The stock ticker symbol
+ * @returns The query result containing insider transactions
+ */
+export function useStockInsider(ticker: string) {
+  return useQuery({
+    queryKey: ["stockInsider", ticker],
+    queryFn: () => fetchJSON<InsiderTransaction[]>(`/api/stock-insider?symbol=${encodeURIComponent(ticker)}`),
+    enabled: !!ticker,
+  });
+}
+
+/**
+ * Retrieves news articles for a stock ticker.
+ *
+ * @param ticker - The stock ticker symbol
+ * @returns The query result containing the stock news articles
+ */
+export function useStockNews(ticker: string) {
+  return useQuery({
+    queryKey: ["stockNews", ticker],
+    queryFn: () => fetchJSON<NewsItem[]>(`/api/stock-news?symbol=${encodeURIComponent(ticker)}`),
+    enabled: !!ticker,
+  });
+}
+
+/**
+ * Retrieves earnings events within a specified date range.
+ *
+ * @param from - The start date of the range
+ * @param to - The end date of the range
+ * @returns The query result containing the earnings events
+ */
+export function useEarningsCalendar(from: string, to: string) {
+  return useQuery({
+    queryKey: ["earningsCalendar", from, to],
+    queryFn: () =>
+      fetchJSON<EarningsEvent[]>(`/api/earnings-calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+    enabled: !!from && !!to,
+  });
+}
+
+/**
+ * Fetches historical chart data for a stock ticker.
+ *
+ * @param ticker - The stock ticker symbol
+ * @returns The chart series, or `null` when no data is available
+ */
+export function useStockChart(ticker: string) {
+  return useQuery({
+    queryKey: ["stockChart", ticker],
+    queryFn: () => fetchJSON<ChartSeries | null>(`/api/stock-chart?symbol=${encodeURIComponent(ticker)}`),
+    enabled: !!ticker,
+  });
+}
+
+/**
+ * Fetches chart data for multiple symbols in parallel.
+ *
+ * @returns Query results in the same order as the input symbols.
+ */
+export function useMultiChart(symbols: string[]) {
+  return useQueries({
+    queries: symbols.map((sym) => ({
+      queryKey: ["stockChart", sym],
+      queryFn: () => fetchJSON<ChartSeries | null>(`/api/stock-chart?symbol=${encodeURIComponent(sym)}`),
+      enabled: !!sym,
+      staleTime: 60 * 60_000, // 1 hr — chart historical is heavy
+    })),
+  });
+}
+
+export type { IndexQuotesResponse };

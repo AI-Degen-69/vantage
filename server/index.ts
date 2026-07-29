@@ -5,16 +5,26 @@ import { handleDemo } from "./routes/demo";
 import { handleCompanyLogo } from "./routes/company-logo";
 import {
   handleStockQuote,
-  handleStockTimeSeries,
+  handleBatchQuotes,
+  handleStockFinancials,
+  handleStockMetrics,
+  handleStockAnalyst,
+  handleStockInsider,
+  handleStockNews,
+  handleEarningsCalendar,
+  handleStockChart,
   handleStockOverview,
-  handleStockData,
-  handleStockInsiderTrades,
-  handleStockEarnings,
+  handleIndexQuotes,
+  handleInsightsTab,
+  handleSmaDistances,
+  handleFxRates,
 } from "./routes/stock-data";
-import { handleInsightsStocks, handleInsightsUniverses } from "./routes/insights";
-import { handleEarningsCalendar } from "./routes/earnings";
-import { handleChartHistory } from "./routes/chart-history";
 
+/**
+ * Creates and configures the Express application with middleware and API routes.
+ *
+ * @returns The configured Express application
+ */
 export function createServer() {
   const app = express();
 
@@ -34,21 +44,19 @@ export function createServer() {
 
   // Stock data routes
   app.get("/api/stock-quote", handleStockQuote);
-  app.get("/api/stock-time-series", handleStockTimeSeries);
+  app.get("/api/stock-batch-quotes", handleBatchQuotes);
   app.get("/api/stock-overview", handleStockOverview);
-  app.get("/api/stock-data", handleStockData);
-  app.get("/api/stock-insider-trades", handleStockInsiderTrades);
-  app.get("/api/stock-earnings", handleStockEarnings);
-
-  // Insights routes
-  app.get("/api/insights/stocks", handleInsightsStocks);
-  app.get("/api/insights/universes", handleInsightsUniverses);
-
-  // Earnings calendar route
-  app.get("/api/earnings/calendar", handleEarningsCalendar);
-
-  // Chart history route
-  app.get("/api/chart-history", handleChartHistory);
+  app.get("/api/stock-financials", handleStockFinancials);
+  app.get("/api/stock-metrics", handleStockMetrics);
+  app.get("/api/stock-analyst", handleStockAnalyst);
+  app.get("/api/stock-insider", handleStockInsider);
+  app.get("/api/stock-news", handleStockNews);
+  app.get("/api/earnings-calendar", handleEarningsCalendar);
+  app.get("/api/stock-chart", handleStockChart);
+  app.get("/api/index-quotes", handleIndexQuotes);
+  app.get("/api/insights-tab", handleInsightsTab);
+  app.get("/api/sma-distances", handleSmaDistances);
+  app.get("/api/fx-rates", handleFxRates);
 
   return app;
 }

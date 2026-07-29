@@ -1,143 +1,159 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+import { useTranslation } from "react-i18next";
 import ChartModal from "@/components/ChartModal";
-import { ChevronDown, Loader2, ExternalLink, Newspaper } from "lucide-react";
-import { useStockData, FinancialMetric } from "@/hooks/useStockData";
+import InsightsCard from "@/components/InsightsCard";
+import CompanyProfile from "@/components/CompanyProfile";
+import TickerLogo from "@/components/TickerLogo";
+import { HeaderPriceSkeleton, MetricCardSkeleton } from "@/components/Skeleton";
+import { financialMetrics, FinancialMetric } from "@/lib/mockData";
+import { useStockQuote, useStockProfile, useStockFinancials } from "@/hooks/useStockData";
 
+/**
+ * Displays a localized stock overview with quote information, company details, financial metrics, and interactive charts for the selected ticker.
+ */
 export default function Index() {
+  const { t } = useTranslation();
   const { ticker: urlTicker } = useParams<{ ticker?: string }>();
   const [selectedMetric, setSelectedMetric] = useState<FinancialMetric | null>(null);
-  const [expandedStats, setExpandedStats] = useState<{ [key: number]: boolean }>({});
 
   const ticker = urlTicker?.toUpperCase() || "AAPL";
 
-  const { data: stockData, isLoading, isError } = useStockData(ticker);
+  const { data: quoteData, isLoading: quoteLoading } = useStockQuote(ticker);
+  const { data: overviewData, isLoading: overviewLoading } = useStockProfile(ticker);
+  // isFetched becomes true once the first query attempt settles (success
+  // OR failure). We need it to distinguish "still loading" from "loaded
+  // with no data" — otherwise the metrics grid shows skeletons forever
+  // when FMP returns null (which happens on the free tier for many tickers).
+  const {
+    data: financialsData,
+    isFetched: financialsFetched,
+    refetch: refetchFinancials,
+  } = useStockFinancials(ticker);
 
-  const colorMap: { [key: string]: string } = {
-    "chart-green": "#00d084",
-    "chart-orange": "#ff9500",
-    "chart-blue": "#3b82f6",
-    "chart-cyan": "#06b6d4",
-    "chart-purple": "#a855f7",
-    "chart-pink": "#ec4899",
-  };
+  const metrics = useMemo(() => {
+    // When no real financials land for the active ticker, do NOT silently
+    // surface financialMetrics (which is hardcoded AAPL data) for a
+    // non-AAPL ticker. Render empty so the `metrics.length === 0` branch
+    // below shows MetricCardSkeleton instead.
+    let metricsResult: typeof financialMetrics = [];
 
-  const toggleStatExpand = (idx: number) => {
-    setExpandedStats((prev) => ({
-      ...prev,
-      [idx]: !prev[idx],
-    }));
-  };
+    const inc = financialsData?.income ?? [];
+    const bal = financialsData?.balance ?? [];
+    if (inc.length > 0) {
+      const incAsc = [...inc].sort((a, b) => (a.date < b.date ? -1 : 1));
+      const balAsc = [...bal].sort((a, b) => (a.date < b.date ? -1 : 1));
 
-  const renderSmallChart = (metric: FinancialMetric) => {
-    const chartColor = colorMap[metric.color] || "#3b82f6";
-    const data = metric.data.slice(-8);
+      const safeYoy = (arr: typeof inc, key: keyof typeof inc[number]) => {
+        if (arr.length < 2) return 0;
+        const prev = arr[arr.length - 2][key] as number;
+        const current = arr[arr.length - 1][key] as number;
+        if (!prev) return 0;
+        return ((current - prev) / Math.abs(prev)) * 100;
+      };
 
-    if (data.length === 0 || data.every((d) => d.value === 0)) {
-      return (
-        <div className="h-[140px] flex items-center justify-center text-muted-foreground text-sm">
-          No data available
-        </div>
-      );
+      metricsResult = [
+        {
+          name: "insights.revenue",
+          unit: "B",
+          yoy: safeYoy(incAsc, "revenue"),
+          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.revenue / 1e9 })),
+          type: "bar",
+          color: "blue",
+        },
+        {
+          name: "insights.ebitda",
+          unit: "B",
+          yoy: safeYoy(incAsc, "ebitda"),
+          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.ebitda / 1e9 })),
+          type: "bar",
+          color: "blue",
+        },
+        {
+          name: "insights.grossProfit",
+          unit: "B",
+          yoy: safeYoy(incAsc, "grossProfit"),
+          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.grossProfit / 1e9 })),
+          type: "bar",
+          color: "blue",
+        },
+        {
+          name: "insights.operatingIncome",
+          unit: "B",
+          yoy: safeYoy(incAsc, "operatingIncome"),
+          data: (incAsc.filter((row) => row.operatingIncome !== undefined) as typeof inc).map((d) => ({
+            date: d.calendarYear,
+            value: (d.operatingIncome ?? 0) / 1e9,
+          })),
+          type: "bar",
+          color: "blue",
+        },
+        {
+          name: "insights.netIncome",
+          unit: "B",
+          yoy: safeYoy(incAsc, "netIncome"),
+          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.netIncome / 1e9 })),
+          type: "bar",
+          color: "blue",
+        },
+        {
+          name: "insights.eps",
+          unit: "$",
+          yoy: safeYoy(incAsc, "eps"),
+          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.eps })),
+          type: "line",
+          color: "blue",
+        },
+        {
+          name: "insights.cashAndEquivalents",
+          unit: "B",
+          yoy:
+            balAsc.length >= 2
+              ? ((balAsc[balAsc.length - 1].cashAndCashEquivalents - balAsc[balAsc.length - 2].cashAndCashEquivalents) /
+                  Math.abs(balAsc[balAsc.length - 2].cashAndCashEquivalents)) *
+                100
+              : 0,
+          data: balAsc.map((d) => ({ date: d.calendarYear, value: d.cashAndCashEquivalents / 1e9 })),
+          type: "bar",
+          color: "green",
+        },
+        {
+          name: "insights.totalAssets",
+          unit: "B",
+          yoy:
+            balAsc.length >= 2
+              ? ((balAsc[balAsc.length - 1].totalAssets - balAsc[balAsc.length - 2].totalAssets) / Math.abs(balAsc[balAsc.length - 2].totalAssets)) * 100
+              : 0,
+          data: balAsc.map((d) => ({ date: d.calendarYear, value: (d.totalAssets ?? 0) / 1e9 })),
+          type: "bar",
+          color: "purple",
+        },
+      ];
     }
+    return metricsResult;
+  }, [financialsData]);
 
-    const commonProps = {
-      data,
-      margin: { top: 5, right: 10, left: 0, bottom: 5 },
+  // Today vs previous-close delta (NOT a true post-market price — FMP free
+  // tier doesn't carry after-hours quote). When a paid key/upgrade adds a
+  // dedicated extended-hours field, replace this with that value.
+  // Note: surfacing as "Today vs Prev Close" rather than "After Hours" so the
+  // label matches the math.
+  const todayVsPrevClose = useMemo(() => {
+    if (!quoteData?.price || !quoteData?.previousClose) return null;
+    const delta = quoteData.price - quoteData.previousClose;
+    return {
+      price: quoteData.price,
+      delta,
+      deltaPct: (delta / quoteData.previousClose) * 100,
     };
+  }, [quoteData]);
 
-    switch (metric.type) {
-      case "bar":
-        return (
-          <ResponsiveContainer width="100%" height={140}>
-            <BarChart {...commonProps}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
-              <XAxis dataKey="date" hide />
-              <YAxis hide />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#1f2937",
-                  border: "1px solid #374151",
-                  color: "#ffffff",
-                  borderRadius: "4px",
-                  fontSize: "12px",
-                }}
-                cursor={false}
-              />
-              <Bar dataKey="value" fill={chartColor} radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        );
-      case "area":
-        return (
-          <ResponsiveContainer width="100%" height={140}>
-            <AreaChart {...commonProps}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
-              <XAxis dataKey="date" hide />
-              <YAxis hide />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#1f2937",
-                  border: "1px solid #374151",
-                  color: "#ffffff",
-                  borderRadius: "4px",
-                  fontSize: "12px",
-                }}
-                cursor={false}
-              />
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke={chartColor}
-                fill={chartColor}
-                fillOpacity={0.2}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        );
-      case "line":
-      default:
-        return (
-          <ResponsiveContainer width="100%" height={140}>
-            <LineChart {...commonProps}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
-              <XAxis dataKey="date" hide />
-              <YAxis hide />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#1f2937",
-                  border: "1px solid #374151",
-                  color: "#ffffff",
-                  borderRadius: "4px",
-                  fontSize: "12px",
-                }}
-                cursor={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="value"
-                stroke={chartColor}
-                dot={false}
-                strokeWidth={2}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        );
-    }
-  };
+  const earningsDate = useMemo(() => {
+    if (!quoteData?.earningsAnnouncement) return null;
+    const d = new Date(quoteData.earningsAnnouncement);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toISOString().slice(0, 10);
+  }, [quoteData?.earningsAnnouncement]);
 
   const quickStats = stockData?.quickStats ?? [];
   const financialMetrics = stockData?.financialMetrics ?? [];
@@ -175,338 +191,148 @@ export default function Index() {
         {/* Centered Header Section */}
         <div className="mb-12 text-center">
           <div className="flex items-center justify-center gap-4 mb-4">
-            <img
-              src={`/api/company-logo?ticker=${ticker}`}
-              alt={`${ticker} logo`}
-              className="w-12 h-12 rounded-md"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = "none";
-              }}
-            />
+            <TickerLogo ticker={ticker} size="md" />
             <div>
               <h1 className="text-3xl font-bold text-foreground">
-                {stockData?.name || ticker}
+                {overviewData?.companyName ?? ticker}
               </h1>
               <p className="text-sm text-muted-foreground">
-                {ticker}
-                {stockData?.exchange ? ` | ${stockData.exchange}` : ""}
-                {stockData?.profile?.sector ? ` | ${stockData.profile.sector}` : ""}
+                {ticker} | {overviewData?.exchange ?? "—"}
               </p>
             </div>
           </div>
 
           {/* Stock Price */}
           <div className="mb-3">
-            {isLoading ? (
-              <div className="flex items-center justify-center gap-2 text-slate-400">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Loading real-time data...</span>
-              </div>
-            ) : quote && quote.price != null ? (
+            {quoteLoading ? (
+              <HeaderPriceSkeleton />
+            ) : quoteData?.price ? (
               <div className="flex items-baseline justify-center gap-3">
-                <span className="text-5xl font-bold text-foreground">
-                  ${typeof quote.price === "number" ? quote.price.toFixed(2) : quote.price}
+                <span className="text-5xl font-bold text-foreground" dir="ltr">
+                  ${quoteData.price.toFixed(2)}
                 </span>
-                <span className="flex items-center gap-1">
-                  {quote.change != null && (
-                    <span
-                      className={`text-lg font-semibold ${
-                        quote.change >= 0 ? "text-chart-green" : "text-red-400"
-                      }`}
-                    >
-                      {quote.change >= 0 ? "+" : ""}
-                      {typeof quote.change === "number" ? quote.change.toFixed(2) : quote.change}
-                    </span>
-                  )}
-                  {quote.changePercent != null && (
-                    <span
-                      className={`px-2 py-1 rounded text-xs font-semibold ${
-                        quote.changePercent >= 0
-                          ? "bg-chart-green/20 text-chart-green"
-                          : "bg-red-400/20 text-red-400"
-                      }`}
-                    >
-                      {quote.changePercent >= 0 ? "+" : ""}
-                      {typeof quote.changePercent === "number"
-                        ? quote.changePercent.toFixed(2)
-                        : quote.changePercent}
-                      %
-                    </span>
-                  )}
+                <span className="flex items-center gap-1" dir="ltr">
+                  <span
+                    className={`text-lg font-semibold ${quoteData.change >= 0 ? "text-chart-green" : "text-red-400"}`}
+                  >
+                    {quoteData.change >= 0 ? "+" : ""}
+                    {quoteData.change.toFixed(2)}
+                  </span>
+                  <span
+                    className={`px-2 py-1 rounded text-xs font-semibold ${quoteData.changesPercentage >= 0 ? "bg-chart-green/20 text-chart-green" : "bg-red-400/20 text-red-400"}`}
+                  >
+                    {quoteData.changesPercentage >= 0 ? "+" : ""}
+                    {quoteData.changesPercentage.toFixed(2)}%
+                  </span>
                 </span>
               </div>
             ) : (
-              <div className="text-center text-slate-400 text-xl">
-                {isError ? "Failed to load data" : "Unavailable via API"}
-              </div>
+              <div className="text-center text-slate-400 text-xl">{t("index.unavailableApi")}</div>
             )}
           </div>
 
-          {/* After Hours & Price Changes */}
-          <div className="flex justify-center gap-6 text-sm text-muted-foreground">
-            {quote?.afterHoursPrice != null && (
-              <span>
-                After hours:{" "}
+          {/* Today vs Prev Close — fed by live quote */}
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-muted-foreground">
+            <span>
+              {t("index.change")}{" "}
+              {todayVsPrevClose ? (
                 <span
-                  className={
-                    quote.afterHoursChange != null && quote.afterHoursChange >= 0
-                      ? "text-chart-green"
-                      : "text-red-400"
-                  }
+                  className={todayVsPrevClose.delta >= 0 ? "text-green-400" : "text-red-400"}
+                  dir="ltr"
                 >
-                  ${quote.afterHoursPrice.toFixed(2)}
+                  {todayVsPrevClose.delta >= 0 ? "+" : ""}
+                  {todayVsPrevClose.delta.toFixed(2)} ({todayVsPrevClose.delta >= 0 ? "+" : ""}
+                  {todayVsPrevClose.deltaPct.toFixed(2)}%)
                 </span>
-                {quote.afterHoursChange != null && (
-                  <span
-                    className={
-                      quote.afterHoursChange >= 0 ? "text-chart-green" : "text-red-400"
-                    }
-                  >
-                    {" "}
-                    {quote.afterHoursChange >= 0 ? "+" : ""}
-                    {quote.afterHoursChange.toFixed(2)}
-                    {quote.afterHoursChangePercent != null
-                      ? ` ${quote.afterHoursChangePercent >= 0 ? "+" : ""}${quote.afterHoursChangePercent.toFixed(2)}%`
-                      : ""}
-                  </span>
-                )}
-              </span>
-            )}
-            {stockData?.priceChange && (
-              <>
-                {stockData.priceChange.ytd != null && (
-                  <span>
-                    YTD:{" "}
-                    <span
-                      className={
-                        stockData.priceChange.ytd >= 0 ? "text-chart-green" : "text-red-400"
-                      }
-                    >
-                      {stockData.priceChange.ytd >= 0 ? "+" : ""}
-                      {stockData.priceChange.ytd.toFixed(2)}%
-                    </span>
-                  </span>
-                )}
-                {stockData.priceChange["1Y"] != null && (
-                  <span>
-                    1Y:{" "}
-                    <span
-                      className={
-                        stockData.priceChange["1Y"] >= 0 ? "text-chart-green" : "text-red-400"
-                      }
-                    >
-                      {stockData.priceChange["1Y"] >= 0 ? "+" : ""}
-                      {stockData.priceChange["1Y"].toFixed(2)}%
-                    </span>
-                  </span>
-                )}
-                {stockData.priceChange["3Y"] != null && (
-                  <span>
-                    3Y:{" "}
-                    <span
-                      className={
-                        stockData.priceChange["3Y"] >= 0 ? "text-chart-green" : "text-red-400"
-                      }
-                    >
-                      {stockData.priceChange["3Y"] >= 0 ? "+" : ""}
-                      {stockData.priceChange["3Y"].toFixed(2)}%
-                    </span>
-                  </span>
-                )}
-              </>
-            )}
+              ) : (
+                <span className="text-slate-500" dir="ltr">—</span>
+              )}
+            </span>
+            <span>
+              {t("index.earnings")}{" "}
+              {earningsDate ? (
+                <span className="text-blue-400" dir="ltr">{earningsDate}</span>
+              ) : (
+                <span className="text-slate-500" dir="ltr">—</span>
+              )}
+            </span>
           </div>
         </div>
 
-        {/* Company Description */}
-        {stockData?.profile?.description && (
-          <div className="bg-card rounded-lg p-8 border border-border mb-12">
-            <h2 className="text-xl font-semibold text-foreground mb-4">Company Overview</h2>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              {stockData.profile.description}
-            </p>
-            {stockData.profile.website && (
-              <a
-                href={stockData.profile.website}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-4 inline-block text-blue-400 hover:text-blue-300 text-sm font-medium"
-              >
-                Visit website →
-              </a>
-            )}
-          </div>
-        )}
+        {/* Quality Brief Section */}
+        <div className="bg-card rounded-lg p-8 border border-border mb-12">
+          <h2 className="text-xl font-semibold text-foreground mb-4">{t("index.qualityInBrief")}</h2>
+          <ul className="space-y-3 text-sm text-foreground">
+            <li className="flex gap-2">
+              <span className="text-chart-green font-bold shrink-0">•</span>
+              <span dangerouslySetInnerHTML={{ __html: t("index.news1") }} />
+            </li>
+            <li className="flex gap-2">
+              <span className="text-chart-green font-bold shrink-0">•</span>
+              <span dangerouslySetInnerHTML={{ __html: t("index.news2") }} />
+            </li>
+          </ul>
+          <button className="mt-4 text-blue-400 hover:text-blue-300 text-sm font-medium">
+            {t("index.viewMore")}
+          </button>
+        </div>
 
-        {/* Company News */}
-        <div className="bg-card rounded-lg p-6 border border-border mb-12">
-          <div className="flex items-center gap-2 mb-5">
-            <Newspaper className="w-5 h-5 text-blue-400" />
-            <h2 className="text-xl font-semibold text-foreground">Latest News</h2>
-            {news.length > 0 && (
-              <span className="text-xs text-muted-foreground ml-auto">
-                {news.length} articles • Finnhub
-              </span>
-            )}
-          </div>
-
-          {isLoading ? (
-            <div className="space-y-3">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="animate-pulse">
-                  <div className="h-4 bg-muted rounded w-3/4 mb-2" />
-                  <div className="h-3 bg-muted/50 rounded w-1/2" />
-                </div>
+        {/* Charts Grid - 4x2 — three render states driven by query fetch status */}
+        <h2 className="text-2xl font-semibold text-foreground mb-6">
+          {t("index.financialMetricsTitle")}
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          {/* Cache-key switch (e.g. /stock/AAPL → /stock/MSFT) resets isFetched
+              to false even though we may have stale data on disk; the skeleton
+              flash masks the cache-miss transition so don't add an enabled:
+              guard here without also handling that path. */}
+          {!financialsFetched ? (
+            <>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <MetricCardSkeleton key={i} />
               ))}
+            </>
+          ) : metrics.length === 0 ? (
+            <div className="col-span-full bg-card border border-border rounded-xl px-6 py-10 text-center">
+              <p className="text-sm text-muted-foreground">
+                {t("index.metricsUnavailable", { ticker })}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  // .catch(() => null) future-proofs against the void-discard
+                  // shape — if anyone later awaits this or chains .then(), the
+                  // pipeline still won't surface an unhandled rejection. The
+                  // FMP free tier frequently returns the same empty array on
+                  // refetch, so this button is honest about a likely no-op.
+                  refetchFinancials().catch(() => null);
+                }}
+                className="mt-4 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+              >
+                {t("index.metricsRetry")}
+              </button>
             </div>
-          ) : news.length > 0 ? (
-              <div className="space-y-1">
-                {news.map((item) => (
-                  <a
-                    key={item.id}
-                    href={item.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block p-3 -mx-3 rounded-lg hover:bg-secondary/50 transition-colors group"
-                  >
-                    <div className="flex items-start gap-3">
-                      {item.image && (
-                        <img
-                          src={item.image}
-                          alt=""
-                          className="w-16 h-16 rounded-md object-cover flex-shrink-0 border border-border"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = "none";
-                          }}
-                          loading="lazy"
-                        />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span
-                            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border uppercase tracking-wider ${getCategoryStyle(
-                              item.category
-                            )}`}
-                          >
-                            {item.category}
-                          </span>
-                          <span className="text-[11px] text-muted-foreground">
-                            {item.source}
-                          </span>
-                          <span className="text-[11px] text-muted-foreground ml-auto flex-shrink-0">
-                            {formatNewsDate(item.datetime)}
-                          </span>
-                        </div>
-                        <p className="text-sm font-medium text-foreground group-hover:text-blue-400 transition-colors leading-snug">
-                          {item.headline}
-                        </p>
-                        {item.summary && (
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                            {item.summary}
-                          </p>
-                        )}
-                      </div>
-                      <ExternalLink className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 mt-1 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                  </a>
-                ))}
-              </div>
-            ) : (
-            <p className="text-sm text-muted-foreground py-4">
-              No recent news available for {ticker}.
-            </p>
+          ) : (
+            metrics.map((metric, idx) => {
+              const latestVal = metric.data[metric.data.length - 1]?.value || 0;
+              const yoyChange = metric.yoy || 0;
+              return (
+                <InsightsCard
+                  key={idx}
+                  title={t(metric.name) === metric.name ? metric.name.split(".")[1] : t(metric.name)}
+                  value={`${latestVal.toFixed(2)}${metric.unit === "$" ? "" : metric.unit}`}
+                  badgeText={`${yoyChange >= 0 ? "+" : ""}${yoyChange.toFixed(2)}%`}
+                  badgeType={yoyChange >= 0 ? "positive" : "negative"}
+                  metricId={metric.name}
+                  metricData={metric}
+                />
+              );
+            })
           )}
         </div>
 
-        {/* Quick Stats Section */}
-        {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-            {[...Array(6)].map((_, i) => (
-              <div
-                key={i}
-                className="bg-card rounded-lg border border-border p-4 animate-pulse"
-              >
-                <div className="h-4 bg-muted rounded w-1/3 mb-2" />
-                <div className="h-6 bg-muted rounded w-1/2" />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-            {quickStats.map((stat, idx) => (
-              <div key={idx} className="bg-card rounded-lg border border-border overflow-hidden">
-                <button
-                  onClick={() => toggleStatExpand(idx)}
-                  className="w-full p-4 flex items-center justify-between hover:bg-secondary/50 transition-colors"
-                >
-                  <div className="text-left">
-                    <p className="text-sm text-muted-foreground mb-1">{stat.label}</p>
-                    <p className="text-xl font-bold text-foreground">{stat.value}</p>
-                  </div>
-                  <ChevronDown
-                    className={`w-5 h-5 text-muted-foreground transition-transform ${
-                      expandedStats[idx] ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
-                {expandedStats[idx] && stat.details && (
-                  <div className="border-t border-border bg-secondary/30 p-4 space-y-2">
-                    {stat.details.map((detail, dIdx) => (
-                      <div key={dIdx} className="flex justify-between text-xs">
-                        <span className="text-muted-foreground">{detail.label}</span>
-                        <span className="text-foreground font-medium">{detail.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Charts Grid */}
-        <h2 className="text-2xl font-semibold text-foreground mb-6">Financial Metrics</h2>
-        {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(8)].map((_, i) => (
-              <div
-                key={i}
-                className="bg-card rounded-lg p-6 border border-border animate-pulse"
-              >
-                <div className="h-5 bg-muted rounded w-1/2 mb-4" />
-                <div className="h-[140px] bg-muted/50 rounded" />
-              </div>
-            ))}
-          </div>
-        ) : financialMetrics.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {financialMetrics.map((metric, idx) => (
-              <div
-                key={idx}
-                onClick={() => setSelectedMetric(metric)}
-                className="bg-card rounded-lg p-6 border border-border hover:border-foreground/50 cursor-pointer transition-all duration-200 hover:shadow-lg"
-              >
-                <h3 className="text-lg font-semibold text-foreground mb-4">{metric.name}</h3>
-                <div className="h-[140px]">{renderSmallChart(metric)}</div>
-                <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    Latest:{" "}
-                    {metric.data.length > 0
-                      ? `${metric.data[metric.data.length - 1].value.toFixed(1)}${metric.unit}`
-                      : "—"}
-                  </span>
-                  <span className="text-xs bg-foreground/10 text-foreground px-2 py-1 rounded">
-                    {metric.type === "bar" ? "Bar" : metric.type === "area" ? "Area" : "Line"}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12 text-muted-foreground">
-            No financial statement data available. (FMP free tier may be exhausted — 250 req/day limit)
-          </div>
-        )}
+        {/* Company Profile Section */}
+        <CompanyProfile ticker={ticker} />
       </div>
 
       {/* Chart Modal */}

@@ -1,138 +1,169 @@
 import { RequestHandler } from "express";
-import { aggregateStockData } from "../services/stockAggregator";
-import { fetchYahooQuote, fetchYahooPriceHistory } from "../services/yahooFinance";
-import { getCompanyProfile, getEarnings, getInsiderTrades } from "../services/fmp";
+import { stockService } from "../services/stockService";
+import type {
+  BatchQuoteResponse,
+  ChartSeries,
+  CompanyProfile,
+  EarningsEvent,
+  FinancialStatements,
+  FxCurrency,
+  FxRatesResponse,
+  IndexQuote,
+  InsightsTabResponse,
+  SmaDistanceResponse,
+  StockMetrics,
+  StockQuote,
+} from "@shared/api";
 
-/**
- * GET /api/stock-quote?symbol=AAPL
- * Returns real-time quote via Yahoo Finance (free, unlimited).
- */
+const MAX_SYMBOLS = 50;
+
 export const handleStockQuote: RequestHandler = async (req, res) => {
-  try {
-    const { symbol } = req.query;
-    if (!symbol || typeof symbol !== "string") {
-      return res.status(400).json({ error: "symbol parameter required" });
-    }
-    const quote = await fetchYahooQuote(symbol.toUpperCase());
-    if (!quote || quote.price == null) {
-      return res.status(404).json({ error: "Unavailable via API" });
-    }
-    res.json({
-      symbol: symbol.toUpperCase(),
-      price: quote.price,
-      change: quote.change,
-      changePercent: quote.changePercent,
-      afterHoursPrice: quote.afterHoursPrice,
-      afterHoursChange: quote.afterHoursChange,
-      afterHoursChangePercent: quote.afterHoursChangePercent,
-    });
-  } catch (error) {
-    console.error("Error fetching stock quote:", error);
-    res.status(500).json({ error: "Failed to fetch stock quote" });
+  const symbol = String(req.query.symbol || "");
+  if (!symbol) return res.status(400).json({ error: "symbol parameter required" });
+  const quote = await stockService.getQuote(symbol);
+  res.json(quote satisfies StockQuote | null);
+};
+
+export const handleBatchQuotes: RequestHandler = async (req, res) => {
+  const symbolsRaw = String(req.query.symbols || "");
+  if (!symbolsRaw) return res.status(400).json({ error: "symbols parameter required" });
+  const symbols = symbolsRaw.split(",").map((s) => s.trim()).filter(Boolean);
+  if (symbols.length > MAX_SYMBOLS) {
+    return res.status(400).json({ error: `Too many symbols requested. Maximum is ${MAX_SYMBOLS}, received ${symbols.length}` });
   }
+  const result: BatchQuoteResponse = await stockService.getBatchQuotes(symbols);
+  res.json(result);
 };
 
 /**
- * GET /api/stock-overview?symbol=AAPL
- * Returns company profile + overview via FMP + Yahoo.
+ * @deprecated The client now hits `/api/stock-overview` for company
+ * profile data. This route forwards to `getProfile` so the response shape
+ * is `CompanyProfile` (NOT a `StockQuote` — the original alias was a bug).
  */
+export const handleStockProfile: RequestHandler = async (req, res) => {
+  const symbol = String(req.query.symbol || "");
+  if (!symbol) return res.status(400).json({ error: "symbol parameter required" });
+  const profile: CompanyProfile | null = await stockService.getProfile(symbol);
+  res.json(profile);
+};
+
 export const handleStockOverview: RequestHandler = async (req, res) => {
-  try {
-    const { symbol } = req.query;
-    if (!symbol || typeof symbol !== "string") {
-      return res.status(400).json({ error: "symbol parameter required" });
-    }
-    const profile = await getCompanyProfile(symbol.toUpperCase());
-    if (!profile) {
-      return res.status(404).json({ error: "Unavailable via API" });
-    }
-    res.json(profile);
-  } catch (error) {
-    console.error("Error fetching stock overview:", error);
-    res.status(500).json({ error: "Failed to fetch overview" });
-  }
+  const symbol = String(req.query.symbol || "");
+  if (!symbol) return res.status(400).json({ error: "symbol parameter required" });
+  const profile: CompanyProfile | null = await stockService.getProfile(symbol);
+  res.json(profile);
+};
+
+export const handleStockFinancials: RequestHandler = async (req, res) => {
+  const symbol = String(req.query.symbol || "");
+  if (!symbol) return res.status(400).json({ error: "symbol parameter required" });
+  const data: FinancialStatements = await stockService.getFinancialStatements(symbol);
+  res.json(data);
+};
+
+export const handleStockMetrics: RequestHandler = async (req, res) => {
+  const symbol = String(req.query.symbol || "");
+  if (!symbol) return res.status(400).json({ error: "symbol parameter required" });
+  const data: StockMetrics = await stockService.getMetrics(symbol);
+  res.json(data);
+};
+
+export const handleStockAnalyst: RequestHandler = async (req, res) => {
+  const symbol = String(req.query.symbol || "");
+  if (!symbol) return res.status(400).json({ error: "symbol parameter required" });
+  const data = await stockService.getAnalystEstimates(symbol);
+  res.json(data);
+};
+
+export const handleStockInsider: RequestHandler = async (req, res) => {
+  const symbol = String(req.query.symbol || "");
+  if (!symbol) return res.status(400).json({ error: "symbol parameter required" });
+  const data = await stockService.getInsiderTrading(symbol);
+  res.json(data);
+};
+
+export const handleStockNews: RequestHandler = async (req, res) => {
+  const symbol = String(req.query.symbol || "");
+  if (!symbol) return res.status(400).json({ error: "symbol parameter required" });
+  const data = await stockService.getNews(symbol);
+  res.json(data);
+};
+
+export const handleEarningsCalendar: RequestHandler = async (req, res) => {
+  const from = String(req.query.from || "");
+  const to = String(req.query.to || "");
+  if (!from || !to) return res.status(400).json({ error: "from and to parameters required" });
+  const data: EarningsEvent[] = await stockService.getEarningsCalendar(from, to);
+  res.json(data);
+};
+
+export const handleStockChart: RequestHandler = async (req, res) => {
+  const symbol = String(req.query.symbol || "");
+  if (!symbol) return res.status(400).json({ error: "symbol parameter required" });
+  const data: ChartSeries | null = await stockService.getChart(symbol);
+  res.json(data);
+};
+
+export const handleIndexQuotes: RequestHandler = async (_req, res) => {
+  const data = await stockService.getIndexQuotes();
+  // Wrap in a typed shape for the client; missing entries are null.
+  const wrap = (
+    q: StockQuote | null,
+    name: string
+  ): IndexQuote | null => (q ? { symbol: q.symbol, name, price: q.price, change: q.change, changesPercentage: q.changesPercentage } : null);
+  res.json({
+    dow: wrap(data.dow, "Dow Jones"),
+    sp500: wrap(data.sp500, "S&P 500"),
+    nasdaq: wrap(data.nasdaq, "Nasdaq"),
+  });
 };
 
 /**
- * GET /api/stock-data?symbol=AAPL
- * Returns aggregated stock data: quote, profile, quickStats, financialMetrics,
- * priceHistory, ratios, insider trades, earnings, price changes.
- * This is the main endpoint powering the stock detail page.
+ * Curated ticker universe for an Insights tab (Phase 1). The client overlays
+ * live prices via `/api/stock-batch-quotes?symbols=…`.
  */
-export const handleStockData: RequestHandler = async (req, res) => {
-  try {
-    const { symbol } = req.query;
-    if (!symbol || typeof symbol !== "string") {
-      return res.status(400).json({ error: "symbol parameter required" });
-    }
-    const data = await aggregateStockData(symbol);
-    if (!data.name && data.quote.price == null) {
-      return res.status(404).json({ error: "No data available for this ticker" });
-    }
-    res.json(data);
-  } catch (error) {
-    console.error("Error aggregating stock data:", error);
-    res.status(500).json({ error: "Failed to fetch stock data" });
-  }
+export const handleInsightsTab: RequestHandler = async (req, res) => {
+  const tab = String(req.query.tab || "sp500");
+  const data: InsightsTabResponse = stockService.getInsightsTab(tab);
+  res.json(data);
 };
 
 /**
- * GET /api/stock-time-series?symbol=AAPL
- * Returns historical price data via Yahoo Finance.
+ * SMA-200 distance for a list of symbols. Symbols are supplied via repeated
+ * `symbol=AAPL&symbol=MSFT` OR a single comma-separated `symbols=AAPL,MSFT`
+ * parameter — both work because Express populates an array either way.
+ *
+ * `?window=20` (default 200, max 200) selects the SMA window directly.
  */
-export const handleStockTimeSeries: RequestHandler = async (req, res) => {
-  try {
-    const { symbol } = req.query;
-    if (!symbol || typeof symbol !== "string") {
-      return res.status(400).json({ error: "symbol parameter required" });
-    }
-    const history = await fetchYahooPriceHistory(symbol.toUpperCase(), 1);
-    if (!history || history.length === 0) {
-      return res.status(404).json({ error: "Unavailable via API" });
-    }
-    const quarters = history.slice(-20).map((p) => ({
-      date: p.date,
-      close: p.close,
-    }));
-    res.json({ quarters });
-  } catch (error) {
-    console.error("Error fetching time series:", error);
-    res.status(500).json({ error: "Failed to fetch time series" });
+export const handleSmaDistances: RequestHandler = async (req, res) => {
+  const listRaw = req.query.symbols ?? req.query.symbol ?? [];
+  const list: string[] = Array.isArray(listRaw)
+    ? listRaw.map((s) => String(s))
+    : String(listRaw).split(",").map((s) => s.trim());
+  const symbols = list.filter(Boolean);
+  if (symbols.length > MAX_SYMBOLS) {
+    return res.status(400).json({ error: `Too many symbols requested. Maximum is ${MAX_SYMBOLS}, received ${symbols.length}` });
   }
+  const windowRaw = Number(req.query.window ?? 200);
+  const windowSize = Number.isFinite(windowRaw) ? windowRaw : 200;
+  const data: SmaDistanceResponse = await stockService.getSmaDistancesFor(symbols, windowSize);
+  res.json(data);
 };
 
 /**
- * GET /api/stock-insider-trades?symbol=AAPL
- * Returns insider trading transactions via FMP.
+ * Live FX rates for cross-currency display (Phase 2). Currencies supplied as
+ * `?currencies=USD,ILS,EUR` (any order; default USD,ILS,EUR). Yahoo offloads
+ * the heavy lifting.
  */
-export const handleStockInsiderTrades: RequestHandler = async (req, res) => {
-  try {
-    const { symbol } = req.query;
-    if (!symbol || typeof symbol !== "string") {
-      return res.status(400).json({ error: "symbol parameter required" });
-    }
-    const trades = await getInsiderTrades(symbol.toUpperCase());
-    res.json({ trades: trades.slice(0, 20) });
-  } catch (error) {
-    console.error("Error fetching insider trades:", error);
-    res.status(500).json({ error: "Failed to fetch insider trades" });
+export const handleFxRates: RequestHandler = async (req, res) => {
+  const raw = String(req.query.currencies || "USD,ILS,EUR");
+  const currencies: FxCurrency[] = raw
+    .split(",")
+    .map((s) => s.trim().toUpperCase())
+    .filter((s): s is FxCurrency => s === "USD" || s === "ILS" || s === "EUR" || s === "GBP");
+  if (currencies.length === 0) {
+    return res.status(400).json({ error: "currencies parameter required" });
   }
-};
-
-/**
- * GET /api/stock-earnings?symbol=AAPL
- * Returns historical earnings via FMP.
- */
-export const handleStockEarnings: RequestHandler = async (req, res) => {
-  try {
-    const { symbol } = req.query;
-    if (!symbol || typeof symbol !== "string") {
-      return res.status(400).json({ error: "symbol parameter required" });
-    }
-    const earnings = await getEarnings(symbol.toUpperCase());
-    res.json({ earnings: earnings.slice(0, 8) });
-  } catch (error) {
-    console.error("Error fetching earnings:", error);
-    res.status(500).json({ error: "Failed to fetch earnings" });
-  }
+  const data: FxRatesResponse = await stockService.getFxRates(currencies);
+  res.json(data);
 };
