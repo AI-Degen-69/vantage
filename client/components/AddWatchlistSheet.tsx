@@ -167,10 +167,12 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
         <div className="space-y-4 px-1">
           <div>
             <label htmlFor="watchlist-name-input" className="text-sm font-medium block mb-1.5">
+          <div>
+            <label htmlFor="watchlist-name" className="text-sm font-medium block mb-1.5">
               {t("watchlists.nameLabel")}
             </label>
             <Input
-              id="watchlist-name-input"
+              id="watchlist-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t("watchlists.namePlaceholder")}
@@ -180,11 +182,11 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
           </div>
 
           <div>
-            <label htmlFor="watchlist-symbols-textarea" className="text-sm font-medium block mb-1.5">
+            <label htmlFor="watchlist-symbols" className="text-sm font-medium block mb-1.5">
               {t("watchlists.symbolsLabel")}
             </label>
             <textarea
-              id="watchlist-symbols-textarea"
+              id="watchlist-symbols"
               value={rawSymbols}
               onChange={(e) => setRawSymbols(e.target.value)}
               placeholder={t("watchlists.symbolsPlaceholder")}
