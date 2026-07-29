@@ -370,6 +370,66 @@ export interface SmaDistanceResponse {
   rows: SmaDistanceRow[];
 }
 
+/**
+ * One cell of the sector heatmap — a sector's average % move DURING one
+ * trading day. `date` is the day the move ENDED on, so for a 5-day heatmap
+ * ending 2025-03-21, the heatmap shows the 5 days that ended:
+ *   2025-03-17, 2025-03-18, 2025-03-19, 2025-03-20, 2025-03-21
+ * `movePct` is null when no ticker in the sector had a close on `date`,
+ * `isPartial` is true on the rightmost column (today vs yesterday, i.e.
+ * still in-session intraday), and `withPrice`/`total` count how many tickers
+ * contributed so the UI can show "12 of 14 contributed".
+ */
+export interface SectorHeatmapCell {
+  date: string;
+  movePct: number | null;
+  withPrice: number;
+  total: number;
+  isPartial: boolean;
+}
+
+/**
+ * One row of the sector heatmap — a sector's 5 daily % moves plus a
+ * weekNet rollup. `weekNet` is the average per-ticker cumulative return
+ * from the heatmap's oldest column's close to its newest column's close,
+ * expressed as a percentage. Sort rows by `weekNet` desc so the hottest
+ * sector lands at the top, mirroring Bloomberg's HSPA / HEAT layout.
+ */
+export interface SectorHeatmapRow {
+  sector: string;
+  cells: SectorHeatmapCell[];
+  weekNet: number | null;
+  /** Total tickers in the universe belonging to this sector. */
+  universeCount: number;
+}
+
+/**
+ * Tracks move history for tickers whose universe row lacks a sector tag.
+ * Surfaced separately so the heatsheet footer can quote the count without
+ * silently misattributing those tickers to a placeholder sector.
+ */
+export interface SectorHeatmapUntagged {
+  symbol: string;
+  cells: Array<{
+    date: string;
+    movePct: number | null;
+    isPartial: boolean;
+  }>;
+}
+
+/**
+ * Server response for `GET /api/sector-heatmap?symbols=…&days=5`. Column
+ * axis (`days`) is oldest → newest ISO dates, matching `rows[*].cells` index
+ * order. `generatedAt` is the server's cache-write ISO timestamp so the
+ * client can show "Updated 12 min ago" without re-fetching.
+ */
+export interface SectorHeatmapResponse {
+  days: string[];
+  rows: SectorHeatmapRow[];
+  untagged: SectorHeatmapUntagged[];
+  generatedAt: string;
+}
+
 /* ------------------------------------------------------------------ *
  * FX rates (Yahoo Finance: USDEUR=X, USDILS=X, EURILS=X)            *
  * ------------------------------------------------------------------ */

@@ -1,6 +1,7 @@
-import { useTranslation } from "react-i18next";
-import { useState, useMemo } from "react";
+import { useI18n } from "@/lib/i18n";
+import { useState, useMemo, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import EarningsCalendar from "@/components/EarningsCalendar";
 
 type MarketCapFilter = "all" | "large" | "mid" | "small";
@@ -66,19 +67,46 @@ function formatHumanRange(from: string, to: string): string {
 /**
  * Renders the earnings calendar with week navigation and filtering controls.
  *
+ * Honors `?focus=AAPL&date=2025-09-15` URL parameters from the alert engine's
+ * "Open" action: shifts the visible week to land `date` in the rendered Mon-
+ * Fri window, forces `watchlistOnly = true`, and forwards both values down
+ * to `<EarningsCalendar>` for highlight + scrollIntoView.
+ *
  * @returns The earnings calendar page.
  */
 export default function EarningsPage() {
-  const { t } = useTranslation();
+  const { t } = useI18n();
   const initial = useMemo(() => currentWeekRange(), []);
   const [offset, setOffset] = useState(0); // 0 = this week
   const [marketCap, setMarketCap] = useState<MarketCapFilter>("all");
   const [watchlistOnly, setWatchlistOnly] = useState(false);
+  const [searchParams] = useSearchParams();
+  const focusSymbol = searchParams.get("focus");
+  const focusDate = searchParams.get("date");
+
+  // When the user follows an alert "Open" link, shift to the week
+  // containing `focusDate` so the calendar reveals the matching card.
+  useEffect(() => {
+    if (!focusDate) return;
+    const target = new Date(focusDate);
+    const base = new Date(initial.from);
+    if (!Number.isFinite(target.getTime()) || !Number.isFinite(base.getTime())) {
+      return;
+    }
+    const diffMs = target.getTime() - base.getTime();
+    const diffWeeks = Math.round(diffMs / (7 * 24 * 60 * 60 * 1000));
+    setOffset(diffWeeks);
+    setWatchlistOnly(true);
+  }, [focusDate, initial.from]);
 
   const { from, to } = useMemo(
     () => shiftRange(initial.from, initial.to, offset),
     [initial.from, initial.to, offset]
   );
+
+  // `forceWatchlistOnly` is auto-set while ?focus is in play regardless of
+  // the user's checkbox so the focused row is guaranteed to be visible.
+  const effectiveWatchlistOnly = watchlistOnly || !!focusSymbol;
 
   const isThisWeek = offset === 0;
   const hasPrev = offset > -8; // up to 8 weeks back
@@ -88,7 +116,7 @@ export default function EarningsPage() {
     <div className="w-full bg-background dark min-h-screen p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-foreground">{t("sidebar.earnings")}</h1>
+          <h1 className="text-3xl font-bold text-foreground">{t("nav.earnings")}</h1>
         </div>
 
         <div className="flex items-center justify-between bg-slate-900/50 p-4 rounded-xl border border-border gap-4 flex-wrap">
@@ -143,7 +171,7 @@ export default function EarningsPage() {
             <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
               <input
                 type="checkbox"
-                checked={watchlistOnly}
+                checked={effectiveWatchlistOnly}
                 onChange={(e) => setWatchlistOnly(e.target.checked)}
                 className="rounded border-slate-700 bg-slate-800 focus:ring-blue-500 cursor-pointer"
               />
@@ -156,7 +184,9 @@ export default function EarningsPage() {
           from={from}
           to={to}
           marketCap={marketCap}
-          watchlistOnly={watchlistOnly}
+          watchlistOnly={effectiveWatchlistOnly}
+          focusSymbol={focusSymbol ?? undefined}
+          focusDate={focusDate ?? undefined}
         />
       </div>
     </div>

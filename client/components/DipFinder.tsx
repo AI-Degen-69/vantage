@@ -1,4 +1,4 @@
-import { useTranslation } from "react-i18next";
+import { useI18n } from "@/lib/i18n";
 import { defaultWatchlist } from "@/lib/mockData";
 import { ChevronDown } from "lucide-react";
 import { useSmaDistances } from "@/hooks/useStockData";
@@ -21,7 +21,7 @@ const WINDOW_SIZE: Record<SmaWindow, number> = {
  * Displays live, partial, or fallback values and provides a selector for SMA windows from 20 to 200 days.
  */
 export default function DipFinder() {
-  const { t } = useTranslation();
+  const { t } = useI18n();
   const [smaWindow, setSmaWindow] = useState<SmaWindow>("200day");
   const windowSize = WINDOW_SIZE[smaWindow];
 

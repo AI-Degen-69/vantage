@@ -1,11 +1,11 @@
-import { useTranslation } from "react-i18next";
+import { useI18n } from "@/lib/i18n";
 import Portfolio from "@/components/Portfolio";
 
 /**
  * Renders the portfolios page with a translated heading and portfolio content.
  */
 export default function Portfolios() {
-  const { t } = useTranslation();
+  const { t } = useI18n();
 
   return (
     <div className="w-full bg-background dark min-h-screen p-8">

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Maximize2 } from "lucide-react";
 import ChartModal from "./ChartModal";
 import { FinancialMetric } from "@/lib/mockData";
-import { useTranslation } from "react-i18next";
+import { useI18n } from "@/lib/i18n";
 import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 
 interface InsightsCardProps {
@@ -25,7 +25,7 @@ interface InsightsCardProps {
  * @param metricData - The metric's historical data for sparkline and chart modal
  */
 export default function InsightsCard({ title, value, badgeText, badgeType = "neutral", metricId, metricData }: InsightsCardProps) {
-  const { t } = useTranslation();
+  const { t } = useI18n();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const getBadgeColor = () => {
@@ -47,6 +47,17 @@ export default function InsightsCard({ title, value, badgeText, badgeType = "neu
 
   // Extract a small sparkline dataset (last 20 items)
   const sparklineData = metricData.data.slice(-20);
+
+  // Compute the real visible window for the footer strip — first / last date
+  // labels from the underlying series, NOT a hardcoded "1D/5D/1M/…/All"
+  // string row that looks like a timeframe toggle but does nothing on click.
+  const firstDate = metricData.data[0]?.date;
+  const lastDate = metricData.data[metricData.data.length - 1]?.date;
+  const dataSpanLabel =
+    firstDate && lastDate
+      ? t("insights.card.dataSpan", { first: firstDate, last: lastDate })
+      : null;
+  const pointsLabel = t("insights.card.points", { count: metricData.data.length });
 
   return (
     <>
@@ -94,18 +105,13 @@ export default function InsightsCard({ title, value, badgeText, badgeType = "neu
             </AreaChart>
           </ResponsiveContainer>
         </div>
-        
-        {/* Time-range strip */}
-        <div className="flex justify-between mt-3 pt-3 border-t border-slate-800 text-xs font-medium text-slate-500">
-          <span className="hover:text-blue-400 transition-colors">1D</span>
-          <span className="hover:text-blue-400 transition-colors">5D</span>
-          <span className="hover:text-blue-400 transition-colors">1M</span>
-          <span className="hover:text-blue-400 transition-colors">3M</span>
-          <span className="hover:text-blue-400 transition-colors">6M</span>
-          <span className="hover:text-blue-400 transition-colors">YTD</span>
-          <span className="hover:text-blue-400 transition-colors text-blue-400">1Y</span>
-          <span className="hover:text-blue-400 transition-colors">5Y</span>
-          <span className="hover:text-blue-400 transition-colors">All</span>
+
+        {/* Data-span footer — replaces the misleading static "1D / 5D / 1M /
+            ... / All" row. Reports the actual period range + sample count so
+            users know what they're looking at. */}
+        <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-800 text-xs text-slate-500">
+          <span className="truncate" dir="ltr">{dataSpanLabel ?? pointsLabel}</span>
+          <span className="text-slate-400 font-medium">{pointsLabel}</span>
         </div>
       </div>
 

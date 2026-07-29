@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { X, Download } from "lucide-react";
-import { useTranslation } from "react-i18next";
+import { useI18n } from "@/lib/i18n";
 import {
   LineChart,
   Line,
@@ -14,7 +14,7 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { FinancialMetric } from "@/hooks/useStockData";
+import { FinancialMetric } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
 
 interface ChartModalProps {
@@ -35,7 +35,7 @@ type TimeframeType = "1Y" | "3Y" | "5Y";
  * @param ticker - The company ticker used for the logo and modal header.
  */
 export default function ChartModal({ metric, isOpen, onClose, ticker = "AAPL" }: ChartModalProps) {
-  const { t } = useTranslation();
+  const { t } = useI18n();
   const [timeframe, setTimeframe] = useState<TimeframeType>("1Y");
   const [filteredData, setFilteredData] = useState(metric.data);
 

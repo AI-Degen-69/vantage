@@ -6,11 +6,14 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { useTranslation } from "react-i18next";
+import { useI18n } from "@/lib/i18n";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "@/components/Sidebar";
+import { WatchlistsProvider } from "@/hooks/useWatchlists";
+import { EarningsAlertEngine } from "@/hooks/useEarningsAlerts";
 import TopBar from "@/components/TopBar";
 import Index from "./pages/Index";
+import I18nDebug from "./pages/I18nDebug";
 import Insights from "./pages/Insights";
 import Charts from "./pages/Charts";
 import Watchlists from "./pages/Watchlists";
@@ -44,29 +47,44 @@ const queryClient = new QueryClient({
 // SplAppLayout + SplashPage
 // ----------------------------------------------------------------------------
 const AppLayout = ({ children }: { children: ReactNode }) => (
-  <div className="flex h-screen bg-background dark overflow-hidden">
-    <Sidebar />
-    <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
-      <TopBar />
-      <main className="flex-1 overflow-auto">{children}</main>
-    </div>
-  </div>
+  // `<WatchlistsProvider>` lifts the module-level watchlists subscription
+  // into the React tree so every consumer (page, alert engine, ...) reads
+  // the same snapshot via `useSyncExternalStore`. Mounted at AppLayout-
+  // level so it wraps ALL pages and never re-mounts on route change.
+  //
+  // `<EarningsAlertEngine>` (nested INSIDE the Watchlists Provider) runs
+  // the engine work exactly once for the whole layout — one TanStack
+  // Query subscription, one 60s heartbeat, one storage listener — and
+  // exposes the resulting `EngineData` via Context. The Strip and
+  // HistoryPanel mounted in TopBar are reading through this Provider;
+  // no second subscription layer.
+  <WatchlistsProvider>
+    <EarningsAlertEngine>
+      <div className="flex h-screen bg-background dark overflow-hidden">
+        <Sidebar />
+        <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
+          <TopBar />
+          <main className="flex-1 overflow-auto">{children}</main>
+        </div>
+      </div>
+    </EarningsAlertEngine>
+  </WatchlistsProvider>
 );
 
 const SplashPage = () => {
-  const { t } = useTranslation();
+  const { t } = useI18n();
   const navigate = useNavigate();
   return (
     <div className="flex flex-col items-center justify-center h-full max-w-md mx-auto text-center px-4">
       <h1 className="text-4xl font-bold text-foreground mb-6 tracking-widest">VANTAGE</h1>
       <p className="text-muted-foreground mb-8 text-lg">
-        {t("splash.subtitle", "Your personalized Bloomberg terminal for long-term investors.")}
+        {t("splash.subtitle")}
       </p>
       <div className="w-full space-y-4 bg-card p-6 rounded-xl border border-border">
         <div>
           <input
             type="email"
-            placeholder={t("splash.email", "Email address")}
+            placeholder={t("splash.email")}
             className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg text-foreground focus:outline-none focus:border-blue-500 transition-colors"
             defaultValue="demo@vantage.com"
           />
@@ -74,7 +92,7 @@ const SplashPage = () => {
         <div>
           <input
             type="password"
-            placeholder={t("splash.password", "Password")}
+            placeholder={t("splash.password")}
             className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg text-foreground focus:outline-none focus:border-blue-500 transition-colors"
             defaultValue="password123"
           />
@@ -83,7 +101,7 @@ const SplashPage = () => {
           onClick={() => navigate("/insights")}
           className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
         >
-          {t("splash.login", "Log In / 7-Day Trial")}
+          {t("splash.login")}
         </button>
       </div>
     </div>
@@ -167,6 +185,13 @@ export default function App() {
               <Route path="/charts" element={<AppLayout><ErrorBoundary><Charts /></ErrorBoundary></AppLayout>} />
               <Route path="/earnings" element={<AppLayout><ErrorBoundary><Earnings /></ErrorBoundary></AppLayout>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              {/* Dev-only `/i18n` translator QA route — gated so the bundle
+                  is excluded from production builds via Vite tree-shake on
+                  the dead branch. Tree-shake succeeds because `import.meta.env.DEV`
+                  is statically replaced with `false` at build time. */}
+              {import.meta.env.DEV && (
+                <Route path="/i18n" element={<AppLayout><ErrorBoundary><I18nDebug /></ErrorBoundary></AppLayout>} />
+              )}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </ErrorBoundary>

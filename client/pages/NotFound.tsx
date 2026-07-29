@@ -1,10 +1,10 @@
 import { useLocation } from "react-router-dom";
 import { useEffect } from "react";
 
-import { useTranslation } from "react-i18next";
+import { useI18n } from "@/lib/i18n";
 
 const NotFound = () => {
-  const { t } = useTranslation();
+  const { t } = useI18n();
   const location = useLocation();
 
   useEffect(() => {

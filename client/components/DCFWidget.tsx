@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useTranslation } from "react-i18next";
+import { useI18n } from "@/lib/i18n";
 import { Info } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 
@@ -13,7 +13,7 @@ interface DCFWidgetProps {
  * @param currentPrice - The current price used to calculate the forward return.
  */
 export default function DCFWidget({ currentPrice = 150.0 }: DCFWidgetProps) {
-  const { t } = useTranslation();
+  const { t } = useI18n();
   const [mode, setMode] = useState<"earnings" | "cashFlow">("earnings");
   
   // Inputs

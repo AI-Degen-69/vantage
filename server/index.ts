@@ -18,6 +18,7 @@ import {
   handleInsightsTab,
   handleSmaDistances,
   handleFxRates,
+  handleSectorHeatmap,
 } from "./routes/stock-data";
 
 /**
@@ -57,6 +58,7 @@ export function createServer() {
   app.get("/api/insights-tab", handleInsightsTab);
   app.get("/api/sma-distances", handleSmaDistances);
   app.get("/api/fx-rates", handleFxRates);
+  app.get("/api/sector-heatmap", handleSectorHeatmap);
 
   return app;
 }

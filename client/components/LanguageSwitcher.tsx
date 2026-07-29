@@ -1,15 +1,15 @@
-import { useTranslation } from "react-i18next";
+import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
  * Renders a language switcher for English and Hebrew.
  */
 export default function LanguageSwitcher() {
-  const { i18n } = useTranslation();
-  const currentLang = i18n.resolvedLanguage || 'en';
+  const { lang, setLang } = useI18n();
+  const currentLang = lang;
 
-  const switchLanguage = (lng: string) => {
-    i18n.changeLanguage(lng);
+  const switchLanguage = (lng: "en" | "he") => {
+    setLang(lng);
   };
 
   return (
@@ -23,6 +23,7 @@ export default function LanguageSwitcher() {
             : "text-slate-400 hover:text-slate-200"
         )}
         dir="ltr"
+        aria-pressed={currentLang === "en"}
       >
         <span className="text-base">🇺🇸</span>
         <span className="font-semibold tracking-wide">US</span>
@@ -37,6 +38,7 @@ export default function LanguageSwitcher() {
             : "text-slate-400 hover:text-slate-200"
         )}
         dir="rtl"
+        aria-pressed={currentLang === "he"}
       >
         <span className="text-base">🇮🇱</span>
         <span className="font-semibold tracking-wide">עב</span>

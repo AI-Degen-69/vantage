@@ -1,4 +1,4 @@
-import { useTranslation } from "react-i18next";
+import { useI18n } from "@/lib/i18n";
 import {
   useStockProfile,
   useStockAnalyst,
@@ -24,7 +24,7 @@ import { SectionCardSkeleton } from "@/components/Skeleton";
  * @returns The company profile page, loading skeleton, or mock-backed profile content.
  */
 export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string }) {
-  const { t } = useTranslation();
+  const { t } = useI18n();
 
   const { data: overviewData, isLoading: overviewLoading } = useStockProfile(ticker);
   const { data: analystData } = useStockAnalyst(ticker);
