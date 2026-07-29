@@ -184,8 +184,9 @@ export function WatchlistsProvider({ children }: { children: ReactNode }) {
  * remain functional.
  */
 export function useWatchlistsContext() {
+  const hookResult = useWatchlists();
   const ctx = useContext(WatchlistsContext);
-  return ctx ?? useWatchlists();
+  return ctx ?? hookResult;
 }
 
 /**

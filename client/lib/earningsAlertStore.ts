@@ -107,10 +107,15 @@ export function pruneExpiredSnoozed(
   now: number = Date.now(),
 ): Record<string, SnoozeEntry> {
   const next: Record<string, SnoozeEntry> = {};
+  let removed = 0;
   for (const [k, v] of Object.entries(map)) {
-    if (v.expiresAt > now) next[k] = v;
+    if (v.expiresAt > now) {
+      next[k] = v;
+    } else {
+      removed++;
+    }
   }
-  return next;
+  return removed === 0 ? map : next;
 }
 
 // ── History ─────────────────────────────────────────────────────────────
@@ -174,7 +179,8 @@ export function appendHistory(
  * storage explicitly.
  */
 export function pruneOldHistory(entries: HistoryEntry[], todayIso: string): HistoryEntry[] {
-  return entries.filter((e) => e.date >= todayIso);
+  const filtered = entries.filter((e) => e.date >= todayIso);
+  return filtered.length === entries.length ? entries : filtered;
 }
 
 export const EARNINGS_ALERT_STORAGE_SNOOZED = STORAGE_SNOOZED;

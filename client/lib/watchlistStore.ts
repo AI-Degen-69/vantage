@@ -511,10 +511,15 @@ function getSnapshotValue(): WatchlistSnapshot {
   return getCurrentSnapshot();
 }
 
+const cachedServerSnapshot: WatchlistSnapshot = {
+  lists: [makeSystemWatchlist()],
+  activeId: SYSTEM_LIST_ID,
+};
+
 function getServerSnapshotValue(): WatchlistSnapshot {
   // Used by useSyncExternalStore on the server pass only. Always safe
   // because we don't touch `window`.
-  return { lists: [makeSystemWatchlist()], activeId: SYSTEM_LIST_ID };
+  return cachedServerSnapshot;
 }
 
 /** Test-only escape hatch. Clears the singleton snapshot + listeners +

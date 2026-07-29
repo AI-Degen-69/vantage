@@ -117,8 +117,13 @@ function inMarketCapBucket(mc: number | undefined, filter: MarketCapFilter): boo
  * (the days grid silently drops unknown values).
  */
 function weekdayOf(isoDate: string): number {
-  const d = new Date(isoDate);
-  return Number.isFinite(d.getTime()) ? d.getDay() : -1;
+  const parts = isoDate.split("-").map(Number);
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) {
+    return 0;
+  }
+  const [y, m, d] = parts;
+  const dt = new Date(y, m - 1, d);
+  return Number.isFinite(dt.getTime()) ? dt.getDay() : 0;
 }
 
 /**
@@ -220,8 +225,14 @@ export default function EarningsCalendar({
     }
     const stamp = `${focusSymbol}|${focusDate}|${eventsList.length}`;
     if (didScrollRef.current === stamp) return;
+    const escapedSymbol = typeof CSS !== "undefined" && typeof CSS.escape === "function"
+      ? CSS.escape(focusSymbol)
+      : focusSymbol.replace(/[!"#$%&'()*+,.\/:;<=>?@[\\\]^`{|}~]/g, "\\$&");
+    const escapedDate = typeof CSS !== "undefined" && typeof CSS.escape === "function"
+      ? CSS.escape(focusDate)
+      : focusDate.replace(/[!"#$%&'()*+,.\/:;<=>?@[\\\]^`{|}~]/g, "\\$&");
     const el = document.querySelector(
-      `[data-focus-event="${focusSymbol}-${focusDate}"]`
+      `[data-focus-event="${escapedSymbol}-${escapedDate}"]`
     ) as HTMLElement | null;
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
