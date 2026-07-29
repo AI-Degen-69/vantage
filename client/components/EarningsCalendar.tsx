@@ -224,16 +224,21 @@ export default function EarningsCalendar({
       return;
     }
     const stamp = `${focusSymbol}|${focusDate}|${eventsList.length}`;
+  useEffect(() => {
+    if (!focusSymbol || !focusDate) {
+      didScrollRef.current = null;
+      return;
+    }
+    const stamp = `${focusSymbol}|${focusDate}|${eventsList.length}`;
     if (didScrollRef.current === stamp) return;
-    const escapedSymbol = typeof CSS !== "undefined" && typeof CSS.escape === "function"
-      ? CSS.escape(focusSymbol)
-      : focusSymbol.replace(/[!"#$%&'()*+,.\/:;<=>?@[\\\]^`{|}~]/g, "\\$&");
-    const escapedDate = typeof CSS !== "undefined" && typeof CSS.escape === "function"
-      ? CSS.escape(focusDate)
-      : focusDate.replace(/[!"#$%&'()*+,.\/:;<=>?@[\\\]^`{|}~]/g, "\\$&");
-    const el = document.querySelector(
-      `[data-focus-event="${escapedSymbol}-${escapedDate}"]`
-    ) as HTMLElement | null;
+    const target = `${focusSymbol}-${focusDate}`;
+    const escaped =
+      typeof CSS !== "undefined" && CSS.escape
+        ? CSS.escape(target)
+        : JSON.stringify(target).slice(1, -1);
+    const el = document.querySelector<HTMLElement>(
+      `[data-focus-event="${escaped}"]`
+    );
     if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "center" });
       didScrollRef.current = stamp;
