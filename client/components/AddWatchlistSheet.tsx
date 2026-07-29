@@ -75,21 +75,45 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
     return map;
   }, [validated.valid]);
 
-  // Combined preview: every parsed symbol tagged with valid/invalid +
+  // Combined preview: every parsed symbol tagged with valid/invalid/unverified +
   // (when valid) a display name. This drives the chip row.
   const preview: Array<{
     symbol: string;
     displayName: string | null;
-    isValid: boolean;
+    state: "valid" | "invalid" | "unverified";
   }> = useMemo(() => {
     const validSet = new Set(validated.valid.map((v) => v.symbol));
     const invalidSet = new Set(validated.invalid);
-    return parsed.valid.map((sym) => ({
-      symbol: sym,
-      displayName: displayNames.get(sym) ?? null,
-      isValid: validSet.has(sym) && !invalidSet.has(sym),
-    }));
-  }, [parsed.valid, validated.valid, validated.invalid, displayNames]);
+    const unverifiedSet = new Set(validated.unverified);
+    return parsed.valid.map((sym) => {
+      if (validSet.has(sym)) {
+        return {
+          symbol: sym,
+          displayName: displayNames.get(sym) ?? null,
+          state: "valid" as const,
+        };
+      } else if (invalidSet.has(sym)) {
+        return {
+          symbol: sym,
+          displayName: null,
+          state: "invalid" as const,
+        };
+      } else if (unverifiedSet.has(sym)) {
+        return {
+          symbol: sym,
+          displayName: null,
+          state: "unverified" as const,
+        };
+      } else {
+        // Still validating
+        return {
+          symbol: sym,
+          displayName: null,
+          state: "unverified" as const,
+        };
+      }
+    });
+  }, [parsed.valid, validated.valid, validated.invalid, validated.unverified, displayNames]);
 
   const formatInvalidPreview = parsed.invalid;
 
@@ -100,7 +124,7 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
   const canSubmit =
     name.trim().length > 0 &&
     preview.length > 0 &&
-    preview.some((p) => p.isValid) &&
+    preview.some((p) => p.state === "valid" || p.state === "unverified") &&
     !validated.isValidating;
 
   const handleSubmit = () => {
@@ -110,14 +134,14 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
       setError(t("watchlists.emptyNameError"));
       return;
     }
-    if (preview.length === 0 || !preview.some((p) => p.isValid)) {
+    if (preview.length === 0 || !preview.some((p) => p.state === "valid" || p.state === "unverified")) {
       setError(t("watchlists.csvHint"));
       return;
     }
-    // Only validated, format-clean symbols ship into the new list — never
+    // Accept validated symbols and unverified format-clean symbols. Never
     // commit invalid candidates to disk; surface them to the user instead.
     const accept: WatchlistSymbolEntry[] = preview
-      .filter((p) => p.isValid)
+      .filter((p) => p.state === "valid" || p.state === "unverified")
       .map((p) => ({ symbol: p.symbol, name: p.displayName ?? undefined }));
 
     const result = onCreate(trimmedName, accept);
@@ -142,10 +166,11 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
         {/* Name + symbols form */}
         <div className="space-y-4 px-1">
           <div>
-            <label className="text-sm font-medium block mb-1.5">
+            <label htmlFor="watchlist-name-input" className="text-sm font-medium block mb-1.5">
               {t("watchlists.nameLabel")}
             </label>
             <Input
+              id="watchlist-name-input"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t("watchlists.namePlaceholder")}
@@ -155,10 +180,11 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
           </div>
 
           <div>
-            <label className="text-sm font-medium block mb-1.5">
+            <label htmlFor="watchlist-symbols-textarea" className="text-sm font-medium block mb-1.5">
               {t("watchlists.symbolsLabel")}
             </label>
             <textarea
+              id="watchlist-symbols-textarea"
               value={rawSymbols}
               onChange={(e) => setRawSymbols(e.target.value)}
               placeholder={t("watchlists.symbolsPlaceholder")}
@@ -186,9 +212,11 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
                   <span
                     key={p.symbol}
                     className={`text-[11px] font-bold px-2 py-0.5 rounded border ${
-                      p.isValid
+                      p.state === "valid"
                         ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-                        : "bg-yellow-500/15 text-yellow-300 border-yellow-500/30"
+                        : p.state === "unverified"
+                          ? "bg-blue-500/15 text-blue-300 border-blue-500/30"
+                          : "bg-yellow-500/15 text-yellow-300 border-yellow-500/30"
                     }`}
                     title={p.displayName ?? p.symbol}
                   >

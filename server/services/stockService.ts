@@ -948,19 +948,29 @@ export const stockService = {
     // cleanly on free-tier keys (the editor-curated fallback in
     // insightsUniverses is only consulted when the universe already
     // ships a static tag, e.g. when the caller passes an overrides map).
-    const rows: SectorHeatmapInputRow[] = await Promise.all(
-      sortedSyms.map(async (sym): Promise<SectorHeatmapInputRow> => {
-        const [chart, profile] = await Promise.all([
-          this.getChart(sym),
-          this.getProfile(sym),
-        ]);
-        return {
-          symbol: sym,
-          sector: profile?.sector?.trim() || null,
-          chart,
-        };
-      }),
-    );
+    //
+    // Process symbols in bounded batches (8 at a time) to throttle the
+    // fan-out, while retaining parallel getChart/getProfile requests
+    // within each batch and preserving result ordering.
+    const rows: SectorHeatmapInputRow[] = [];
+    const BATCH_SIZE = 8;
+    for (let i = 0; i < sortedSyms.length; i += BATCH_SIZE) {
+      const batch = sortedSyms.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batch.map(async (sym): Promise<SectorHeatmapInputRow> => {
+          const [chart, profile] = await Promise.all([
+            this.getChart(sym),
+            this.getProfile(sym),
+          ]);
+          return {
+            symbol: sym,
+            sector: profile?.sector?.trim() || null,
+            chart,
+          };
+        }),
+      );
+      rows.push(...batchResults);
+    }
 
     // Today's ISO date (server local) → `isPartial` on the rightmost cell.
     // On weekends the server treats the most recent settled bar as "today",

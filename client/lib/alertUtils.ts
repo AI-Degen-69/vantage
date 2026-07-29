@@ -84,12 +84,13 @@ export function formatTimeUntil(
   if (deltaMs <= 0) return t("earningsAlerts.timeUntilNow");
   const totalMin = Math.floor(deltaMs / (60 * 1000));
   if (totalMin < 60) {
-    return t("earningsAlerts.timeUntilMinutes_other", { count: Math.max(1, totalMin) });
+    const count = Math.max(1, totalMin);
+    return t(count === 1 ? "earningsAlerts.timeUntilMinutes_one" : "earningsAlerts.timeUntilMinutes_other", { count });
   }
   const totalHour = Math.floor(deltaMs / MS_PER_HOUR);
   if (totalHour < 24) {
-    return t("earningsAlerts.timeUntilHours_other", { count: totalHour });
+    return t(totalHour === 1 ? "earningsAlerts.timeUntilHours_one" : "earningsAlerts.timeUntilHours_other", { count: totalHour });
   }
   const days = Math.floor(deltaMs / MS_PER_DAY);
-  return t("earningsAlerts.timeUntilDays_other", { count: days });
+  return t(days === 1 ? "earningsAlerts.timeUntilDays_one" : "earningsAlerts.timeUntilDays_other", { count: days });
 }

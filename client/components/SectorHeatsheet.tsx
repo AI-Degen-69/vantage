@@ -135,7 +135,9 @@ export function SectorHeatsheet({ heatmap, days, isLoading }: SectorHeatsheetPro
             {/* leftmost column header — empty for the sector-label column */}
           </div>
           {heatmap!.days.map((date, idx) => {
-            const isPartial = idx === heatmap!.days.length - 1;
+            // Derive isPartial from the first row's cell for this column index,
+            // preserving the server's suppression of partial status for weekend landings.
+            const isPartial = heatmap!.rows.length > 0 && heatmap!.rows[0].cells[idx]?.isPartial === true;
             return (
               <div
                 key={date}

@@ -44,8 +44,8 @@ export default function Charts() {
     midpointGap === null
       ? null
       : midpointGap >= 0
-        ? `Above midpoint · +$${midpointGap.toFixed(2)}`
-        : `Below midpoint · −$${Math.abs(midpointGap).toFixed(2)}`;
+        ? t("charts.aboveMidpoint", { amount: midpointGap.toFixed(2) })
+        : t("charts.belowMidpoint", { amount: Math.abs(midpointGap).toFixed(2) });
 
   return (
     <div className="w-full bg-background dark min-h-screen p-8">
@@ -121,7 +121,7 @@ export default function Charts() {
               {/* Day range */}
               <div className="flex flex-col">
                 <span className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
-                  Day Range
+                  {t("charts.dayRange")}
                 </span>
                 {dayLow !== null && dayHigh !== null ? (
                   <>
@@ -145,7 +145,7 @@ export default function Charts() {
               {/* 52-week range */}
               <div className="flex flex-col">
                 <span className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
-                  52-Week Range
+                  {t("charts.weekRange")}
                 </span>
                 {yearLow !== null && yearHigh !== null ? (
                   <>
@@ -176,9 +176,7 @@ export default function Charts() {
           <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-4 text-xs text-slate-400 flex items-center gap-3">
             <Calendar className="w-4 h-4 shrink-0" />
             <span>
-              Adjust the income / growth / multiple inputs to model scenarios. Forward return
-              assumes reinvestment and the multiple stays constant — a real DCF discounts
-              future cash-flows at WACC, not multiples, so treat this widget as a back-of-the-envelope.
+              {t("charts.dcfGuidance")}
             </span>
             <span className="ml-auto inline-flex items-center gap-1 text-slate-500">
               <TrendingUp className="w-3 h-3" />

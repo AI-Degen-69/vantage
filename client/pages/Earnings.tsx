@@ -94,7 +94,7 @@ export default function EarningsPage() {
       return;
     }
     const diffMs = target.getTime() - base.getTime();
-    const diffWeeks = Math.round(diffMs / (7 * 24 * 60 * 60 * 1000));
+    const diffWeeks = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000));
     setOffset(diffWeeks);
     setWatchlistOnly(true);
   }, [focusDate, initial.from]);

@@ -499,6 +499,14 @@ export function useValidateSymbols(candidates: string[]) {
         .filter(Boolean),
     [candidates],
   );
+  const unverified = useMemo(
+    () =>
+      candidates
+        .slice(8)
+        .map((s) => s.toUpperCase().trim())
+        .filter(Boolean),
+    [candidates],
+  );
   const results = useQueries({
     queries: bounded.map((sym) => ({
       queryKey: ["stockProfile", sym],
@@ -510,26 +518,27 @@ export function useValidateSymbols(candidates: string[]) {
       staleTime: 5 * 60_000,
     })),
   });
-  const valid: Array<{ symbol: string; profile: ApiCompanyProfile }> = [];
-  const invalid: string[] = [];
-  for (let i = 0; i < bounded.length; i++) {
-    const sym = bounded[i];
-    const data = results[i]?.data;
-    if (data && typeof data.symbol === "string" && data.symbol.length > 0) {
-      valid.push({ symbol: data.symbol.toUpperCase(), profile: data });
-    } else if (data === null) {
-      invalid.push(sym);
+  return useMemo(() => {
+    const valid: Array<{ symbol: string; profile: ApiCompanyProfile }> = [];
+    const invalid: string[] = [];
+    for (let i = 0; i < bounded.length; i++) {
+      const sym = bounded[i];
+      const q = results[i];
+      const data = q?.data;
+      if (data && typeof data.symbol === "string" && data.symbol.length > 0) {
+        valid.push({ symbol: data.symbol.toUpperCase(), profile: data });
+      } else if (data === null || (data === undefined && q?.isError)) {
+        invalid.push(sym);
+      }
     }
-  }
-  return useMemo(
-    () => ({
+    return {
       valid,
       invalid,
+      unverified,
       isValidating: results.some((q) => q.isLoading),
       isError: results.some((q) => q.isError),
-    }),
-    [valid, invalid, results],
-  );
+    };
+  }, [bounded, results, unverified]);
 }
 
 export type { IndexQuotesResponse };

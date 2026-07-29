@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
 import { useI18n } from "@/lib/i18n";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "@/components/Sidebar";
@@ -46,7 +46,7 @@ const queryClient = new QueryClient({
 // ----------------------------------------------------------------------------
 // SplAppLayout + SplashPage
 // ----------------------------------------------------------------------------
-const AppLayout = ({ children }: { children: ReactNode }) => (
+const AppLayout = () => (
   // `<WatchlistsProvider>` lifts the module-level watchlists subscription
   // into the React tree so every consumer (page, alert engine, ...) reads
   // the same snapshot via `useSyncExternalStore`. Mounted at AppLayout-
@@ -64,7 +64,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => (
         <Sidebar />
         <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
           <TopBar />
-          <main className="flex-1 overflow-auto">{children}</main>
+          <main className="flex-1 overflow-auto"><Outlet /></main>
         </div>
       </div>
     </EarningsAlertEngine>
@@ -170,28 +170,23 @@ export default function App() {
         <BrowserRouter>
           <ErrorBoundary>
             <Routes>
-              <Route
-                path="/"
-                element={
-                  <AppLayout>
-                    <SplashPage />
-                  </AppLayout>
-                }
-              />
-              <Route path="/portfolios" element={<AppLayout><ErrorBoundary><Portfolios /></ErrorBoundary></AppLayout>} />
-              <Route path="/stock/:ticker" element={<AppLayout><ErrorBoundary><Index /></ErrorBoundary></AppLayout>} />
-              <Route path="/insights" element={<AppLayout><ErrorBoundary><Insights /></ErrorBoundary></AppLayout>} />
-              <Route path="/watchlists" element={<AppLayout><ErrorBoundary><Watchlists /></ErrorBoundary></AppLayout>} />
-              <Route path="/charts" element={<AppLayout><ErrorBoundary><Charts /></ErrorBoundary></AppLayout>} />
-              <Route path="/earnings" element={<AppLayout><ErrorBoundary><Earnings /></ErrorBoundary></AppLayout>} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              {/* Dev-only `/i18n` translator QA route — gated so the bundle
-                  is excluded from production builds via Vite tree-shake on
-                  the dead branch. Tree-shake succeeds because `import.meta.env.DEV`
-                  is statically replaced with `false` at build time. */}
-              {import.meta.env.DEV && (
-                <Route path="/i18n" element={<AppLayout><ErrorBoundary><I18nDebug /></ErrorBoundary></AppLayout>} />
-              )}
+              <Route element={<AppLayout />}>
+                <Route path="/" element={<SplashPage />} />
+                <Route path="/portfolios" element={<ErrorBoundary><Portfolios /></ErrorBoundary>} />
+                <Route path="/stock/:ticker" element={<ErrorBoundary><Index /></ErrorBoundary>} />
+                <Route path="/insights" element={<ErrorBoundary><Insights /></ErrorBoundary>} />
+                <Route path="/watchlists" element={<ErrorBoundary><Watchlists /></ErrorBoundary>} />
+                <Route path="/charts" element={<ErrorBoundary><Charts /></ErrorBoundary>} />
+                <Route path="/earnings" element={<ErrorBoundary><Earnings /></ErrorBoundary>} />
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                {/* Dev-only `/i18n` translator QA route — gated so the bundle
+                    is excluded from production builds via Vite tree-shake on
+                    the dead branch. Tree-shake succeeds because `import.meta.env.DEV`
+                    is statically replaced with `false` at build time. */}
+                {import.meta.env.DEV && (
+                  <Route path="/i18n" element={<ErrorBoundary><I18nDebug /></ErrorBoundary>} />
+                )}
+              </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
           </ErrorBoundary>

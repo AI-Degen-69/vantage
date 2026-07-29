@@ -72,6 +72,13 @@ const en = {
   "dcf.targetingReturn": "Targeting a {{target}}% annualized return.",
   "dcf.projectedPrice": "Projected Price",
 
+  // Charts page
+  "charts.dayRange": "Day Range",
+  "charts.weekRange": "52-Week Range",
+  "charts.aboveMidpoint": "Above midpoint · +${{amount}}",
+  "charts.belowMidpoint": "Below midpoint · −${{amount}}",
+  "charts.dcfGuidance": "Adjust the income / growth / multiple inputs to model scenarios. Forward return assumes reinvestment and the multiple stays constant — a real DCF discounts future cash-flows at WACC, not multiples, so treat this widget as a back-of-the-envelope.",
+
   // DipFinder
   "dipFinder.title": "Dip Finder (SMA Distance)",
   "dipFinder.liveBadge": "LIVE",
@@ -248,8 +255,9 @@ const en = {
   "watchlists.csvHint": "We validate each ticker against /api/stock-overview before adding.",
   "watchlists.validatingLabel": "Validating…",
   "watchlists.validCount_one": "1 valid",
-  "watchlists.validCount_other": "{{n}} valid",
+  "watchlists.validCount_other": "{{count}} valid",
   "watchlists.invalidCount_one": "1 invalid",
+  "watchlists.invalidCount_other": "{{count}} invalid",
   "watchlists.invalidChip": "Invalid",
   "watchlists.createButton": "Create",
   "watchlists.cancelButton": "Cancel",
@@ -369,8 +377,11 @@ const en = {
   "earningsAlerts.historyAction.snoozed": "Snoozed",
   "earningsAlerts.historyAction.dismissed": "Dismissed",
   "earningsAlerts.timeUntilNow": "now",
+  "earningsAlerts.timeUntilMinutes_one": "in {{count}} min",
   "earningsAlerts.timeUntilMinutes_other": "in {{count}} min",
+  "earningsAlerts.timeUntilHours_one": "in {{count}}h",
   "earningsAlerts.timeUntilHours_other": "in {{count}}h",
+  "earningsAlerts.timeUntilDays_one": "in {{count}}d",
   "earningsAlerts.timeUntilDays_other": "in {{count}}d",
 
   // Language
@@ -445,6 +456,13 @@ const he: Record<string, string> = {
   "dcf.targetingReturn": "מכוון לתשואה שנתית של {{target}}%.",
   "dcf.projectedPrice": "מחיר צפוי",
 
+  // Charts page
+  "charts.dayRange": "טווח יומי",
+  "charts.weekRange": "טווח 52 שבועות",
+  "charts.aboveMidpoint": "מעל נקודת האמצע · +${{amount}}",
+  "charts.belowMidpoint": "מתחת לנקודת האמצע · −${{amount}}",
+  "charts.dcfGuidance": "התאם את תשומות ההכנסה / צמיחה / מכפיל כדי לדמות תרחישים. תשואה צפויה מניחה השקעה חוזרת והמכפיל נשאר קבוע — DCF אמיתי מנכה תזרימי מזומנים עתידיים ב-WACC, לא במכפילים, אז התייחס לווידג'ט הזה כחישוב גס.",
+
   "dipFinder.title": "מחפש הנחות (מרחק מ-SMA)",
   "dipFinder.liveBadge": "חי",
   "dipFinder.partialBadge": "חלקי",
@@ -468,6 +486,11 @@ const he: Record<string, string> = {
   "earningsCalendar.marketCapLarge": "גדול ($10B+)",
   "earningsCalendar.marketCapMid": "בינוני ($2B+)",
   "earningsCalendar.marketCapSmall": "קטן (<$2B)",
+  "earningsCalendar.mon": "ב'",
+  "earningsCalendar.tue": "ג'",
+  "earningsCalendar.wed": "ד'",
+  "earningsCalendar.thu": "ה'",
+  "earningsCalendar.fri": "ו'",
   "earningsCalendar.nextWeek": "שבוע הבא",
   "earningsCalendar.noEventsThisWeek": "אין אירועי דוחות השבוע.",
   "earningsCalendar.prevWeek": "שבוע קודם",
@@ -611,8 +634,9 @@ const he: Record<string, string> = {
   "watchlists.csvHint": "כל סמל מאומת מול /api/stock-overview לפני ההוספה.",
   "watchlists.validatingLabel": "מאמת…",
   "watchlists.validCount_one": "1 תקין",
-  "watchlists.validCount_other": "{{n}} תקינים",
+  "watchlists.validCount_other": "{{count}} תקינים",
   "watchlists.invalidCount_one": "1 לא תקין",
+  "watchlists.invalidCount_other": "{{count}} לא תקינים",
   "watchlists.invalidChip": "לא תקין",
   "watchlists.createButton": "צור",
   "watchlists.cancelButton": "בטל",
@@ -737,8 +761,11 @@ const he: Record<string, string> = {
   "earningsAlerts.historyAction.snoozed": "הושתק",
   "earningsAlerts.historyAction.dismissed": "נסגר",
   "earningsAlerts.timeUntilNow": "עכשיו",
+  "earningsAlerts.timeUntilMinutes_one": "בעוד דקה",
   "earningsAlerts.timeUntilMinutes_other": "בעוד {{count}} דקות",
+  "earningsAlerts.timeUntilHours_one": "בעוד שעה",
   "earningsAlerts.timeUntilHours_other": "בעוד {{count}} שעות",
+  "earningsAlerts.timeUntilDays_one": "בעוד יום",
   "earningsAlerts.timeUntilDays_other": "בעוד {{count}} ימים",
 
   "language.en": "English",
