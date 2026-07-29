@@ -1,31 +1,31 @@
 import { Link, useLocation } from "react-router-dom";
 import { BarChart3, List, TrendingUp, Calendar } from "lucide-react";
-import { useTranslation } from "react-i18next";
+import { useI18n } from "@/lib/i18n";
 import LanguageSwitcher from "./LanguageSwitcher";
 
 const navItems = [
   {
-    i18nKey: "sidebar.insights",
+    i18nKey: "nav.insights",
     href: "/insights",
     icon: BarChart3,
   },
   {
-    i18nKey: "sidebar.watchlists",
+    i18nKey: "nav.watchlists",
     href: "/watchlists",
     icon: List,
   },
   {
-    i18nKey: "sidebar.charts",
+    i18nKey: "nav.charts",
     href: "/charts",
     icon: TrendingUp,
   },
   {
-    i18nKey: "sidebar.earnings",
+    i18nKey: "nav.earnings",
     href: "/earnings",
     icon: Calendar,
   },
   {
-    i18nKey: "sidebar.portfolios",
+    i18nKey: "nav.portfolios",
     href: "/portfolios",
     icon: List, // Temporary icon for portfolios
   },
@@ -36,7 +36,7 @@ const navItems = [
  */
 export default function Sidebar() {
   const location = useLocation();
-  const { t } = useTranslation();
+  const { t } = useI18n();
 
   return (
     <aside className="w-64 bg-slate-900 border-e border-slate-800 h-screen flex flex-col">

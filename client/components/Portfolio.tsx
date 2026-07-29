@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useTranslation } from "react-i18next";
+import { useI18n } from "@/lib/i18n";
 import { portfolios } from "@/lib/mockData";
 import {
   useBatchQuotes,
@@ -84,7 +84,7 @@ function historicalCloses(chart: { historical?: { close: number }[] } | null | u
  * @returns The rendered portfolio dashboard
  */
 export default function Portfolio() {
-  const { t } = useTranslation();
+  const { t } = useI18n();
   const [selectedPortfolioId, setSelectedPortfolioId] = useState(portfolios[0].id);
   const [currency, setCurrency] = useState<Currency>("USD");
   const [divOverlay, setDivOverlay] = useState(true);

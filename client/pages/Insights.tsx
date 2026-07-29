@@ -1,15 +1,9 @@
 import { useState, useMemo } from "react";
-import {
-  Search,
-  Loader2,
-  TrendingUp,
-  TrendingDown,
-  X,
-  ChevronDown,
-} from "lucide-react";
+import { Search, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useTranslation } from "react-i18next";
-import { useInsightsTab, useBatchQuotes } from "@/hooks/useStockData";
+import { useI18n } from "@/lib/i18n";
+import { useInsightsTab, useBatchQuotes, useSectorHeatmap } from "@/hooks/useStockData";
+import { SectorHeatsheet } from "@/components/SectorHeatsheet";
 import type { InsightsTabId, StockQuote } from "@shared/api";
 
 const TABS: { id: InsightsTabId; i18nKey: string }[] = [
@@ -44,36 +38,10 @@ function formatMarketCap(mc: number | undefined): string {
  * @returns The rendered insights page.
  */
 export default function Insights() {
-  const { t } = useTranslation();
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<InsightsTabId>("sp500");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedSector, setSelectedSector] = useState<string>("all");
-  const [marketCapRange, setMarketCapRange] = useState<MarketCapRange>("all");
-  const [priceChangeRange, setPriceChangeRange] = useState<PriceChangeRange>("all");
-  const [showSectorDropdown, setShowSectorDropdown] = useState(false);
-
-  const { data, isLoading, isError } = useInsightsStocks(activeTab);
-
-  const stocks: InsightsStock[] = data?.stocks ?? [];
-
-  // Extract unique non-null sectors
-  const sectors = useMemo(() => {
-    const set = new Set<string>();
-    stocks.forEach((s) => {
-      if (s.sector) set.add(s.sector);
-    });
-    return Array.from(set).sort();
-  }, [stocks]);
-
-  const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (searchQuery) count++;
-    if (selectedSector !== "all") count++;
-    if (marketCapRange !== "all") count++;
-    if (priceChangeRange !== "all") count++;
-    return count;
-  }, [searchQuery, selectedSector, marketCapRange, priceChangeRange]);
 
   const { data: tabData, isLoading: tabLoading, isFetching: tabFetching } = useInsightsTab(activeTab);
 
@@ -108,6 +76,19 @@ export default function Insights() {
     );
   }, [merged, searchQuery]);
 
+  // Sector × 5-day heatmap. Lives entirely on the server side
+  // (`/api/sector-heatmap`): the route fans out `getChart` + `getProfile`
+  // per symbol, aggregates by sector tag in one pass, and node-caches the
+  // full response for 15 minutes. Client staleTime matches the server
+  // TTL with a 5-minute loop so the user sees fresh intraday without
+  // hammering the cache.
+  const heatmapSymbols = useMemo(() => merged.map((r) => r.symbol), [merged]);
+  const {
+    data: heatmapData,
+    isLoading: heatmapLoading,
+    isFetching: heatmapFetching,
+  } = useSectorHeatmap(heatmapSymbols, 5);
+
   // Card-level [LIVE] / [MOCK] comes from whether ANY quote landed.
   const liveCount = merged.filter((r) => r.price !== undefined).length;
   const totalCount = merged.length;
@@ -135,6 +116,23 @@ export default function Insights() {
           </div>
         </div>
       </div>
+
+      {/* Sector Heatsheet — 5-day columnar heatmap of average daily %
+          moves per sector. Server aggregates per-ticker historical
+          closes (cached 15 min) and renders a Bloomberg-style grid:
+          rows = sectors (best weekNet at the top), columns = past
+          5 trading days, cells tinted by |mean move|. Hidden when the
+          server returns zero tagged sectors. */}
+      <SectorHeatsheet
+        heatmap={heatmapData ?? null}
+        days={5}
+        isLoading={heatmapLoading && !heatmapData}
+      />
+      {heatmapFetching && !!heatmapData && (
+        <div className="text-center text-xs text-slate-500 -mt-2 mb-2">
+          {t("common.search")}…
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="bg-slate-800/30 border-b border-slate-700 overflow-x-auto">

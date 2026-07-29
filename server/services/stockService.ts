@@ -21,12 +21,18 @@ import {
   KeyMetricsTTM,
   NewsItem,
   RatiosTTM,
+  SectorHeatmapResponse,
   SmaDistanceResponse,
   SmaDistanceRow,
   StockMetrics,
   StockQuote,
 } from '@shared/api';
 import { insightsTabUniverses } from './insightsUniverses';
+// Relative path (not `@shared/...`) so the helper resolves cleanly under Vite's
+// config-file resolver, which doesn't apply its own `resolve.alias` map when
+// bundling vite.config.ts at startup. The TS path alias still works — this is
+// purely a runtime resolution concern at config-load time.
+import { aggregateSectorHeatmap, type SectorHeatmapInputRow } from '../../shared/aggregateSectorHeatmap';
 
 // yahoo-finance2 v4 ships the class as its default export. Use one shared
 // instance per process; constructing it "throwaway" per call degrades
@@ -49,6 +55,7 @@ const yahooFinance = new yahooFinanceDefault({ suppressNotices: ['yahooSurvey'] 
 // ---- Cache ----------------------------------------------------------------
 const cache = new NodeCache({ stdTTL: 3600 });
 const QUOTE_TTL = 60; // 1 min — quotes are the only thing we ever refetch live
+const SECTOR_HEATMAP_TTL = 900; // 15 min — heatmap recomputation cache (day deltas are slow-moving)
 
 // ---- Warn throttling --------------------------------------
 const lastWarnAt = new Map<string, number>();
@@ -902,6 +909,69 @@ export const stockService = {
     };
     cache.set(cacheKey, out, 3600);
     return out;
+  },
+
+  /**
+   * Sector × days heatmap for an Insights universe. Cache the FULL
+   * aggregation result for 15 minutes — every per-ticker chart is
+   * independently cached in `getChart` for 1h, so a 30-ticker universe on
+   * the first warm call burns ~30 upstream Yahoo requests; subsequent
+   * refreshes inside the TTL window are pure node-cache reads.
+   *
+   * The `sectors` arg lets the caller scope the heatmap to a subset of
+   * sectors (e.g. "Tech only"); rows whose sector isn't in the allowlist
+   * flow into `untagged` so the UI can still count them. Pass `[]` to
+   * include every distinct sector in `symbols`.
+   *
+   * Cache key includes the sorted symbol list, the day count, and the
+   * sector allowlist so distinct calls don't collide.
+   */
+  async getSectorHeatmap(
+    symbols: string[],
+    days: number = 5,
+    sectorAllow: string[] | null = null,
+  ): Promise<SectorHeatmapResponse> {
+    if (symbols.length === 0) {
+      return { days: [], rows: [], untagged: [], generatedAt: new Date().toISOString() };
+    }
+    const sortedSyms = symbols.slice().map((s) => s.toUpperCase()).sort();
+    const allowKey =
+      sectorAllow && sectorAllow.length > 0 ? sectorAllow.slice().sort().join(',') : '*';
+    const cacheKey = `sector_heatmap_${days}_${allowKey}_${sortedSyms.join(',')}`;
+    if (cache.has(cacheKey)) return cache.get(cacheKey) as SectorHeatmapResponse;
+
+    // Fan out `getChart` + `getProfile` per symbol. Both are independently
+    // cached (1h for chart, 1h for profile), so a 30-ticker universe on
+    // the first warm call costs ~60 upstream calls (parallel). Subsequent
+    // calls inside the 15-min node-cache TTL are pure in-memory reads.
+    // Profile.sector is canonical: FMP's `/stable/profile` returns it
+    // cleanly on free-tier keys (the editor-curated fallback in
+    // insightsUniverses is only consulted when the universe already
+    // ships a static tag, e.g. when the caller passes an overrides map).
+    const rows: SectorHeatmapInputRow[] = await Promise.all(
+      sortedSyms.map(async (sym): Promise<SectorHeatmapInputRow> => {
+        const [chart, profile] = await Promise.all([
+          this.getChart(sym),
+          this.getProfile(sym),
+        ]);
+        return {
+          symbol: sym,
+          sector: profile?.sector?.trim() || null,
+          chart,
+        };
+      }),
+    );
+
+    // Today's ISO date (server local) → `isPartial` on the rightmost cell.
+    // On weekends the server treats the most recent settled bar as "today",
+    // so callers don't see "today (partial)" on Saturday/Sunday landings.
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const result = aggregateSectorHeatmap(rows, days, {
+      allowedSectors: sectorAllow,
+      todayIso,
+    });
+    cache.set(cacheKey, result, SECTOR_HEATMAP_TTL);
+    return result;
   },
 
   /**

@@ -1,8 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
-import { useTranslation } from "react-i18next";
+import { useI18n } from "@/lib/i18n";
 import { useEffect, useState } from "react";
 import { useIndexQuotes } from "@/hooks/useStockData";
 import type { IndexQuote } from "@shared/api";
+import { EarningsAlertStrip } from "@/components/EarningsAlertStrip";
+import { EarningsAlertHistoryButton } from "@/components/EarningsAlertHistoryPanel";
 
 /**
  * Provides the styling classes for an index quote pill container.
@@ -96,7 +98,7 @@ function Freshness({ updatedAt }: { updatedAt: number | null }) {
  * Renders the application header with navigation context, market index summaries, and data freshness.
  */
 export default function TopBar() {
-  const { t } = useTranslation();
+  const { t, lang } = useI18n();
   const location = useLocation();
   const { data, isLoading, dataUpdatedAt } = useIndexQuotes();
 
@@ -105,18 +107,17 @@ export default function TopBar() {
     const path = location.pathname;
     if (path === "/insights" || path.startsWith("/stock/")) {
       const ticker = path.startsWith("/stock/") ? path.replace("/stock/", "").toUpperCase() : "";
-      return ticker ? `${t("sidebar.insights")} · ${ticker}` : t("sidebar.insights");
+      return ticker ? `${t("nav.insights")} · ${ticker}` : t("nav.insights");
     }
-    if (path === "/watchlists") return t("sidebar.watchlists");
-    if (path === "/charts") return t("sidebar.charts");
-    if (path === "/earnings") return t("sidebar.earnings");
-    if (path === "/portfolios") return t("sidebar.portfolios");
+    if (path === "/watchlists") return t("nav.watchlists");
+    if (path === "/charts") return t("nav.charts");
+    if (path === "/earnings") return t("nav.earnings");
+    if (path === "/portfolios") return t("nav.portfolios");
     return "";
   };
 
-  // Detect UI language from html dir attribute as a cheap + reliable signal
-  // (i18n.language flips on toggle; we just need it for an aria-suffix).
-  const language = typeof document !== "undefined" && document.documentElement.dir === "rtl" ? "he" : "en";
+  // Use lang directly from the I18nProvider context — flips on toggle.
+  const language = lang;
 
   return (
     <header className="h-16 border-b border-slate-800 bg-slate-900/50 backdrop-blur flex items-center justify-between px-6 sticky top-0 z-40 w-full shrink-0">
@@ -133,6 +134,15 @@ export default function TopBar() {
 
       {/* Center section */}
       <div className="flex-1 flex justify-center" />
+
+      {/* The strip itself renders nothing — it dispatches sonner toasts via
+          the engine mounted above. Mounting it inside TopBar ensures it's
+          reactive to watchlist symbols + financial-calendar polling while
+          the rest of the page is alive. The history button is the user-
+          visible Bell badge that opens the per-day acknowledged-alerts
+          popover. */}
+      <EarningsAlertStrip />
+      <EarningsAlertHistoryButton />
 
       {/* Right section: Market index pills */}
       <div className="flex items-center gap-2">

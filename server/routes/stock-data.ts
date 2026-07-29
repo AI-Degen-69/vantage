@@ -13,6 +13,7 @@ import type {
   SmaDistanceResponse,
   StockMetrics,
   StockQuote,
+  SectorHeatmapResponse,
 } from "@shared/api";
 
 const MAX_SYMBOLS = 50;
@@ -116,6 +117,41 @@ export const handleIndexQuotes: RequestHandler = async (_req, res) => {
     sp500: wrap(data.sp500, "S&P 500"),
     nasdaq: wrap(data.nasdaq, "Nasdaq"),
   });
+};
+
+/**
+ * Sector × days heatmap for an Insights universe. Fanned out server-side
+ * from `getChart` per symbol, then aggregated by sector in one pass.
+ * Whole-aggregation cached for 15 minutes; per-ticker chart cache reused.
+ *
+ * Query params:
+ *   - `symbols=AAPL,MSFT,…` (required, comma-separated; max 50)
+ *   - `days=5` (optional, clamped 3-10; default 5)
+ *   - `sectors=Technology,Healthcare` (optional allowlist; rows outside the
+ *     allowlist flow into `untagged[]` instead of `rows`)
+ */
+export const handleSectorHeatmap: RequestHandler = async (req, res) => {
+  const symbolsRaw = String(req.query.symbols || "");
+  if (!symbolsRaw) return res.status(400).json({ error: "symbols parameter required" });
+  const symbols = symbolsRaw.split(",").map((s) => s.trim()).filter(Boolean);
+  if (symbols.length > MAX_SYMBOLS) {
+    return res.status(400).json({
+      error: `Too many symbols requested. Maximum is ${MAX_SYMBOLS}, received ${symbols.length}`,
+    });
+  }
+  const daysRaw = Number(req.query.days ?? 5);
+  const days = Math.max(3, Math.min(10, Number.isFinite(daysRaw) ? Math.floor(daysRaw) : 5));
+  const sectorsRaw = String(req.query.sectors || "").trim();
+  const sectorAllow =
+    sectorsRaw.length > 0
+      ? sectorsRaw.split(",").map((s) => s.trim()).filter(Boolean)
+      : null;
+  const data: SectorHeatmapResponse = await stockService.getSectorHeatmap(
+    symbols,
+    days,
+    sectorAllow,
+  );
+  res.json(data);
 };
 
 /**

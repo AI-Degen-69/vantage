@@ -1,8 +1,8 @@
-import { useTranslation } from "react-i18next";
+import { useI18n } from "@/lib/i18n";
 import { defaultWatchlist } from "@/lib/mockData";
 import { Sun, Moon } from "lucide-react";
 import { useEarningsCalendar } from "@/hooks/useStockData";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 type MarketCapFilter = "all" | "large" | "mid" | "small";
 
@@ -11,10 +11,25 @@ interface EarningsCalendarProps {
   to: string;
   marketCap: MarketCapFilter;
   watchlistOnly: boolean;
+  focusSymbol?: string;
+  focusDate?: string;
 }
 
-const EventCard = ({ ev, t }: { ev: any; t: any }) => (
-  <div className="bg-slate-800/50 rounded-lg p-3 border border-slate-700/50 hover:border-slate-600 transition-colors">
+interface EventCardProps {
+  ev: any;
+  t: any;
+  isFocus: boolean;
+}
+
+const EventCard = ({ ev, t, isFocus }: EventCardProps) => (
+  <div
+    data-focus-event={`${ev.ticker}-${ev.date}`}
+    className={`bg-slate-800/50 rounded-lg p-3 border transition-colors ${
+      isFocus
+        ? "border-blue-500 ring-2 ring-blue-500/40 shadow-lg shadow-blue-500/20"
+        : "border-slate-700/50 hover:border-slate-600"
+    }`}
+  >
     <div className="flex justify-between items-start mb-2">
       <div className="font-bold text-foreground text-lg">{ev.ticker}</div>
       <div
@@ -84,7 +99,7 @@ export const mockEarningsEvents = [
  * Determines whether a market capitalization matches the selected filter.
  *
  * @param mc - The market capitalization to evaluate.
- * @param filter - The market-capacity bucket to apply.
+ * @param filter - The market-capacity bucket to apply
  * @returns `true` if the market capitalization matches the filter, `false` otherwise.
  */
 function inMarketCapBucket(mc: number | undefined, filter: MarketCapFilter): boolean {
@@ -97,69 +112,134 @@ function inMarketCapBucket(mc: number | undefined, filter: MarketCapFilter): boo
 }
 
 /**
+ * Returns the weekday index for a YYYY-MM-DD ISO string. Defaults to 0
+ * (Sunday) when the input is malformed so the row's `weekday` stays numeric
+ * (the days grid silently drops unknown values).
+ */
+function weekdayOf(isoDate: string): number {
+  const d = new Date(isoDate);
+  return Number.isFinite(d.getTime()) ? d.getDay() : -1;
+}
+
+/**
  * Displays a filtered earnings calendar for a selected date range.
  *
  * @param from - Start date of the earnings data range
  * @param to - End date of the earnings data range
  * @param marketCap - Market-cap bucket used to filter events
  * @param watchlistOnly - Whether to show only watchlist events
+ * @param focusSymbol - When set, the matching card renders with a blue ring
+ * @param focusDate - The matching card's date (paired with focusSymbol)
  * @returns The rendered earnings calendar
  */
-export default function EarningsCalendar({ from, to, marketCap, watchlistOnly }: EarningsCalendarProps) {
-  const { t } = useTranslation();
+export default function EarningsCalendar({
+  from,
+  to,
+  marketCap,
+  watchlistOnly,
+  focusSymbol,
+  focusDate,
+}: EarningsCalendarProps) {
+  const { t } = useI18n();
+
+  // Static seed list (curated universe). We deliberately do NOT call
+  // `useWatchlists()` here — that hook is single-instance by design and
+  // mounting a second instance from this page would let a same-tab
+  // mutation on the Watchlists page diverge from what we see (the
+  // browser's `storage` event does not fire in the originating tab).
+  // The earnings-alert engine (TopBar) already handles the live
+  // user-list union through its own `useEarningsAlerts` mount.
+  const watchlistSymbols = useMemo(
+    () => defaultWatchlist.map((w) => w.symbol),
+    []
+  );
 
   const { data, isLoading } = useEarningsCalendar(from, to);
 
-  const eventsList = useMemo(() => {
+  const eventsList = useMemo<Array<any>>(() => {
     if (data && data.length > 0) {
-      const watchlistSymbols = defaultWatchlist.map((w) => w.symbol);
       // FMP returns a LOT of earnings. Prioritize our watchlist, then large caps if possible.
       let filtered = data.filter(
-        (e: any) => watchlistSymbols.includes(e.symbol) || (e.revenueEstimated && e.revenueEstimated > 5_000_000_000)
+        (e: any) =>
+          watchlistSymbols.includes((e.symbol ?? "").toUpperCase()) ||
+          (e.revenueEstimated && e.revenueEstimated > 5_000_000_000)
       );
 
       if (watchlistOnly) {
-        filtered = filtered.filter((e: any) => watchlistSymbols.includes(e.symbol));
+        filtered = filtered.filter((e: any) =>
+          watchlistSymbols.includes((e.symbol ?? "").toUpperCase())
+        );
       }
 
       filtered = filtered.filter((e: any) => inMarketCapBucket(e.marketCap, marketCap));
 
-      return filtered.slice(0, 25).map((e: any) => {
-        const dateObj = new Date(e.date);
-        const dayStr = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][dateObj.getDay()];
-        return {
-          ticker: e.symbol,
-          date: dayStr,
-          epsEst: e.epsEstimated || 0,
-          epsActual: e.eps,
-          revEst: (e.revenueEstimated || 0) / 1e9,
-          revActual: (e.revenue || 0) / 1e9,
-          time: e.time === "amc" ? "After Close" : "Before Open",
-          marketCap: e.marketCap,
-          surprise: e.eps ? (e.eps > e.epsEstimated ? "beat" : "miss") : "none",
-        };
-      });
+      return filtered.slice(0, 25).map((e: any) => ({
+        ticker: e.symbol,
+        date: e.date,
+        weekday: weekdayOf(e.date),
+        epsEst: e.epsEstimated || 0,
+        epsActual: e.eps,
+        revEst: (e.revenueEstimated || 0) / 1e9,
+        revActual: (e.revenue || 0) / 1e9,
+        time: e.time === "amc" ? "After Close" : "Before Open",
+        marketCap: e.marketCap,
+        surprise: e.eps ? (e.eps > e.epsEstimated ? "beat" : "miss") : "none",
+      }));
     }
 
     // Mock fallback — apply the same filters so the controls act on mock data too.
     let mockFiltered = mockEarningsEvents.slice(0, 25);
     if (watchlistOnly) {
-      const watchlistSymbols = defaultWatchlist.map((w) => w.symbol);
-      mockFiltered = mockFiltered.filter((e: any) => watchlistSymbols.includes(e.ticker));
+      mockFiltered = mockFiltered.filter((e: any) =>
+        watchlistSymbols.includes((e.ticker ?? "").toUpperCase())
+      );
     }
     mockFiltered = mockFiltered.filter((e: any) => inMarketCapBucket(e.marketCap, marketCap));
-    return mockFiltered;
-  }, [data, marketCap, watchlistOnly]);
+    // Mock events use late-week weekdays; map English abbreviations back to
+    // numeric weekday so the grid filters using the SAME comparison as the
+    // real-data branch.
+    const mockNameToWd: Record<string, number> = {
+      Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+    };
+    return mockFiltered.map((e: any) => ({
+      ...e,
+      weekday: mockNameToWd[e.date] ?? -1,
+    }));
+  }, [data, marketCap, watchlistOnly, watchlistSymbols]);
+
+  // Scroll the matching card into view once the calendar has rendered
+  // it. We re-run on every `[focusSymbol, focusDate, eventsList]` change
+  // so navigation back/forward (changing ?focus param) re-scrolls. Using
+  // `didScrollRef` keeps subsequent refetches from harassing the
+  // viewport with redundant smooth-scroll calls.
+  const didScrollRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focusSymbol || !focusDate) {
+      didScrollRef.current = null;
+      return;
+    }
+    const stamp = `${focusSymbol}|${focusDate}|${eventsList.length}`;
+    if (didScrollRef.current === stamp) return;
+    const el = document.querySelector(
+      `[data-focus-event="${focusSymbol}-${focusDate}"]`
+    ) as HTMLElement | null;
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      didScrollRef.current = stamp;
+    }
+  }, [focusSymbol, focusDate, eventsList.length, isLoading]);
 
   const isMock = !data || data.length === 0;
   const eventCount = eventsList.length;
 
+  // Numeric weekday (1=Mon..5=Fri) so the grid matches by index instead of
+  // trying to compare i18n strings across languages.
   const days = [
-    { key: "Mon", i18nKey: "earningsCalendar.mon" },
-    { key: "Tue", i18nKey: "earningsCalendar.tue" },
-    { key: "Wed", i18nKey: "earningsCalendar.wed" },
-    { key: "Thu", i18nKey: "earningsCalendar.thu" },
-    { key: "Fri", i18nKey: "earningsCalendar.fri" },
+    { wd: 1, i18nKey: "earningsCalendar.mon" },
+    { wd: 2, i18nKey: "earningsCalendar.tue" },
+    { wd: 3, i18nKey: "earningsCalendar.wed" },
+    { wd: 4, i18nKey: "earningsCalendar.thu" },
+    { wd: 5, i18nKey: "earningsCalendar.fri" },
   ];
 
   const empty = eventCount === 0;
@@ -169,9 +249,7 @@ export default function EarningsCalendar({ from, to, marketCap, watchlistOnly }:
       <div className="absolute top-2 right-2 flex items-center gap-2 z-10">
         {!isLoading && (
           <span className="text-xs text-slate-400 bg-slate-800/60 px-2 py-1 rounded">
-            {eventCount === 1
-              ? t("earningsCalendar.showing", { count: eventCount })
-              : t("earningsCalendar.showingPlural", { count: eventCount })}
+            {t("earningsCalendar.showing", { count: eventCount })}
           </span>
         )}
         {isMock && !isLoading && (
@@ -187,15 +265,20 @@ export default function EarningsCalendar({ from, to, marketCap, watchlistOnly }:
       ) : (
         <div className="grid grid-cols-5 divide-x divide-border rtl:divide-x-reverse">
           {days.map((dayObj) => {
-            const events = eventsList.filter((e: any) => e.date === dayObj.key);
+            const events = eventsList.filter((e: any) => e.weekday === dayObj.wd);
             return (
-              <div key={dayObj.key} className="min-h-[400px]">
+              <div key={dayObj.wd} className="min-h-[400px]">
                 <div className="bg-slate-900/50 p-4 border-b border-border text-center">
                   <span className="font-semibold text-foreground">{t(dayObj.i18nKey)}</span>
                 </div>
                 <div className="p-4 flex flex-col gap-4">
                   {events.filter((e: any) => e.time === "Before Open").map((ev: any, i: number) => (
-                    <EventCard key={`pre-${i}`} ev={ev} t={t} />
+                    <EventCard
+                      key={`pre-${ev.ticker}-${i}`}
+                      ev={ev}
+                      t={t}
+                      isFocus={focusSymbol === ev.ticker && focusDate === ev.date}
+                    />
                   ))}
 
                   {events.some((e: any) => e.time === "Before Open") &&
@@ -204,7 +287,12 @@ export default function EarningsCalendar({ from, to, marketCap, watchlistOnly }:
                     )}
 
                   {events.filter((e: any) => e.time === "After Close").map((ev: any, i: number) => (
-                    <EventCard key={`post-${i}`} ev={ev} t={t} />
+                    <EventCard
+                      key={`post-${ev.ticker}-${i}`}
+                      ev={ev}
+                      t={t}
+                      isFocus={focusSymbol === ev.ticker && focusDate === ev.date}
+                    />
                   ))}
                 </div>
               </div>

@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
-import { useTranslation } from "react-i18next";
+import { useI18n } from "@/lib/i18n";
 import ChartModal from "@/components/ChartModal";
 import InsightsCard from "@/components/InsightsCard";
 import CompanyProfile from "@/components/CompanyProfile";
@@ -13,7 +13,7 @@ import { useStockQuote, useStockProfile, useStockFinancials } from "@/hooks/useS
  * Displays a localized stock overview with quote information, company details, financial metrics, and interactive charts for the selected ticker.
  */
 export default function Index() {
-  const { t } = useTranslation();
+  const { t } = useI18n();
   const { ticker: urlTicker } = useParams<{ ticker?: string }>();
   const [selectedMetric, setSelectedMetric] = useState<FinancialMetric | null>(null);
 
@@ -155,35 +155,11 @@ export default function Index() {
     return d.toISOString().slice(0, 10);
   }, [quoteData?.earningsAnnouncement]);
 
-  const quickStats = stockData?.quickStats ?? [];
-  const financialMetrics = stockData?.financialMetrics ?? [];
-  const quote = stockData?.quote;
-  const news = stockData?.news ?? [];
-
-  const formatNewsDate = (datetime: number) => {
-    const diff = Date.now() - datetime * 1000;
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    if (hours < 1) return "Just now";
-    if (hours < 24) return `${hours}h ago`;
-    const days = Math.floor(hours / 24);
-    if (days < 7) return `${days}d ago`;
-    return new Date(datetime * 1000).toLocaleDateString();
-  };
-
-  const categoryColor: Record<string, string> = {
-    earnings: "text-chart-green bg-chart-green/10 border-chart-green/30",
-    "merger & acquisition": "text-purple-400 bg-purple-400/10 border-purple-400/30",
-    "analyst": "text-blue-400 bg-blue-400/10 border-blue-400/30",
-    "guidance": "text-amber-400 bg-amber-400/10 border-amber-400/30",
-    "general": "text-slate-400 bg-slate-400/10 border-slate-400/30",
-  };
-
-  const getCategoryStyle = (category: string) => {
-    const key = Object.keys(categoryColor).find((k) =>
-      category.toLowerCase().includes(k)
-    );
-    return key ? categoryColor[key] : categoryColor["general"];
-  };
+  // NOTE: `categoryColor` and `getCategoryStyle` previously lived here to
+  // color news-pill chips per category, but Index.tsx no longer renders
+  // news pills (the CompanyProfile sub-component handles news). Both
+  // aliases are removed so future readers don't wire them back up — news
+  // styling lives in `client/components/CompanyProfile.tsx`.
 
   return (
     <div className="w-full bg-background dark">
