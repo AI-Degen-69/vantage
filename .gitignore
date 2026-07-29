@@ -24,4 +24,6 @@ dist-ssr
 *.sw?
 
 .config/
-!.env
+
+# Environment variables
+.env

@@ -1,139 +1,159 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+import { useTranslation } from "react-i18next";
 import ChartModal from "@/components/ChartModal";
-import { quickStats, financialMetrics, FinancialMetric } from "@/lib/mockData";
-import { ChevronDown } from "lucide-react";
-import { useStockQuote, useStockOverview } from "@/hooks/useStockData";
+import InsightsCard from "@/components/InsightsCard";
+import CompanyProfile from "@/components/CompanyProfile";
+import TickerLogo from "@/components/TickerLogo";
+import { HeaderPriceSkeleton, MetricCardSkeleton } from "@/components/Skeleton";
+import { financialMetrics, FinancialMetric } from "@/lib/mockData";
+import { useStockQuote, useStockProfile, useStockFinancials } from "@/hooks/useStockData";
 
+/**
+ * Displays a localized stock overview with quote information, company details, financial metrics, and interactive charts for the selected ticker.
+ */
 export default function Index() {
+  const { t } = useTranslation();
   const { ticker: urlTicker } = useParams<{ ticker?: string }>();
   const [selectedMetric, setSelectedMetric] = useState<FinancialMetric | null>(null);
-  const [expandedStats, setExpandedStats] = useState<{ [key: number]: boolean }>({});
 
-  // Use ticker from URL or default to AAPL
   const ticker = urlTicker?.toUpperCase() || "AAPL";
 
-  // Fetch real stock data from API
-  const { data: quoteData, loading: quoteLoading } = useStockQuote(ticker);
-  const { data: overviewData, loading: overviewLoading } = useStockOverview(ticker);
+  const { data: quoteData, isLoading: quoteLoading } = useStockQuote(ticker);
+  const { data: overviewData, isLoading: overviewLoading } = useStockProfile(ticker);
+  // isFetched becomes true once the first query attempt settles (success
+  // OR failure). We need it to distinguish "still loading" from "loaded
+  // with no data" — otherwise the metrics grid shows skeletons forever
+  // when FMP returns null (which happens on the free tier for many tickers).
+  const {
+    data: financialsData,
+    isFetched: financialsFetched,
+    refetch: refetchFinancials,
+  } = useStockFinancials(ticker);
 
-  const colorMap: { [key: string]: string } = {
-    "chart-green": "#00d084",
-    "chart-orange": "#ff9500",
-    "chart-blue": "#3b82f6",
-    "chart-cyan": "#06b6d4",
-    "chart-purple": "#a855f7",
-    "chart-pink": "#ec4899",
-  };
+  const metrics = useMemo(() => {
+    // When no real financials land for the active ticker, do NOT silently
+    // surface financialMetrics (which is hardcoded AAPL data) for a
+    // non-AAPL ticker. Render empty so the `metrics.length === 0` branch
+    // below shows MetricCardSkeleton instead.
+    let metricsResult: typeof financialMetrics = [];
 
-  const toggleStatExpand = (idx: number) => {
-    setExpandedStats((prev) => ({
-      ...prev,
-      [idx]: !prev[idx],
-    }));
-  };
+    const inc = financialsData?.income ?? [];
+    const bal = financialsData?.balance ?? [];
+    if (inc.length > 0) {
+      const incAsc = [...inc].sort((a, b) => (a.date < b.date ? -1 : 1));
+      const balAsc = [...bal].sort((a, b) => (a.date < b.date ? -1 : 1));
 
-  const renderSmallChart = (metric: FinancialMetric) => {
-    const chartColor = colorMap[metric.color] || "#3b82f6";
-    const data = metric.data.slice(-8);
+      const safeYoy = (arr: typeof inc, key: keyof typeof inc[number]) => {
+        if (arr.length < 2) return 0;
+        const prev = arr[arr.length - 2][key] as number;
+        const current = arr[arr.length - 1][key] as number;
+        if (!prev) return 0;
+        return ((current - prev) / Math.abs(prev)) * 100;
+      };
 
-    const commonProps = {
-      data,
-      margin: { top: 5, right: 10, left: 0, bottom: 5 },
-    };
-
-    switch (metric.type) {
-      case "bar":
-        return (
-          <ResponsiveContainer width="100%" height={140}>
-            <BarChart {...commonProps}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
-              <XAxis dataKey="date" hide />
-              <YAxis hide />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#1f2937",
-                  border: "1px solid #374151",
-                  color: "#ffffff",
-                  borderRadius: "4px",
-                  fontSize: "12px",
-                }}
-                cursor={false}
-              />
-              <Bar dataKey="value" fill={chartColor} radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        );
-      case "area":
-        return (
-          <ResponsiveContainer width="100%" height={140}>
-            <AreaChart {...commonProps}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
-              <XAxis dataKey="date" hide />
-              <YAxis hide />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#1f2937",
-                  border: "1px solid #374151",
-                  color: "#ffffff",
-                  borderRadius: "4px",
-                  fontSize: "12px",
-                }}
-                cursor={false}
-              />
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke={chartColor}
-                fill={chartColor}
-                fillOpacity={0.2}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        );
-      case "line":
-      default:
-        return (
-          <ResponsiveContainer width="100%" height={140}>
-            <LineChart {...commonProps}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
-              <XAxis dataKey="date" hide />
-              <YAxis hide />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#1f2937",
-                  border: "1px solid #374151",
-                  color: "#ffffff",
-                  borderRadius: "4px",
-                  fontSize: "12px",
-                }}
-                cursor={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="value"
-                stroke={chartColor}
-                dot={false}
-                strokeWidth={2}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        );
+      metricsResult = [
+        {
+          name: "insights.revenue",
+          unit: "B",
+          yoy: safeYoy(incAsc, "revenue"),
+          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.revenue / 1e9 })),
+          type: "bar",
+          color: "blue",
+        },
+        {
+          name: "insights.ebitda",
+          unit: "B",
+          yoy: safeYoy(incAsc, "ebitda"),
+          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.ebitda / 1e9 })),
+          type: "bar",
+          color: "blue",
+        },
+        {
+          name: "insights.grossProfit",
+          unit: "B",
+          yoy: safeYoy(incAsc, "grossProfit"),
+          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.grossProfit / 1e9 })),
+          type: "bar",
+          color: "blue",
+        },
+        {
+          name: "insights.operatingIncome",
+          unit: "B",
+          yoy: safeYoy(incAsc, "operatingIncome"),
+          data: (incAsc.filter((row) => row.operatingIncome !== undefined) as typeof inc).map((d) => ({
+            date: d.calendarYear,
+            value: (d.operatingIncome ?? 0) / 1e9,
+          })),
+          type: "bar",
+          color: "blue",
+        },
+        {
+          name: "insights.netIncome",
+          unit: "B",
+          yoy: safeYoy(incAsc, "netIncome"),
+          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.netIncome / 1e9 })),
+          type: "bar",
+          color: "blue",
+        },
+        {
+          name: "insights.eps",
+          unit: "$",
+          yoy: safeYoy(incAsc, "eps"),
+          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.eps })),
+          type: "line",
+          color: "blue",
+        },
+        {
+          name: "insights.cashAndEquivalents",
+          unit: "B",
+          yoy:
+            balAsc.length >= 2
+              ? ((balAsc[balAsc.length - 1].cashAndCashEquivalents - balAsc[balAsc.length - 2].cashAndCashEquivalents) /
+                  Math.abs(balAsc[balAsc.length - 2].cashAndCashEquivalents)) *
+                100
+              : 0,
+          data: balAsc.map((d) => ({ date: d.calendarYear, value: d.cashAndCashEquivalents / 1e9 })),
+          type: "bar",
+          color: "green",
+        },
+        {
+          name: "insights.totalAssets",
+          unit: "B",
+          yoy:
+            balAsc.length >= 2
+              ? ((balAsc[balAsc.length - 1].totalAssets - balAsc[balAsc.length - 2].totalAssets) / Math.abs(balAsc[balAsc.length - 2].totalAssets)) * 100
+              : 0,
+          data: balAsc.map((d) => ({ date: d.calendarYear, value: (d.totalAssets ?? 0) / 1e9 })),
+          type: "bar",
+          color: "purple",
+        },
+      ];
     }
-  };
+    return metricsResult;
+  }, [financialsData]);
+
+  // Today vs previous-close delta (NOT a true post-market price — FMP free
+  // tier doesn't carry after-hours quote). When a paid key/upgrade adds a
+  // dedicated extended-hours field, replace this with that value.
+  // Note: surfacing as "Today vs Prev Close" rather than "After Hours" so the
+  // label matches the math.
+  const todayVsPrevClose = useMemo(() => {
+    if (!quoteData?.price || !quoteData?.previousClose) return null;
+    const delta = quoteData.price - quoteData.previousClose;
+    return {
+      price: quoteData.price,
+      delta,
+      deltaPct: (delta / quoteData.previousClose) * 100,
+    };
+  }, [quoteData]);
+
+  const earningsDate = useMemo(() => {
+    if (!quoteData?.earningsAnnouncement) return null;
+    const d = new Date(quoteData.earningsAnnouncement);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toISOString().slice(0, 10);
+  }, [quoteData?.earningsAnnouncement]);
 
   return (
     <div className="w-full bg-background dark">
@@ -141,137 +161,148 @@ export default function Index() {
         {/* Centered Header Section */}
         <div className="mb-12 text-center">
           <div className="flex items-center justify-center gap-4 mb-4">
-            <img
-              src={`/api/company-logo?ticker=${ticker}`}
-              alt={`${ticker} logo`}
-              className="w-12 h-12 rounded-md"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
+            <TickerLogo ticker={ticker} size="md" />
             <div>
               <h1 className="text-3xl font-bold text-foreground">
-                {overviewData ? overviewData["Name"] || ticker : ticker}
+                {overviewData?.companyName ?? ticker}
               </h1>
-              <p className="text-sm text-muted-foreground">{ticker} | NASDAQ</p>
+              <p className="text-sm text-muted-foreground">
+                {ticker} | {overviewData?.exchange ?? "—"}
+              </p>
             </div>
           </div>
 
           {/* Stock Price */}
           <div className="mb-3">
             {quoteLoading ? (
-              <div className="text-center text-slate-400">Loading price data...</div>
-            ) : quoteData ? (
+              <HeaderPriceSkeleton />
+            ) : quoteData?.price ? (
               <div className="flex items-baseline justify-center gap-3">
-                <span className="text-5xl font-bold text-foreground">
-                  ${quoteData.price}
+                <span className="text-5xl font-bold text-foreground" dir="ltr">
+                  ${quoteData.price.toFixed(2)}
                 </span>
-                <span className="flex items-center gap-1">
-                  <span className={`text-lg font-semibold ${
-                    typeof quoteData.change === "string"
-                      ? (parseFloat(quoteData.change) >= 0 ? "text-chart-green" : "text-red-400")
-                      : (quoteData.change >= 0 ? "text-chart-green" : "text-red-400")
-                  }`}>
-                    {typeof quoteData.change === "string" ? quoteData.change : quoteData.change}
+                <span className="flex items-center gap-1" dir="ltr">
+                  <span
+                    className={`text-lg font-semibold ${quoteData.change >= 0 ? "text-chart-green" : "text-red-400"}`}
+                  >
+                    {quoteData.change >= 0 ? "+" : ""}
+                    {quoteData.change.toFixed(2)}
                   </span>
-                  <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                    typeof quoteData.changePercent === "string"
-                      ? (parseFloat(quoteData.changePercent) >= 0 ? "bg-chart-green/20 text-chart-green" : "bg-red-400/20 text-red-400")
-                      : (quoteData.changePercent >= 0 ? "bg-chart-green/20 text-chart-green" : "bg-red-400/20 text-red-400")
-                  }`}>
-                    {quoteData.changePercent}%
+                  <span
+                    className={`px-2 py-1 rounded text-xs font-semibold ${quoteData.changesPercentage >= 0 ? "bg-chart-green/20 text-chart-green" : "bg-red-400/20 text-red-400"}`}
+                  >
+                    {quoteData.changesPercentage >= 0 ? "+" : ""}
+                    {quoteData.changesPercentage.toFixed(2)}%
                   </span>
                 </span>
               </div>
             ) : (
-              <div className="text-center text-slate-400 text-xl">Unavailable via API</div>
+              <div className="text-center text-slate-400 text-xl">{t("index.unavailableApi")}</div>
             )}
           </div>
 
-          {/* After Hours & Earnings */}
-          <div className="flex justify-center gap-6 text-sm text-muted-foreground">
-            <span>After hours: <span className="text-red-400">$308.40</span> <span className="text-red-400">-$0.42 -0.14%</span></span>
-            <span>Earnings: <span className="text-blue-400">Jul 30, 2024</span></span>
+          {/* Today vs Prev Close — fed by live quote */}
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-muted-foreground">
+            <span>
+              {t("index.change")}{" "}
+              {todayVsPrevClose ? (
+                <span
+                  className={todayVsPrevClose.delta >= 0 ? "text-green-400" : "text-red-400"}
+                  dir="ltr"
+                >
+                  {todayVsPrevClose.delta >= 0 ? "+" : ""}
+                  {todayVsPrevClose.delta.toFixed(2)} ({todayVsPrevClose.delta >= 0 ? "+" : ""}
+                  {todayVsPrevClose.deltaPct.toFixed(2)}%)
+                </span>
+              ) : (
+                <span className="text-slate-500" dir="ltr">—</span>
+              )}
+            </span>
+            <span>
+              {t("index.earnings")}{" "}
+              {earningsDate ? (
+                <span className="text-blue-400" dir="ltr">{earningsDate}</span>
+              ) : (
+                <span className="text-slate-500" dir="ltr">—</span>
+              )}
+            </span>
           </div>
         </div>
 
         {/* Quality Brief Section */}
         <div className="bg-card rounded-lg p-8 border border-border mb-12">
-          <h2 className="text-xl font-semibold text-foreground mb-4">Quality in Brief</h2>
+          <h2 className="text-xl font-semibold text-foreground mb-4">{t("index.qualityInBrief")}</h2>
           <ul className="space-y-3 text-sm text-foreground">
             <li className="flex gap-2">
-              <span className="text-chart-green font-bold">•</span>
-              <span>
-                <strong>Neutral Google appeals iPhone search ruling</strong> – May 22, 2024. Google appealed a 2024 U.S. antitrust ruling that restricted its ability to secure exclusive default search agreements, but the company can still pay Apple...
-              </span>
+              <span className="text-chart-green font-bold shrink-0">•</span>
+              <span dangerouslySetInnerHTML={{ __html: t("index.news1") }} />
             </li>
             <li className="flex gap-2">
-              <span className="text-chart-green font-bold">•</span>
-              <span>
-                <strong>Apple faces labor concerns in Asia</strong> – Recent reports highlight working conditions at suppliers in the region.
-              </span>
+              <span className="text-chart-green font-bold shrink-0">•</span>
+              <span dangerouslySetInnerHTML={{ __html: t("index.news2") }} />
             </li>
           </ul>
-          <button className="mt-4 text-blue-400 hover:text-blue-300 text-sm font-medium">View More</button>
+          <button className="mt-4 text-blue-400 hover:text-blue-300 text-sm font-medium">
+            {t("index.viewMore")}
+          </button>
         </div>
 
-        {/* Quick Stats Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-          {quickStats.map((stat, idx) => (
-            <div key={idx} className="bg-card rounded-lg border border-border overflow-hidden">
-              {/* Header */}
+        {/* Charts Grid - 4x2 — three render states driven by query fetch status */}
+        <h2 className="text-2xl font-semibold text-foreground mb-6">
+          {t("index.financialMetricsTitle")}
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          {/* Cache-key switch (e.g. /stock/AAPL → /stock/MSFT) resets isFetched
+              to false even though we may have stale data on disk; the skeleton
+              flash masks the cache-miss transition so don't add an enabled:
+              guard here without also handling that path. */}
+          {!financialsFetched ? (
+            <>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <MetricCardSkeleton key={i} />
+              ))}
+            </>
+          ) : metrics.length === 0 ? (
+            <div className="col-span-full bg-card border border-border rounded-xl px-6 py-10 text-center">
+              <p className="text-sm text-muted-foreground">
+                {t("index.metricsUnavailable", { ticker })}
+              </p>
               <button
-                onClick={() => toggleStatExpand(idx)}
-                className="w-full p-4 flex items-center justify-between hover:bg-secondary/50 transition-colors"
+                type="button"
+                onClick={() => {
+                  // .catch(() => null) future-proofs against the void-discard
+                  // shape — if anyone later awaits this or chains .then(), the
+                  // pipeline still won't surface an unhandled rejection. The
+                  // FMP free tier frequently returns the same empty array on
+                  // refetch, so this button is honest about a likely no-op.
+                  refetchFinancials().catch(() => null);
+                }}
+                className="mt-4 text-xs text-blue-400 hover:text-blue-300 transition-colors"
               >
-                <div className="text-left">
-                  <p className="text-sm text-muted-foreground mb-1">{stat.label}</p>
-                  <p className="text-xl font-bold text-foreground">{stat.value}</p>
-                </div>
-                <ChevronDown
-                  className={`w-5 h-5 text-muted-foreground transition-transform ${
-                    expandedStats[idx] ? "rotate-180" : ""
-                  }`}
-                />
+                {t("index.metricsRetry")}
               </button>
-
-              {/* Details */}
-              {expandedStats[idx] && stat.details && (
-                <div className="border-t border-border bg-secondary/30 p-4 space-y-2">
-                  {stat.details.map((detail, dIdx) => (
-                    <div key={dIdx} className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">{detail.label}</span>
-                      <span className="text-foreground font-medium">{detail.value}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
-          ))}
+          ) : (
+            metrics.map((metric, idx) => {
+              const latestVal = metric.data[metric.data.length - 1]?.value || 0;
+              const yoyChange = metric.yoy || 0;
+              return (
+                <InsightsCard
+                  key={idx}
+                  title={t(metric.name) === metric.name ? metric.name.split(".")[1] : t(metric.name)}
+                  value={`${latestVal.toFixed(2)}${metric.unit === "$" ? "" : metric.unit}`}
+                  badgeText={`${yoyChange >= 0 ? "+" : ""}${yoyChange.toFixed(2)}%`}
+                  badgeType={yoyChange >= 0 ? "positive" : "negative"}
+                  metricId={metric.name}
+                  metricData={metric}
+                />
+              );
+            })
+          )}
         </div>
 
-        {/* Charts Grid */}
-        <h2 className="text-2xl font-semibold text-foreground mb-6">Financial Metrics</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {financialMetrics.map((metric, idx) => (
-            <div
-              key={idx}
-              onClick={() => setSelectedMetric(metric)}
-              className="bg-card rounded-lg p-6 border border-border hover:border-foreground/50 cursor-pointer transition-all duration-200 hover:shadow-lg"
-            >
-              <h3 className="text-lg font-semibold text-foreground mb-4">{metric.name}</h3>
-              <div className="h-[140px]">{renderSmallChart(metric)}</div>
-              <div className="mt-4 pt-4 border-t border-border flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">
-                  Latest: {metric.data[metric.data.length - 1].value.toFixed(1)}{metric.unit}
-                </span>
-                <span className="text-xs bg-foreground/10 text-foreground px-2 py-1 rounded">
-                  {metric.type === "bar" ? "Bar" : metric.type === "area" ? "Area" : "Line"}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
+        {/* Company Profile Section */}
+        <CompanyProfile ticker={ticker} />
       </div>
 
       {/* Chart Modal */}
