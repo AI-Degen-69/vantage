@@ -166,8 +166,6 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
         {/* Name + symbols form */}
         <div className="space-y-4 px-1">
           <div>
-            <label htmlFor="watchlist-name-input" className="text-sm font-medium block mb-1.5">
-          <div>
             <label htmlFor="watchlist-name" className="text-sm font-medium block mb-1.5">
               {t("watchlists.nameLabel")}
             </label>

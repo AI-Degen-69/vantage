@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useI18n } from "@/lib/i18n";
 import { useInsightsTab, useBatchQuotes, useSectorHeatmap } from "@/hooks/useStockData";
 import { SectorHeatsheet } from "@/components/SectorHeatsheet";
+import TickerLogo from "@/components/TickerLogo";
 import type { InsightsTabId, StockQuote } from "@shared/api";
 
 const TABS: { id: InsightsTabId; i18nKey: string }[] = [
@@ -204,9 +205,7 @@ export default function Insights() {
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-slate-700 rounded flex items-center justify-center text-xs font-bold text-foreground group-hover:bg-blue-600 transition-colors">
-                        {row.symbol.substring(0, 2)}
-                      </div>
+                      <TickerLogo ticker={row.symbol} size="sm" />
                       <div>
                         <p className="text-sm font-semibold text-foreground">{row.symbol}</p>
                         {row.sector && (

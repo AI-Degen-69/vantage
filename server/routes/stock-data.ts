@@ -14,7 +14,7 @@ import type {
   StockMetrics,
   StockQuote,
   SectorHeatmapResponse,
-} from "@shared/api";
+} from "../../shared/api";
 
 const MAX_SYMBOLS = 50;
 

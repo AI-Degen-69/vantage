@@ -5,6 +5,8 @@ import { GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import DipFinder from "@/components/DipFinder";
 import { AddWatchlistSheet } from "@/components/AddWatchlistSheet";
+import EagerLogoWarmer from "@/components/EagerLogoWarmer";
+import TickerLogo from "@/components/TickerLogo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useBatchQuotes, useEarningsCalendar, useWatchlistNews } from "@/hooks/useStockData";
@@ -130,6 +132,11 @@ export default function Watchlists() {
 
   return (
     <div className="w-full bg-background dark min-h-screen p-8">
+      {/* Pre-resolve Logo.dev tier assignments for every row's ticker so
+          TickerLogo mounts on /insights, /stock/<ticker>, and slide-overs
+          read the cache instead of doing the onError dance at first paint.
+          Renders nothing — purely a side-effect host. */}
+      <EagerLogoWarmer />
       <div className="max-w-6xl mx-auto space-y-6">
         <div className="flex items-center gap-3 flex-wrap">
           <h1 className="text-3xl font-bold text-foreground">{t("nav.watchlists")}</h1>
@@ -349,12 +356,10 @@ export default function Watchlists() {
                         key={`${e.symbol}-${e.date}`}
                         className="flex justify-between items-center border-b border-border pb-3 last:border-0 last:pb-0"
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded bg-slate-800 flex items-center justify-center font-bold text-xs">
-                            {e.symbol}
-                          </div>
-                          <div>
-                            <p className="font-semibold text-sm">{name}</p>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <TickerLogo ticker={e.symbol} size="sm" />
+                          <div className="min-w-0">
+                            <p className="font-semibold text-sm truncate">{name}</p>
                             <p className="text-xs text-muted-foreground" dir="ltr">
                               {e.date}, {t(timeLabel)}
                             </p>

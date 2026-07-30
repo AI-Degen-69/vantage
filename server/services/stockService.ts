@@ -26,7 +26,7 @@ import {
   SmaDistanceRow,
   StockMetrics,
   StockQuote,
-} from '@shared/api';
+} from '../../shared/api';
 import { insightsTabUniverses } from './insightsUniverses';
 // Relative path (not `@shared/...`) so the helper resolves cleanly under Vite's
 // config-file resolver, which doesn't apply its own `resolve.alias` map when

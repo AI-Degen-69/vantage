@@ -387,6 +387,10 @@ const en = {
   // Language
   "language.en": "English",
   "language.he": "עברית",
+
+  // Third-party attribution links (free-tier requirement)
+  "attribution.logoDev": "Logos by Logo.dev",
+  "attribution.logoDevAria": "Company logos provided by Logo.dev (opens in new tab)",
 };
 
 // Re-exported so tests can verify the dictionary snapshots without a second import.
@@ -770,6 +774,10 @@ const he: Record<string, string> = {
 
   "language.en": "English",
   "language.he": "עברית",
+
+  // Third-party attribution links (free-tier requirement)
+  "attribution.logoDev": "לוגואים מ־Logo.dev",
+  "attribution.logoDevAria": "לוגואי חברות מ־Logo.dev (נפתח בכרטיסייה חדשה)",
 };
 
 export const heDict = he;

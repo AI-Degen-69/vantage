@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { X, Download } from "lucide-react";
+import TickerLogo from "@/components/TickerLogo";
 import { useI18n } from "@/lib/i18n";
 import {
   LineChart,
@@ -170,14 +171,7 @@ export default function ChartModal({ metric, isOpen, onClose, ticker = "AAPL" }:
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-border sticky top-0 bg-card">
           <div className="flex items-center gap-3">
-            <img
-              src={`/api/company-logo?ticker=${ticker}`}
-              alt={`${ticker} logo`}
-              className="w-8 h-8 rounded"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
+            <TickerLogo ticker={ticker} size="sm" />
             <div>
               <h2 className="text-xl font-semibold text-foreground">{t(metric.name)}</h2>
               <p className="text-sm text-muted-foreground">{ticker}</p>
