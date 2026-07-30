@@ -2,7 +2,6 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { handleDemo } from "./routes/demo";
-import { handleCompanyLogo } from "./routes/company-logo";
 import {
   handleStockQuote,
   handleBatchQuotes,
@@ -41,7 +40,6 @@ export function createServer() {
   });
 
   app.get("/api/demo", handleDemo);
-  app.get("/api/company-logo", handleCompanyLogo);
 
   // Stock data routes
   app.get("/api/stock-quote", handleStockQuote);

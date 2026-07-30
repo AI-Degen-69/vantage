@@ -1,4 +1,4 @@
-import type { InsightsTabEntry, InsightsTabId } from "@shared/api";
+import type { InsightsTabEntry, InsightsTabId } from "../../shared/api";
 
 /**
  * Per-tab curated ticker universes.

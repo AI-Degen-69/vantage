@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { X, Loader2, TrendingUp, TrendingDown, ChevronDown, ExternalLink } from "lucide-react";
+import TickerLogo from "@/components/TickerLogo";
 import { useStockData } from "@/hooks/useStockData";
 
 interface StockSlideOverProps {
@@ -87,14 +88,7 @@ export default function StockSlideOver({ ticker, isOpen, onClose }: StockSlideOv
         <div className="sticky top-0 bg-slate-900 border-b border-slate-700 z-10">
           <div className="flex items-center justify-between px-5 py-4">
             <div className="flex items-center gap-3">
-              <img
-                src={`/api/company-logo?ticker=${ticker}`}
-                alt={ticker}
-                className="w-8 h-8 rounded"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = "none";
-                }}
-              />
+              <TickerLogo ticker={ticker} size="sm" />
               <div>
                 <p className="text-sm font-semibold text-foreground leading-tight">
                   {stockData?.name || ticker}

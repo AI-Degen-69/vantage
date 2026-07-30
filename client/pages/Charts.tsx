@@ -2,6 +2,7 @@ import { useSearchParams } from "react-router-dom";
 import { useI18n } from "@/lib/i18n";
 import DCFWidget from "@/components/DCFWidget";
 import { SectionCardSkeleton, HeaderPriceSkeleton } from "@/components/Skeleton";
+import TickerLogo from "@/components/TickerLogo";
 import { useStockQuote, useStockProfile } from "@/hooks/useStockData";
 import { TrendingUp, TrendingDown, BarChart3, Calendar, Building2 } from "lucide-react";
 
@@ -53,9 +54,7 @@ export default function Charts() {
         {/* Header strip — ticker + company + price + day/year range */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-4 min-w-0">
-            <div className="w-12 h-12 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-2xl font-bold text-foreground shrink-0">
-              {ticker.slice(0, 2)}
-            </div>
+            <TickerLogo ticker={ticker} size="md" />
             <div className="min-w-0">
               <h1 className="text-2xl font-bold text-foreground truncate">
                 {profileLoading ? "…" : profileData?.companyName ?? ticker}

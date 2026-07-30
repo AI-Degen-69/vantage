@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { BarChart3, List, TrendingUp, Calendar } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import LanguageSwitcher from "./LanguageSwitcher";
+import { getLogoDevAttributionUrl } from "@/lib/logoDev";
 
 const navItems = [
   {
@@ -66,6 +67,18 @@ export default function Sidebar() {
       {/* Footer / Settings */}
       <div className="p-4 border-t border-slate-800">
         <LanguageSwitcher />
+        {/* Free-tier attribution link required by https://www.logo.dev/ when no
+            paid plan is in place. Renders as a tiny muted text link so it
+            stays out of the way visually but is always discoverable. */}
+        <a
+          href={getLogoDevAttributionUrl()}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 block text-[10px] text-slate-500 hover:text-slate-300 transition-colors tracking-wide uppercase opacity-70 hover:opacity-100"
+          aria-label={t("attribution.logoDevAria")}
+        >
+          {t("attribution.logoDev")}
+        </a>
       </div>
     </aside>
   );
