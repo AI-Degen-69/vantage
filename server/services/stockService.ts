@@ -56,6 +56,7 @@ const yahooFinance = new yahooFinanceDefault({ suppressNotices: ['yahooSurvey'] 
 const cache = new NodeCache({ stdTTL: 3600 });
 const QUOTE_TTL = 60; // 1 min — quotes are the only thing we ever refetch live
 const SECTOR_HEATMAP_TTL = 900; // 15 min — heatmap recomputation cache (day deltas are slow-moving)
+const MAX_EARNINGS_ENRICH_SYMBOLS = 100; // protect provider quotas on unusually large calendars
 
 // ---- Warn throttling --------------------------------------
 const lastWarnAt = new Map<string, number>();
@@ -344,7 +345,11 @@ function normalizeCashRow(raw: any): CashFlowRow {
  * @returns An earnings event with normalized identifiers, dates, timing, and financial values
  */
 function normalizeEarningEvent(raw: any): EarningsEvent {
-  const toNum = (v: any) => (v === undefined || v === null ? null : Number(v));
+  const toNum = (v: any): number | null => {
+    if (v === undefined || v === null || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
   return {
     symbol: String(raw.symbol ?? ''),
     date: String(raw.date ?? ''),
@@ -431,6 +436,38 @@ function normalizeChartPoint(raw: any) {
  * @param symbol - The ticker symbol to retrieve
  * @returns The normalized chart series, or `null` when no data is available
  */
+async function fetchProfileWithAvailability(
+  symbol: string,
+): Promise<{ profile: CompanyProfile | null; unavailable: boolean }> {
+  if (!hasFmp()) return { profile: null, unavailable: true };
+
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 12_000);
+    try {
+      const response = await fetch(tickerUrl('profile', symbol), { signal: ctrl.signal });
+      if (!response.ok) {
+        throttledWarn(`profile/${symbol}`, `[stockService] profile/${symbol} HTTP ${response.status}`);
+        return { profile: null, unavailable: true };
+      }
+      const raw = (await response.json()) as any;
+      const row = Array.isArray(raw) ? raw[0] : raw;
+      const profile = row ? normalizeProfile(row) : null;
+      const matchesRequestedSymbol =
+        profile?.symbol.trim().toUpperCase() === symbol.toUpperCase();
+      return {
+        profile: matchesRequestedSymbol ? profile : null,
+        unavailable: false,
+      };
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (error: any) {
+    throttledWarn(`profile/${symbol}`, `[stockService] profile/${symbol} failed: ${error?.message ?? error}`);
+    return { profile: null, unavailable: true };
+  }
+}
+
 async function yahooChart(symbol: string): Promise<ChartSeries | null> {
   try {
     // yahoo-finance2 v4 returns {quotes: [{date, open, high, low, close, volume, adjclose}], ...}
@@ -475,29 +512,37 @@ async function yahooQuote(symbol: string): Promise<StockQuote | null> {
     // yahoo-finance2 v4 returns camelCase already for the regularMarket* fields.
     const q: any = await yahooFinance.quote(symbol);
     if (!q) return null;
-    const price = Number(q.regularMarketPrice ?? 0);
-    if (!Number.isFinite(price) || price <= 0) return null;
+    const toFinite = (value: unknown): number | undefined => {
+      if (value === null || value === undefined || value === "") return undefined;
+      const number = Number(value);
+      return Number.isFinite(number) ? number : undefined;
+    };
+    const price = toFinite(q.regularMarketPrice);
+    if (price === undefined || price <= 0) return null;
+    const earningsTimestamp = toFinite(q.earningsTimestamp);
     return {
       symbol: String(q.symbol ?? symbol),
       name: q.longName ?? q.shortName ?? q.displayName,
       price,
-      change: Number(q.regularMarketChange ?? 0),
-      changesPercentage: Number(q.regularMarketChangePercent ?? 0),
-      previousClose: Number(q.regularMarketPreviousClose ?? 0),
-      dayLow: Number(q.regularMarketDayLow ?? 0),
-      dayHigh: Number(q.regularMarketDayHigh ?? 0),
-      yearLow: Number(q.fiftyTwoWeekLow ?? 0),
-      yearHigh: Number(q.fiftyTwoWeekHigh ?? 0),
-      priceAvg50: Number(q.fiftyDayAverage ?? 0),
-      priceAvg200: Number(q.twoHundredDayAverage ?? 0),
-      marketCap: Number(q.marketCap ?? 0),
-      volume: Number(q.regularMarketVolume ?? 0),
-      avgVolume: Number(q.averageDailyVolume10Day ?? q.averageDailyVolume3Month ?? 0),
+      change: toFinite(q.regularMarketChange) ?? 0,
+      changesPercentage: toFinite(q.regularMarketChangePercent) ?? 0,
+      previousClose: toFinite(q.regularMarketPreviousClose),
+      dayLow: toFinite(q.regularMarketDayLow),
+      dayHigh: toFinite(q.regularMarketDayHigh),
+      yearLow: toFinite(q.fiftyTwoWeekLow),
+      yearHigh: toFinite(q.fiftyTwoWeekHigh),
+      priceAvg50: toFinite(q.fiftyDayAverage),
+      priceAvg200: toFinite(q.twoHundredDayAverage),
+      marketCap: toFinite(q.marketCap),
+      volume: toFinite(q.regularMarketVolume),
+      avgVolume: toFinite(q.averageDailyVolume10Day ?? q.averageDailyVolume3Month),
       exchange: q.exchange,
-      sharesOutstanding: Number(q.sharesOutstanding ?? 0),
-      eps: q.epsTrailingTwelveMonths,
-      pe: q.trailingPE,
-      earningsAnnouncement: q.earningsTimestamp ? new Date(q.earningsTimestamp * 1000).toISOString() : null,
+      sharesOutstanding: toFinite(q.sharesOutstanding),
+      eps: toFinite(q.epsTrailingTwelveMonths),
+      pe: toFinite(q.trailingPE),
+      earningsAnnouncement: earningsTimestamp === undefined
+        ? null
+        : new Date(earningsTimestamp * 1000).toISOString(),
     };
   } catch (e: any) {
     // Yahoo v4 throws if the symbol is unknown — fall through to MOCK.
@@ -553,20 +598,23 @@ export const stockService = {
       }
     }
     if (!result && AV_KEY) {
-      // Alpha Vantage fallback — same shape mapping.
+      // Alpha Vantage fallback — normalize through the same positive-price
+      // guard used by FMP so empty/error payloads never become quotes.
       const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${AV_KEY}`;
       const raw = await fetchJSON<any>(url, `av quote/${symbol}`);
       const g = raw?.['Global Quote'];
       if (g) {
-        const toNum = (s: string) => Number(String(s).replace(/[%,$]/g, ''));
-        result = {
-          symbol: g['01. symbol'] ?? symbol,
-          price: toNum(g['05. price'] ?? 0),
-          change: toNum(g['09. change'] ?? 0),
-          changesPercentage: toNum(g['10. change percent'] ?? 0),
-          previousClose: toNum(g['08. previous close'] ?? 0),
-          exchange: undefined,
+        const toNum = (s: unknown) => {
+          const n = Number(String(s ?? '').replace(/[%,$]/g, ''));
+          return Number.isFinite(n) ? n : undefined;
         };
+        result = normalizeQuote({
+          symbol: g['01. symbol'] ?? symbol,
+          price: toNum(g['05. price']),
+          change: toNum(g['09. change']),
+          changesPercentage: toNum(g['10. change percent']),
+          previousClose: toNum(g['08. previous close']),
+        });
       }
     }
     cache.set(cacheKey, result, QUOTE_TTL);
@@ -632,13 +680,18 @@ export const stockService = {
   },
 
   async getProfile(symbol: string): Promise<CompanyProfile | null> {
+    return (await this.getProfileValidation(symbol)).profile;
+  },
+
+  async getProfileValidation(
+    symbol: string,
+  ): Promise<{ profile: CompanyProfile | null; unavailable: boolean }> {
     const cacheKey = `profile_${symbol}`;
-    if (cache.has(cacheKey)) return cache.get(cacheKey) as CompanyProfile | null;
-    if (!hasFmp()) return null;
-    const raw = await fetchJSON<any>(tickerUrl('profile', symbol), `profile/${symbol}`);
-    const row = Array.isArray(raw) ? raw[0] : raw;
-    const result = row ? normalizeProfile(row) : null;
-    if (result) cache.set(cacheKey, result);
+    if (cache.has(cacheKey)) {
+      return { profile: cache.get(cacheKey) as CompanyProfile, unavailable: false };
+    }
+    const result = await fetchProfileWithAvailability(symbol);
+    if (result.profile) cache.set(cacheKey, result.profile);
     return result;
   },
 
@@ -759,11 +812,20 @@ export const stockService = {
     const result: EarningsEvent[] = Array.isArray(raw) ? raw.map(normalizeEarningEvent) : [];
 
     // FMP's calendar often omits market cap, while the client uses it for
-    // the large/mid/small filters. Enrich a bounded set from the same quote
-    // cache without turning one calendar request into an unbounded fan-out.
-    const symbols = Array.from(new Set(result.map((event) => event.symbol.toUpperCase()))).slice(0, 50);
-    if (symbols.length > 0) {
-      const quotes = await this.getBatchQuotes(symbols);
+    // the large/mid/small filters. Enrich distinct returned symbols from the
+    // quote cache; getBatchQuotes keeps concurrency bounded. Keep a service-level
+    // ceiling as a second line of defense against unusually large provider
+    // responses exhausting the upstream quote budget.
+    const symbols = Array.from(
+      new Set(
+        result
+          .map((event) => event.symbol.trim().toUpperCase())
+          .filter(Boolean),
+      ),
+    );
+    const enrichSymbols = symbols.slice(0, MAX_EARNINGS_ENRICH_SYMBOLS);
+    if (enrichSymbols.length > 0) {
+      const quotes = await this.getBatchQuotes(enrichSymbols);
       const marketCaps = new Map<string, number>();
       for (const quote of quotes.quotes) {
         if (!quote?.symbol || quote.marketCap === undefined || quote.marketCap <= 0) continue;
@@ -1021,8 +1083,11 @@ export const stockService = {
   async getSmaDistancesFor(symbols: string[], windowSize: number = 200): Promise<SmaDistanceResponse> {
     if (symbols.length === 0) return { rows: [] };
     const cap = Math.max(5, Math.min(200, Math.floor(windowSize)));
-    const rows: SmaDistanceRow[] = await Promise.all(
-      symbols.map(async (sym): Promise<SmaDistanceRow> => {
+    const rows: SmaDistanceRow[] = [];
+    const BATCH_SIZE = 8;
+    for (let i = 0; i < symbols.length; i += BATCH_SIZE) {
+      const batchRows = await Promise.all(
+        symbols.slice(i, i + BATCH_SIZE).map(async (sym): Promise<SmaDistanceRow> => {
         try {
           const [chart, quote] = await Promise.all([
             this.getChart(sym.toUpperCase()),
@@ -1053,8 +1118,10 @@ export const stockService = {
           throttledWarn(`sma:${sym}`, `[stockService] sma ${sym} failed: ${e?.message ?? e}`);
           return { symbol: sym, sma200: null, distancePct: null, sampleSize: 0, price: null };
         }
-      }),
-    );
+        }),
+      );
+      rows.push(...batchRows);
+    }
     return { rows };
   },
 };

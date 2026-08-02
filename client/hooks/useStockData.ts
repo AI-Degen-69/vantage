@@ -481,8 +481,9 @@ export function useSectorHeatmap(symbols: string[], days: number = 5) {
  *   - Validate every candidate in sequential batches of eight so a large
  *     paste cannot create an unbounded upstream request burst.
  *   - A candidate is "valid" when the upstream returned a non-null
- *     CompanyProfile with a non-empty `symbol` field. Unrecognized or
- *     unavailable candidates surface as `invalid` and are not persisted.
+ *     CompanyProfile whose `symbol` matches the requested symbol.
+ *     Unrecognized candidates surface as `invalid`; request failures surface
+ *     separately as `unavailable`, and neither is persisted.
  *
  * `staleTime: 5min` for the complete candidate set keeps repeated validation
  * of the same Add-sheet session cheap (users often re-paste while iterating).
@@ -493,8 +494,8 @@ export function useValidateSymbols(candidates: string[]) {
     [candidates],
   );
   const validation = useQuery({
-    queryKey: ["validateStockProfiles", normalized.join(",")],
-    queryFn: async () => {
+    queryKey: ["validateStockProfiles", [...normalized].sort().join(",")],
+    queryFn: async ({ signal }) => {
       const profiles: Array<{ symbol: string; profile: ApiCompanyProfile }> = [];
       const invalid: string[] = [];
       const unavailable: string[] = [];
@@ -502,16 +503,32 @@ export function useValidateSymbols(candidates: string[]) {
 
       // Validate every format-clean candidate, but keep upstream concurrency
       // bounded so a large paste cannot create an unbounded request burst.
+      const throwIfAborted = () => {
+        if (signal.aborted) {
+          throw new DOMException("Validation aborted", "AbortError");
+        }
+      };
+
       for (let i = 0; i < normalized.length; i += batchSize) {
+        throwIfAborted();
         const batch = normalized.slice(i, i + batchSize);
         const settled = await Promise.all(
           batch.map(async (sym) => {
             try {
-              const profile = await fetchJSON<ApiCompanyProfile | null>(
+              const response = await fetch(
                 `/api/stock-overview?symbol=${encodeURIComponent(sym)}`,
+                { signal },
               );
+              if (response.status === 503) {
+                return { sym, profile: null, unavailable: true };
+              }
+              if (!response.ok) {
+                throw new Error(`Request failed (${response.status})`);
+              }
+              const profile = (await response.json()) as ApiCompanyProfile | null;
               return { sym, profile, unavailable: false };
-            } catch {
+            } catch (error) {
+              if (signal.aborted) throw error;
               // A timeout, 429, or provider outage is not proof that the
               // ticker is invalid. Keep it separate so the UI can ask the
               // user to retry rather than silently dropping it.
@@ -519,6 +536,9 @@ export function useValidateSymbols(candidates: string[]) {
             }
           }),
         );
+        // Do not cache partial results if the query was superseded while the
+        // current batch was in flight.
+        throwIfAborted();
         for (const { sym, profile, unavailable: requestUnavailable } of settled) {
           if (requestUnavailable) {
             unavailable.push(sym);
@@ -545,8 +565,7 @@ export function useValidateSymbols(candidates: string[]) {
     invalid: validation.data?.invalid ?? [],
     unavailable: validation.data?.unavailable ?? [],
     isValidating: validation.isPending || validation.isFetching,
-    isError: validation.isError,
-  }), [validation.data, validation.isPending, validation.isFetching, validation.isError]);
+  }), [validation.data, validation.isPending, validation.isFetching]);
 }
 
 export type { IndexQuotesResponse };

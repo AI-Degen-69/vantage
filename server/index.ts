@@ -28,24 +28,33 @@ import {
  */
 const API_RATE_WINDOW_MS = 60_000;
 const API_RATE_LIMIT = 120;
+const API_RATE_STATE_MAX = 10_000;
 const apiRateState = new Map<string, { count: number; resetAt: number }>();
 
 function apiRateLimit(req: Request, res: Response, next: NextFunction): void {
   const now = Date.now();
   const key = req.ip || req.socket.remoteAddress || "unknown";
   const current = apiRateState.get(key);
+
+  // Clean expired keys before adding a new identity. If the process is already
+  // at capacity, fail closed rather than allowing unbounded memory growth.
+  if (!current) {
+    for (const [candidate, value] of apiRateState) {
+      if (value.resetAt <= now) apiRateState.delete(candidate);
+    }
+    if (apiRateState.size >= API_RATE_STATE_MAX) {
+      res.setHeader("Retry-After", "1");
+      res.status(429).json({ error: "Too many clients; please retry shortly" });
+      return;
+    }
+  }
+
   const state = !current || current.resetAt <= now
     ? { count: 0, resetAt: now + API_RATE_WINDOW_MS }
     : current;
 
   state.count += 1;
   apiRateState.set(key, state);
-
-  if (apiRateState.size > 10_000) {
-    for (const [candidate, value] of apiRateState) {
-      if (value.resetAt <= now) apiRateState.delete(candidate);
-    }
-  }
 
   if (state.count > API_RATE_LIMIT) {
     res.setHeader("Retry-After", Math.ceil((state.resetAt - now) / 1000));

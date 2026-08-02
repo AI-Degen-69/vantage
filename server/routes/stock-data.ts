@@ -64,8 +64,8 @@ export const handleStockQuote: RequestHandler = async (req, res) => {
 
 export const handleBatchQuotes: RequestHandler = async (req, res) => {
   const { symbols, invalid } = parseSymbolList(req.query.symbols);
-  if (symbols.length === 0) return res.status(400).json({ error: "symbols parameter required" });
   if (invalid.length > 0) return res.status(400).json({ error: "invalid symbol parameter", symbols: invalid });
+  if (symbols.length === 0) return res.status(400).json({ error: "symbols parameter required" });
   if (symbols.length > MAX_SYMBOLS) {
     return res.status(400).json({ error: `Too many symbols requested. Maximum is ${MAX_SYMBOLS}, received ${symbols.length}` });
   }
@@ -81,15 +81,21 @@ export const handleBatchQuotes: RequestHandler = async (req, res) => {
 export const handleStockProfile: RequestHandler = async (req, res) => {
   const symbol = parseTicker(req.query.symbol);
   if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
-  const profile: CompanyProfile | null = await stockService.getProfile(symbol);
-  res.json(profile);
+  const result = await stockService.getProfileValidation(symbol);
+  if (result.unavailable) {
+    return res.status(503).json({ error: "profile service temporarily unavailable" });
+  }
+  res.json(result.profile);
 };
 
 export const handleStockOverview: RequestHandler = async (req, res) => {
   const symbol = parseTicker(req.query.symbol);
   if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
-  const profile: CompanyProfile | null = await stockService.getProfile(symbol);
-  res.json(profile);
+  const result = await stockService.getProfileValidation(symbol);
+  if (result.unavailable) {
+    return res.status(503).json({ error: "profile service temporarily unavailable" });
+  }
+  res.json(result.profile);
 };
 
 export const handleStockFinancials: RequestHandler = async (req, res) => {
@@ -175,8 +181,8 @@ export const handleIndexQuotes: RequestHandler = async (_req, res) => {
  */
 export const handleSectorHeatmap: RequestHandler = async (req, res) => {
   const { symbols, invalid } = parseSymbolList(req.query.symbols);
-  if (symbols.length === 0) return res.status(400).json({ error: "symbols parameter required" });
   if (invalid.length > 0) return res.status(400).json({ error: "invalid symbol parameter", symbols: invalid });
+  if (symbols.length === 0) return res.status(400).json({ error: "symbols parameter required" });
   if (symbols.length > MAX_SYMBOLS) {
     return res.status(400).json({
       error: `Too many symbols requested. Maximum is ${MAX_SYMBOLS}, received ${symbols.length}`,
@@ -217,8 +223,8 @@ export const handleInsightsTab: RequestHandler = async (req, res) => {
 export const handleSmaDistances: RequestHandler = async (req, res) => {
   const listRaw = req.query.symbols ?? req.query.symbol;
   const { symbols, invalid } = parseSymbolList(listRaw);
-  if (symbols.length === 0) return res.status(400).json({ error: "symbols parameter required" });
   if (invalid.length > 0) return res.status(400).json({ error: "invalid symbol parameter", symbols: invalid });
+  if (symbols.length === 0) return res.status(400).json({ error: "symbols parameter required" });
   if (symbols.length > MAX_SYMBOLS) {
     return res.status(400).json({ error: `Too many symbols requested. Maximum is ${MAX_SYMBOLS}, received ${symbols.length}` });
   }
