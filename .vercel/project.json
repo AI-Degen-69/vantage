@@ -1,0 +1,16 @@
+{
+  "projectId": "prj_kaQpEvzdhwrtYmeVs77u6JPMH3D8",
+  "orgId": "team_xE80mJVsS3sTOgQFKxk2ftO3",
+  "projectName": "vantage",
+  "settings": {
+    "createdAt": 1785366761027,
+    "framework": "vite",
+    "devCommand": null,
+    "installCommand": null,
+    "buildCommand": "vite build",
+    "outputDirectory": "dist/spa",
+    "rootDirectory": null,
+    "directoryListing": false,
+    "nodeVersion": "24.x"
+  }
+}

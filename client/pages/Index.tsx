@@ -5,6 +5,7 @@ import ChartModal from "@/components/ChartModal";
 import InsightsCard from "@/components/InsightsCard";
 import CompanyProfile from "@/components/CompanyProfile";
 import TickerLogo from "@/components/TickerLogo";
+import EagerLogoWarmer from "@/components/EagerLogoWarmer";
 import { HeaderPriceSkeleton, MetricCardSkeleton } from "@/components/Skeleton";
 import { financialMetrics, FinancialMetric } from "@/lib/mockData";
 import { useStockQuote, useStockProfile, useStockFinancials } from "@/hooks/useStockData";
@@ -163,6 +164,7 @@ export default function Index() {
 
   return (
     <div className="w-full bg-background dark">
+      <EagerLogoWarmer symbols={ticker ? [ticker] : []} size="md" />
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Centered Header Section */}
         <div className="mb-12 text-center">

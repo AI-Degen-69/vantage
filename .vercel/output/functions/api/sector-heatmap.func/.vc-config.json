@@ -1,0 +1,20 @@
+{
+  "handler": "api/sector-heatmap.js",
+  "runtime": "nodejs24.x",
+  "architecture": "x86_64",
+  "memory": 1024,
+  "maxDuration": 30,
+  "environment": {},
+  "shouldDisableAutomaticFetchInstrumentation": false,
+  "launcherType": "Nodejs",
+  "shouldAddHelpers": true,
+  "shouldAddSourcemapSupport": true,
+  "awsLambdaHandler": "",
+  "filePathMap": {
+    "node_modules/node-cache": "node_modules/node-cache",
+    "node_modules/yahoo-finance2": "node_modules/yahoo-finance2",
+    "node_modules/.pnpm/node-cache@5.1.2/node_modules/clone": "node_modules/.pnpm/node-cache@5.1.2/node_modules/clone",
+    "node_modules/.pnpm/yahoo-finance2@4.0.0/node_modules/tough-cookie": "node_modules/.pnpm/yahoo-finance2@4.0.0/node_modules/tough-cookie",
+    "node_modules/.pnpm/tough-cookie@6.0.2/node_modules/tldts": "node_modules/.pnpm/tough-cookie@6.0.2/node_modules/tldts"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "handler": "api/demo.js",
+  "runtime": "nodejs24.x",
+  "architecture": "x86_64",
+  "memory": 1024,
+  "maxDuration": 30,
+  "environment": {},
+  "shouldDisableAutomaticFetchInstrumentation": false,
+  "launcherType": "Nodejs",
+  "shouldAddHelpers": true,
+  "shouldAddSourcemapSupport": true,
+  "awsLambdaHandler": ""
+}

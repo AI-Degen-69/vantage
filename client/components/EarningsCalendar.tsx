@@ -224,12 +224,6 @@ export default function EarningsCalendar({
       return;
     }
     const stamp = `${focusSymbol}|${focusDate}|${eventsList.length}`;
-  useEffect(() => {
-    if (!focusSymbol || !focusDate) {
-      didScrollRef.current = null;
-      return;
-    }
-    const stamp = `${focusSymbol}|${focusDate}|${eventsList.length}`;
     if (didScrollRef.current === stamp) return;
     const target = `${focusSymbol}-${focusDate}`;
     const escaped =

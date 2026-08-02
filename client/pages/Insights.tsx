@@ -4,6 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { useI18n } from "@/lib/i18n";
 import { useInsightsTab, useBatchQuotes, useSectorHeatmap } from "@/hooks/useStockData";
 import { SectorHeatsheet } from "@/components/SectorHeatsheet";
+import TickerLogo from "@/components/TickerLogo";
+import EagerLogoWarmer from "@/components/EagerLogoWarmer";
+import { DeferredInsightsCard } from "@/components/DeferredInsightsCard";
 import type { InsightsTabId, StockQuote } from "@shared/api";
 
 const TABS: { id: InsightsTabId; i18nKey: string }[] = [
@@ -83,6 +86,19 @@ export default function Insights() {
   // TTL with a 5-minute loop so the user sees fresh intraday without
   // hammering the cache.
   const heatmapSymbols = useMemo(() => merged.map((r) => r.symbol), [merged]);
+
+  // Pass the active tab's symbols + names to the route-aware warmer so each
+  // <TickerLogo> on the cards mounts with a pre-resolved sessionStorage tier
+  // (no onError ladder walk on first paint). Cap at 24 so the browser's
+  // per-origin connection pool has headroom even on HTTP/1.1.
+  const warmSymbols = useMemo(() => merged.map((r) => r.symbol), [merged]);
+  const warmNames = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const row of merged) {
+      if (row.name && row.symbol) map[row.symbol.toUpperCase()] = row.name;
+    }
+    return map;
+  }, [merged]);
   const {
     data: heatmapData,
     isLoading: heatmapLoading,
@@ -97,6 +113,7 @@ export default function Insights() {
 
   return (
     <div className="w-full bg-background dark min-h-screen">
+      <EagerLogoWarmer symbols={warmSymbols} namesBySymbol={warmNames} size="sm" />
       {/* Header */}
       <div className="bg-slate-800/50 border-b border-slate-700 px-8 py-12">
         <h1 className="text-4xl font-bold text-center text-foreground mb-8">{t("insights.title")}</h1>
@@ -197,40 +214,39 @@ export default function Insights() {
               const cls = pct === undefined ? "text-slate-500" : pct >= 0 ? "text-green-400" : "text-red-400";
               const sign = pct === undefined || pct < 0 ? "" : "+";
               return (
-                <div
-                  key={row.symbol}
-                  onClick={() => navigate(`/stock/${row.symbol}`)}
-                  className="bg-card rounded-lg p-4 border border-slate-700 hover:border-slate-600 hover:bg-slate-700/30 transition-all cursor-pointer group"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-slate-700 rounded flex items-center justify-center text-xs font-bold text-foreground group-hover:bg-blue-600 transition-colors">
-                        {row.symbol.substring(0, 2)}
+                <DeferredInsightsCard key={row.symbol} symbol={row.symbol}>
+                  <div
+                    onClick={() => navigate(`/stock/${row.symbol}`)}
+                    className="bg-card rounded-lg p-4 border border-slate-700 hover:border-slate-600 hover:bg-slate-700/30 transition-all cursor-pointer group min-h-[160px]"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <TickerLogo ticker={row.symbol} size="sm" />
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">{row.symbol}</p>
+                          {row.sector && (
+                            <p className="text-[10px] text-slate-500 uppercase tracking-wide truncate max-w-[120px]">
+                              {row.sector}
+                            </p>
+                          )}
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{row.symbol}</p>
-                        {row.sector && (
-                          <p className="text-[10px] text-slate-500 uppercase tracking-wide truncate max-w-[120px]">
-                            {row.sector}
-                          </p>
-                        )}
+                      <div className="text-right rtl:text-left">
+                        <p className="text-sm font-bold text-foreground" dir="ltr">
+                          {live ? `$${row.price!.toFixed(2)}` : "—"}
+                        </p>
+                        <p className={`text-xs font-semibold ${cls}`} dir="ltr">
+                          {pct === undefined ? "—" : `${sign}${pct.toFixed(2)}%`}
+                        </p>
                       </div>
                     </div>
-                    <div className="text-right rtl:text-left">
-                      <p className="text-sm font-bold text-foreground" dir="ltr">
-                        {live ? `$${row.price!.toFixed(2)}` : "—"}
-                      </p>
-                      <p className={`text-xs font-semibold ${cls}`} dir="ltr">
-                        {pct === undefined ? "—" : `${sign}${pct.toFixed(2)}%`}
-                      </p>
-                    </div>
+                    <p className="text-xs text-slate-400 mb-2 truncate">{row.name}</p>
+                    <p className="text-xs text-slate-500 flex items-center gap-1">
+                      <span>{t("insights.marketCap")}:</span>
+                      <span dir="ltr">{formatMarketCap(row.marketCap)}</span>
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-400 mb-2 truncate">{row.name}</p>
-                  <p className="text-xs text-slate-500 flex items-center gap-1">
-                    <span>{t("insights.marketCap")}:</span>
-                    <span dir="ltr">{formatMarketCap(row.marketCap)}</span>
-                  </p>
-                </div>
+                </DeferredInsightsCard>
               );
             })}
           </div>
