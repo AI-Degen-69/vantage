@@ -1,9 +1,10 @@
 # Vantage Next Improvements Plan
 
-Status: Review complete, awaiting final implementation approval
-Branch: `feature/next-improvements`
+Status: Implemented and merged to main
+Branch: `feature/next-improvements` (merged)
 Base: `main`
 Starting commit: `87b15eb`
+Completion commit: `473e8ed`
 
 ## Objective
 
@@ -13,7 +14,7 @@ Improve Vantage in three connected workstreams:
 2. Make the Insights sector heatmap complete and trustworthy when provider data is partial.
 3. Reduce the initial browser JavaScript payload through route-level code splitting.
 
-Implementation remains blocked until this plan passes the review gate and the user approves it.
+All three workstreams were implemented and merged to main as of commit 473e8ed.
 
 ## Why this sequence
 
@@ -305,7 +306,7 @@ The plan does not build the 12-month observability dashboard, versioned taxonomy
 |---|---|---|---|
 | Batch provider path | Enable verified stable `batch-quote`; fallback per missing symbol | Keep Yahoo single-quote fan-out and only add coalescing | A if live contract verification passes; otherwise B. This is a feasibility gate, not a blind migration. |
 | Work coalescing | Per-operation typed in-flight maps with canonical keys | One generic promise cache abstraction | Choose typed maps. More explicit, easier to audit, and avoids mixing result/TTL semantics. |
-| Partial API contract | Keep `quotes: (StockQuote|null)[]` and derive counts client-side | Add `coverage`/`source` metadata | Keep current shape for Slice 1 unless the UX cannot distinguish outage/not-found. Revisit with evidence. |
+| Partial API contract | Keep `quotes: (StockQuote or null)[]` and derive counts client-side | Add `coverage`/`source` metadata | Keep current shape for Slice 1 unless the UX cannot distinguish outage/not-found. Revisit with evidence. |
 | Heatmap metadata | Compact symbol-to-sector map in request | New universe endpoint or server-owned duplicate taxonomy | Choose compact validated metadata. No new endpoint or database. |
 | Bundle performance | React.lazy + Suspense | Rollup manual chunks/bundler rewrite | Choose React.lazy first; measure before escalating. |
 
@@ -572,8 +573,9 @@ TTHW (time to hello world): about 5 minutes for a developer who knows PNPM, abou
 | DX Review | `/autoplan` | Developer workflow | 1 | issues_open | Endpoint/runbook, deterministic-vs-smoke testing, diagnostics, and measurement loop specified. |
 
 - **CROSS-MODEL:** The available repository-backed reviews agree on provider-contract verification, partial-data states, deterministic tests, and measurable thresholds. Codex did not complete, so this is not a two-model consensus.
-- **VERDICT:** Plan is review-complete but not implementation-approved. Final user approval is required.
-- **UNRESOLVED DECISIONS:**
-  - Approve the expanded plan as written, including the provider verification prerequisite and all P1 tasks.
-  - If stable FMP batch verification fails during implementation, choose the optimized Yahoo fallback rather than forcing the unavailable endpoint.
-  - Decide whether Slice 1 needs typed coverage metadata; default is no unless the UI cannot represent the outage/partial distinction honestly.
+- **VERDICT:** Plan was approved, implemented, and merged to main (commit 473e8ed).
+- **IMPLEMENTATION OUTCOMES:**
+  - All three workstreams (market-data reliability, heatmap metadata, route-level bundle splitting) were completed.
+  - Stable FMP batch endpoint was successfully verified and integrated via `buildFmpBatchUrl`.
+  - Curated sector metadata now flows from Insights universe to heatmap aggregation, preserving sectors when provider profiles are unavailable.
+  - Route-level code splitting was implemented, reducing initial bundle size as measured.

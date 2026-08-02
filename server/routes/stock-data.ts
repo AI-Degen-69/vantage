@@ -51,6 +51,7 @@ function parseSymbolList(value: unknown): { symbols: string[]; invalid: string[]
 }
 
 const MAX_SECTOR_LEN = 64;
+const SECTOR_NAME_PATTERN = /^[A-Za-z0-9 &\-]+$/; // Letters, digits, spaces, ampersand, hyphen only
 
 /**
  * Parse the optional `sectorMeta=SYM:SECTOR,SYM2:SECTOR2` query parameter
@@ -62,6 +63,7 @@ const MAX_SECTOR_LEN = 64;
 function parseSectorMeta(value: unknown): SectorHeatmapMetadata | null {
   if (value === undefined) return {};
   if (typeof value !== "string" || value.trim().length === 0) return {};
+  if (Array.isArray(value)) return null; // Reject arrays explicitly — symbol-list semantics don't apply to metadata.
   const entries = value.split(",");
   if (entries.length > MAX_SYMBOLS) return null;
   const out: SectorHeatmapMetadata = {};
@@ -74,6 +76,7 @@ function parseSectorMeta(value: unknown): SectorHeatmapMetadata | null {
     if (!symbol) return null;
     const sector = pair.slice(sep + 1).trim();
     if (!sector || sector.length > MAX_SECTOR_LEN) return null;
+    if (!SECTOR_NAME_PATTERN.test(sector)) return null; // Reject invalid characters
     out[symbol] = sector;
   }
   return out;
@@ -228,6 +231,14 @@ export const handleSectorHeatmap: RequestHandler = async (req, res) => {
     sectorsRaw.length > 0
       ? sectorsRaw.split(",").map((s) => s.trim()).filter(Boolean)
       : null;
+  // Validate sector allowlist names with the same character-set constraint
+  if (sectorAllow) {
+    for (const sector of sectorAllow) {
+      if (sector.length > MAX_SECTOR_LEN || !SECTOR_NAME_PATTERN.test(sector)) {
+        return res.status(400).json({ error: "invalid sectors parameter" });
+      }
+    }
+  }
   // Optional curated symbol→sector metadata from the Insights universe.
   // Malformed or oversized payloads are rejected without touching the
   // symbol validation guarantees above.

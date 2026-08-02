@@ -64,7 +64,7 @@ const yahooFinance = new yahooFinanceDefault({ suppressNotices: ['yahooSurvey'] 
  */
 
 // ---- Cache ----------------------------------------------------------------
-const cache = new NodeCache({ stdTTL: 3600 });
+const cache = new NodeCache({ stdTTL: 3600, maxKeys: 10000 });
 const QUOTE_TTL = 60; // 1 min — quotes are the only thing we ever refetch live
 const QUOTE_NEGATIVE_TTL = 15; // Briefly suppress repeated misses without hiding recovery.
 const PROFILE_NEGATIVE_TTL = 30; // Provider outages/not-found responses are retryable.
@@ -1091,7 +1091,9 @@ export const stockService = {
         allowedSectors: sectorAllow,
         todayIso,
       });
-      cache.set(cacheKey, result, SECTOR_HEATMAP_TTL);
+      // Use short negative TTL for empty results to allow recovery from transient provider issues
+      const isEmpty = result.rows.length === 0;
+      cache.set(cacheKey, result, isEmpty ? CHART_NEGATIVE_TTL : SECTOR_HEATMAP_TTL);
       return result;
     });
   },

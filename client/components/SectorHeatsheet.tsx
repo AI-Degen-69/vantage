@@ -102,7 +102,7 @@ export function SectorHeatsheet({ heatmap, days, isLoading }: SectorHeatsheetPro
           </span>
         )}
         {isLoading && hasRows && (
-          <span className="text-[10px] text-amber-300 ml-auto">
+          <span className="text-[10px] text-amber-300 ms-auto">
             {t("insights.heatsheet.loading", { days })}
           </span>
         )}

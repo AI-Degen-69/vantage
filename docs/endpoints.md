@@ -71,7 +71,7 @@ GET {FMP_BASE}/quote/{symbol}
     dayLow, dayHigh, yearLow, yearHigh,
     priceAvg50, priceAvg200, marketCap, volume, avgVolume,
     eps, pe, sharesOutstanding, exchange, earningsAnnouncement (ISO)
-GET {FMP_BASE}/quote?symbol={A,B,C,...}
+GET {FMP_BASE}/batch-quote?symbols=A,B,C
   → Batch quotes: array of single-quote rows in the same order you asked.
 GET {FMP_BASE}/income-statement/{symbol}?limit=10
   → revenue, costOfRevenue, grossProfit, operatingIncome, ebitda,

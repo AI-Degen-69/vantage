@@ -71,8 +71,9 @@ export async function resolveOrderedBatch<T extends SymbolRecord>({
   const limit = Math.max(1, Math.floor(concurrency));
   for (let start = 0; start < missing.length; start += limit) {
     const group = missing.slice(start, start + limit);
-    const fallbackRecords = await Promise.all(group.map((symbol) => fetchSingle(symbol)));
-    fallbackRecords.forEach((record) => {
+    const fallbackResults = await Promise.allSettled(group.map((symbol) => fetchSingle(symbol)));
+    fallbackResults.forEach((result) => {
+      const record = result.status === 'fulfilled' ? result.value : null;
       const symbol = record?.symbol?.trim().toUpperCase();
       if (symbol) bySymbol.set(symbol, record as T);
     });
@@ -130,10 +131,12 @@ export async function buildHeatmapRows<T extends { symbol: string; sector: strin
     const batchRows = await Promise.all(
       batch.map(async (sym): Promise<T> => {
         const curatedTag = curated[sym]?.trim() || null;
-        const [chart, profile] = await Promise.all([
+        const [chartResult, profileResult] = await Promise.allSettled([
           getChart(sym),
           curatedTag ? Promise.resolve(null) : getProfile(sym),
         ]);
+        const chart = chartResult.status === 'fulfilled' ? chartResult.value : null;
+        const profile = profileResult.status === 'fulfilled' ? profileResult.value : null;
         const providerSector = profile?.sector?.trim() || null;
         return {
           symbol: sym,
