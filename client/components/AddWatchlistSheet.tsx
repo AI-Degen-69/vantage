@@ -16,6 +16,8 @@ import { parseTickers } from "@/lib/parseCsv";
 import { useValidateSymbols } from "@/hooks/useStockData";
 import type { Result, Watchlist, WatchlistSymbolEntry } from "@/lib/watchlistStore";
 
+const MAX_WATCHLIST_SYMBOLS = 50;
+
 interface AddWatchlistSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -34,12 +36,12 @@ interface AddWatchlistSheetProps {
  * Validation flow:
  *   1. User types/pastes in the textarea. `parseTickers` gives us the
  *      format-clean list and an honest invalid-set back.
- *   2. We feed the format-clean list to `useValidateSymbols` which fires
- *      `/api/stock-overview` in parallel (cap 8). Results return as
- *      `valid` (with profile.companyName to seed display names) plus
- *      `invalid`.
- *   3. The submit button counts valid items and disables itself when
- *      valid < 1 OR the name field is empty.
+ *   2. We feed the format-clean list to `useValidateSymbols`, which validates
+ *      every candidate in bounded batches of eight. Results return as
+ *      `valid` (with profile.companyName to seed display names), `invalid`,
+ *      or `unavailable` when the API cannot be reached.
+ *   3. The submit button only accepts upstream-validated symbols and remains
+ *      disabled while validation is in flight or when any result is unavailable.
  *
  * Honest feedback: the user sees both the format-invalid chips (from
  * `parseTickers`) AND the upstream-invalid chips (from the validation
@@ -63,68 +65,81 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
 
   // Format-clean list (uppercased, deduped, regex-gated).
   const parsed = useMemo(() => parseTickers(rawSymbols), [rawSymbols]);
-  const validated = useValidateSymbols(parsed.valid);
+  const tooManySymbols = parsed.valid.length > MAX_WATCHLIST_SYMBOLS;
+  const candidatesForValidation = useMemo(
+    () => (tooManySymbols ? [] : parsed.valid.slice(0, MAX_WATCHLIST_SYMBOLS)),
+    [parsed.valid, tooManySymbols],
+  );
+  const [debouncedCandidates, setDebouncedCandidates] = useState<string[]>([]);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedCandidates(candidatesForValidation), 250);
+    return () => clearTimeout(timer);
+  }, [candidatesForValidation]);
+  const validated = useValidateSymbols(debouncedCandidates);
+  const validationIsCurrent =
+    debouncedCandidates.length === candidatesForValidation.length &&
+    debouncedCandidates.every((symbol, index) => symbol === candidatesForValidation[index]);
+  // Ignore the previous query's result during the debounce window. Otherwise a
+  // fast edit could briefly enable submission for symbols that are no longer
+  // the current textarea value.
+  const currentValid = validationIsCurrent ? validated.valid : [];
+  const currentInvalid = validationIsCurrent ? validated.invalid : [];
+  const currentUnavailable = validationIsCurrent ? validated.unavailable : [];
 
   // Display names come from the validated profiles when we have them;
   // otherwise we fall back to whatever the system knows about the symbol.
   const displayNames = useMemo(() => {
     const map = new Map<string, string>();
-    for (const { symbol, profile } of validated.valid) {
+    for (const { symbol, profile } of currentValid) {
       if (profile.companyName) map.set(symbol, profile.companyName);
     }
     return map;
-  }, [validated.valid]);
+  }, [currentValid]);
 
-  // Combined preview: every parsed symbol tagged with valid/invalid/unverified +
-  // (when valid) a display name. This drives the chip row.
+  // Preview only covers candidates currently eligible for upstream validation;
+  // an over-limit paste is rejected without leaving 51+ symbols in a pending state.
+  const formatInvalidPreview = parsed.invalid;
+  const invalidSymbols = useMemo(
+    () => Array.from(new Set([...formatInvalidPreview, ...currentInvalid])),
+    [formatInvalidPreview, currentInvalid],
+  );
   const preview: Array<{
     symbol: string;
     displayName: string | null;
-    state: "valid" | "invalid" | "unverified";
+    state: "valid" | "invalid" | "pending" | "unavailable";
   }> = useMemo(() => {
-    const validSet = new Set(validated.valid.map((v) => v.symbol));
-    const invalidSet = new Set(validated.invalid);
-    const unverifiedSet = new Set(validated.unverified);
-    return parsed.valid.map((sym) => {
+    const validSet = new Set(currentValid.map((v) => v.symbol));
+    const invalidSet = new Set(currentInvalid);
+    const unavailableSet = new Set(currentUnavailable);
+    return candidatesForValidation.map((sym) => {
       if (validSet.has(sym)) {
         return {
           symbol: sym,
           displayName: displayNames.get(sym) ?? null,
           state: "valid" as const,
         };
-      } else if (invalidSet.has(sym)) {
-        return {
-          symbol: sym,
-          displayName: null,
-          state: "invalid" as const,
-        };
-      } else if (unverifiedSet.has(sym)) {
-        return {
-          symbol: sym,
-          displayName: null,
-          state: "unverified" as const,
-        };
-      } else {
-        // Still validating
-        return {
-          symbol: sym,
-          displayName: null,
-          state: "unverified" as const,
-        };
       }
+      if (invalidSet.has(sym)) {
+        return { symbol: sym, displayName: null, state: "invalid" as const };
+      }
+      if (unavailableSet.has(sym)) {
+        return { symbol: sym, displayName: null, state: "unavailable" as const };
+      }
+      return { symbol: sym, displayName: null, state: "pending" as const };
     });
-  }, [parsed.valid, validated.valid, validated.invalid, validated.unverified, displayNames]);
-
-  const formatInvalidPreview = parsed.invalid;
+  }, [candidatesForValidation, currentValid, currentInvalid, currentUnavailable, displayNames]);
 
   const truncatedPreview = preview.slice(0, 48); // keep chip row scannable
-  const visibleValidCount = preview.length;
-  const visibleInvalidCount = formatInvalidPreview.length;
+  const visibleValidCount = currentValid.length;
+  const visibleInvalidCount = invalidSymbols.length;
+  const unavailableCount = currentUnavailable.length;
 
   const canSubmit =
     name.trim().length > 0 &&
-    preview.length > 0 &&
-    preview.some((p) => p.state === "valid" || p.state === "unverified") &&
+    currentValid.length > 0 &&
+    validationIsCurrent &&
+    unavailableCount === 0 &&
+    !tooManySymbols &&
     !validated.isValidating;
 
   const handleSubmit = () => {
@@ -134,15 +149,29 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
       setError(t("watchlists.emptyNameError"));
       return;
     }
-    if (preview.length === 0 || !preview.some((p) => p.state === "valid" || p.state === "unverified")) {
+    if (tooManySymbols) {
+      setError(t("watchlists.tooManySymbols", { max: MAX_WATCHLIST_SYMBOLS }));
+      return;
+    }
+    if (unavailableCount > 0) {
+      setError(t("watchlists.validationUnavailable"));
+      return;
+    }
+    if (!validationIsCurrent || validated.isValidating) {
+      setError(t("watchlists.validatingLabel"));
+      return;
+    }
+    if (currentValid.length === 0) {
       setError(t("watchlists.csvHint"));
       return;
     }
-    // Accept validated symbols and unverified format-clean symbols. Never
-    // commit invalid candidates to disk; surface them to the user instead.
-    const accept: WatchlistSymbolEntry[] = preview
-      .filter((p) => p.state === "valid" || p.state === "unverified")
-      .map((p) => ({ symbol: p.symbol, name: p.displayName ?? undefined }));
+    // Persist only symbols whose upstream profile resolved successfully.
+    // Format-clean-but-unknown symbols remain visible as invalid/pending and
+    // are never treated as valid merely because they match the ticker regex.
+    const accept: WatchlistSymbolEntry[] = currentValid.map(({ symbol, profile }) => ({
+      symbol,
+      name: profile.companyName || undefined,
+    }));
 
     const result = onCreate(trimmedName, accept);
     // Explicit `result.ok === false` narrowing — TS sometimes loses the
@@ -195,7 +224,7 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
           {/* Validation chips — show what we have after parsing. Live
               upstream-validation chips flip from pending to valid/invalid
               as /api/stock-overview resolves per symbol (cap 8). */}
-          {truncatedPreview.length > 0 && (
+          {(truncatedPreview.length > 0 || invalidSymbols.length > 0 || tooManySymbols) && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-slate-400 font-medium">
@@ -214,9 +243,11 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
                     className={`text-[11px] font-bold px-2 py-0.5 rounded border ${
                       p.state === "valid"
                         ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
-                        : p.state === "unverified"
-                          ? "bg-blue-500/15 text-blue-300 border-blue-500/30"
-                          : "bg-yellow-500/15 text-yellow-300 border-yellow-500/30"
+                        : p.state === "invalid"
+                          ? "bg-red-500/15 text-red-300 border-red-500/30"
+                          : p.state === "unavailable"
+                            ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                            : "bg-blue-500/15 text-blue-300 border-blue-500/30"
                     }`}
                     title={p.displayName ?? p.symbol}
                   >
@@ -229,13 +260,23 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
                   </span>
                 )}
               </div>
-              {formatInvalidPreview.length > 0 && (
+              {tooManySymbols && (
+                <div className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2">
+                  {t("watchlists.tooManySymbols", { max: MAX_WATCHLIST_SYMBOLS })}
+                </div>
+              )}
+              {unavailableCount > 0 && (
+                <div className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2">
+                  {t("watchlists.validationUnavailable")}
+                </div>
+              )}
+              {invalidSymbols.length > 0 && (
                 <>
                   <div className="text-xs text-slate-400 font-medium" dir="ltr">
                     {t("watchlists.invalidCount", { count: visibleInvalidCount })}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {formatInvalidPreview.slice(0, 24).map((s) => (
+                    {invalidSymbols.slice(0, 24).map((s) => (
                       <span
                         key={s}
                         className="text-[11px] font-bold px-2 py-0.5 rounded border bg-red-500/15 text-red-300 border-red-500/30"
@@ -244,9 +285,9 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
                         {s} <X className="w-3 h-3 inline-block -mt-0.5" />
                       </span>
                     ))}
-                    {formatInvalidPreview.length > 24 && (
+                    {invalidSymbols.length > 24 && (
                       <span className="text-[11px] text-slate-500 px-2 py-0.5" dir="ltr">
-                        +{formatInvalidPreview.length - 24}
+                        +{invalidSymbols.length - 24}
                       </span>
                     )}
                   </div>

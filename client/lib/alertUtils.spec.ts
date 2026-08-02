@@ -103,6 +103,7 @@ describe("formatTimeUntil", () => {
       "earningsAlerts.timeUntilNow": "now",
       "earningsAlerts.timeUntilMinutes_other": `in ${v?.count}m`,
       "earningsAlerts.timeUntilHours_other": `in ${v?.count}h`,
+      "earningsAlerts.timeUntilDays_one": `in ${v?.count}d`,
       "earningsAlerts.timeUntilDays_other": `in ${v?.count}d`,
     };
     return map[k] ?? k;

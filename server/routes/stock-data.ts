@@ -17,18 +17,55 @@ import type {
 } from "../../shared/api";
 
 const MAX_SYMBOLS = 50;
+const TICKER_PATTERN = /^[A-Z]{1,5}(?:[.-][A-Z])?$/;
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseTicker(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const symbol = value.trim().toUpperCase();
+  return TICKER_PATTERN.test(symbol) ? symbol : null;
+}
+
+function parseSymbolList(value: unknown): { symbols: string[]; invalid: string[] } {
+  const raw = typeof value === "string"
+    ? value.split(",")
+    : Array.isArray(value) && value.every((item) => typeof item === "string")
+      ? value.flatMap((item) => item.split(","))
+      : [];
+  const symbols: string[] = [];
+  const invalid: string[] = [];
+  const seen = new Set<string>();
+
+  for (const item of raw) {
+    const candidate = item.trim().toUpperCase();
+    if (!candidate) continue;
+    if (!TICKER_PATTERN.test(candidate)) {
+      invalid.push(candidate);
+    } else if (!seen.has(candidate)) {
+      seen.add(candidate);
+      symbols.push(candidate);
+    }
+  }
+  return { symbols, invalid };
+}
+
+function isIsoDate(value: unknown): value is string {
+  if (typeof value !== "string" || !ISO_DATE_PATTERN.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
 
 export const handleStockQuote: RequestHandler = async (req, res) => {
-  const symbol = String(req.query.symbol || "");
-  if (!symbol) return res.status(400).json({ error: "symbol parameter required" });
+  const symbol = parseTicker(req.query.symbol);
+  if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
   const quote = await stockService.getQuote(symbol);
   res.json(quote satisfies StockQuote | null);
 };
 
 export const handleBatchQuotes: RequestHandler = async (req, res) => {
-  const symbolsRaw = String(req.query.symbols || "");
-  if (!symbolsRaw) return res.status(400).json({ error: "symbols parameter required" });
-  const symbols = symbolsRaw.split(",").map((s) => s.trim()).filter(Boolean);
+  const { symbols, invalid } = parseSymbolList(req.query.symbols);
+  if (invalid.length > 0) return res.status(400).json({ error: "invalid symbol parameter", symbols: invalid });
+  if (symbols.length === 0) return res.status(400).json({ error: "symbols parameter required" });
   if (symbols.length > MAX_SYMBOLS) {
     return res.status(400).json({ error: `Too many symbols requested. Maximum is ${MAX_SYMBOLS}, received ${symbols.length}` });
   }
@@ -42,65 +79,77 @@ export const handleBatchQuotes: RequestHandler = async (req, res) => {
  * is `CompanyProfile` (NOT a `StockQuote` — the original alias was a bug).
  */
 export const handleStockProfile: RequestHandler = async (req, res) => {
-  const symbol = String(req.query.symbol || "");
-  if (!symbol) return res.status(400).json({ error: "symbol parameter required" });
-  const profile: CompanyProfile | null = await stockService.getProfile(symbol);
-  res.json(profile);
+  const symbol = parseTicker(req.query.symbol);
+  if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
+  const result = await stockService.getProfileValidation(symbol);
+  if (result.unavailable) {
+    return res.status(503).json({ error: "profile service temporarily unavailable" });
+  }
+  res.json(result.profile);
 };
 
 export const handleStockOverview: RequestHandler = async (req, res) => {
-  const symbol = String(req.query.symbol || "");
-  if (!symbol) return res.status(400).json({ error: "symbol parameter required" });
-  const profile: CompanyProfile | null = await stockService.getProfile(symbol);
-  res.json(profile);
+  const symbol = parseTicker(req.query.symbol);
+  if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
+  const result = await stockService.getProfileValidation(symbol);
+  if (result.unavailable) {
+    return res.status(503).json({ error: "profile service temporarily unavailable" });
+  }
+  res.json(result.profile);
 };
 
 export const handleStockFinancials: RequestHandler = async (req, res) => {
-  const symbol = String(req.query.symbol || "");
-  if (!symbol) return res.status(400).json({ error: "symbol parameter required" });
+  const symbol = parseTicker(req.query.symbol);
+  if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
   const data: FinancialStatements = await stockService.getFinancialStatements(symbol);
   res.json(data);
 };
 
 export const handleStockMetrics: RequestHandler = async (req, res) => {
-  const symbol = String(req.query.symbol || "");
-  if (!symbol) return res.status(400).json({ error: "symbol parameter required" });
+  const symbol = parseTicker(req.query.symbol);
+  if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
   const data: StockMetrics = await stockService.getMetrics(symbol);
   res.json(data);
 };
 
 export const handleStockAnalyst: RequestHandler = async (req, res) => {
-  const symbol = String(req.query.symbol || "");
-  if (!symbol) return res.status(400).json({ error: "symbol parameter required" });
+  const symbol = parseTicker(req.query.symbol);
+  if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
   const data = await stockService.getAnalystEstimates(symbol);
   res.json(data);
 };
 
 export const handleStockInsider: RequestHandler = async (req, res) => {
-  const symbol = String(req.query.symbol || "");
-  if (!symbol) return res.status(400).json({ error: "symbol parameter required" });
+  const symbol = parseTicker(req.query.symbol);
+  if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
   const data = await stockService.getInsiderTrading(symbol);
   res.json(data);
 };
 
 export const handleStockNews: RequestHandler = async (req, res) => {
-  const symbol = String(req.query.symbol || "");
-  if (!symbol) return res.status(400).json({ error: "symbol parameter required" });
+  const symbol = parseTicker(req.query.symbol);
+  if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
   const data = await stockService.getNews(symbol);
   res.json(data);
 };
 
 export const handleEarningsCalendar: RequestHandler = async (req, res) => {
-  const from = String(req.query.from || "");
-  const to = String(req.query.to || "");
-  if (!from || !to) return res.status(400).json({ error: "from and to parameters required" });
+  const from = req.query.from;
+  const to = req.query.to;
+  if (!isIsoDate(from) || !isIsoDate(to)) {
+    return res.status(400).json({ error: "from and to must be valid YYYY-MM-DD dates" });
+  }
+  const rangeDays = (Date.parse(`${to}T00:00:00.000Z`) - Date.parse(`${from}T00:00:00.000Z`)) / 86_400_000;
+  if (rangeDays < 0 || rangeDays > 31) {
+    return res.status(400).json({ error: "date range must be between 0 and 31 days" });
+  }
   const data: EarningsEvent[] = await stockService.getEarningsCalendar(from, to);
   res.json(data);
 };
 
 export const handleStockChart: RequestHandler = async (req, res) => {
-  const symbol = String(req.query.symbol || "");
-  if (!symbol) return res.status(400).json({ error: "symbol parameter required" });
+  const symbol = parseTicker(req.query.symbol);
+  if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
   const data: ChartSeries | null = await stockService.getChart(symbol);
   res.json(data);
 };
@@ -131,9 +180,9 @@ export const handleIndexQuotes: RequestHandler = async (_req, res) => {
  *     allowlist flow into `untagged[]` instead of `rows`)
  */
 export const handleSectorHeatmap: RequestHandler = async (req, res) => {
-  const symbolsRaw = String(req.query.symbols || "");
-  if (!symbolsRaw) return res.status(400).json({ error: "symbols parameter required" });
-  const symbols = symbolsRaw.split(",").map((s) => s.trim()).filter(Boolean);
+  const { symbols, invalid } = parseSymbolList(req.query.symbols);
+  if (invalid.length > 0) return res.status(400).json({ error: "invalid symbol parameter", symbols: invalid });
+  if (symbols.length === 0) return res.status(400).json({ error: "symbols parameter required" });
   if (symbols.length > MAX_SYMBOLS) {
     return res.status(400).json({
       error: `Too many symbols requested. Maximum is ${MAX_SYMBOLS}, received ${symbols.length}`,
@@ -172,11 +221,10 @@ export const handleInsightsTab: RequestHandler = async (req, res) => {
  * `?window=20` (default 200, max 200) selects the SMA window directly.
  */
 export const handleSmaDistances: RequestHandler = async (req, res) => {
-  const listRaw = req.query.symbols ?? req.query.symbol ?? [];
-  const list: string[] = Array.isArray(listRaw)
-    ? listRaw.map((s) => String(s))
-    : String(listRaw).split(",").map((s) => s.trim());
-  const symbols = list.filter(Boolean);
+  const listRaw = req.query.symbols ?? req.query.symbol;
+  const { symbols, invalid } = parseSymbolList(listRaw);
+  if (invalid.length > 0) return res.status(400).json({ error: "invalid symbol parameter", symbols: invalid });
+  if (symbols.length === 0) return res.status(400).json({ error: "symbols parameter required" });
   if (symbols.length > MAX_SYMBOLS) {
     return res.status(400).json({ error: `Too many symbols requested. Maximum is ${MAX_SYMBOLS}, received ${symbols.length}` });
   }

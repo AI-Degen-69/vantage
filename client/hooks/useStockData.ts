@@ -478,67 +478,94 @@ export function useSectorHeatmap(symbols: string[], days: number = 5) {
  * commit a typo ("APPL" for Apple) into the persisted store.
  *
  * Strategy:
- *   - Run `useStockProfile` in parallel via `useQueries`, capped at the
- *     first 8 candidates per call (matches `useWatchlistNews`'s rate
- *     ceiling — beyond 8, free-tier FMP `/stable/profile` risks 429s).
+ *   - Validate every candidate in sequential batches of eight so a large
+ *     paste cannot create an unbounded upstream request burst.
  *   - A candidate is "valid" when the upstream returned a non-null
- *     CompanyProfile with a non-empty `symbol` field. Unrecognized
- *     tickers surface as `invalid`. Per-query `isError` is informational
- *     but does not disqualify the row — we surface the result list
- *     regardless so the user can decide.
+ *     CompanyProfile whose `symbol` matches the requested symbol.
+ *     Unrecognized candidates surface as `invalid`; request failures surface
+ *     separately as `unavailable`, and neither is persisted.
  *
- * `staleTime: 5min` per query keeps repeated validation of the same
- * Add-sheet session cheap (users often re-paste while iterating).
+ * `staleTime: 5min` for the complete candidate set keeps repeated validation
+ * of the same Add-sheet session cheap (users often re-paste while iterating).
  */
 export function useValidateSymbols(candidates: string[]) {
-  const bounded = useMemo(
-    () =>
-      candidates
-        .slice(0, 8)
-        .map((s) => s.toUpperCase().trim())
-        .filter(Boolean),
+  const normalized = useMemo(
+    () => Array.from(new Set(candidates.map((s) => s.toUpperCase().trim()).filter(Boolean))),
     [candidates],
   );
-  const unverified = useMemo(
-    () =>
-      candidates
-        .slice(8)
-        .map((s) => s.toUpperCase().trim())
-        .filter(Boolean),
-    [candidates],
-  );
-  const results = useQueries({
-    queries: bounded.map((sym) => ({
-      queryKey: ["stockProfile", sym],
-      queryFn: () =>
-        fetchJSON<ApiCompanyProfile | null>(
-          `/api/stock-overview?symbol=${encodeURIComponent(sym)}`,
-        ),
-      enabled: !!sym,
-      staleTime: 5 * 60_000,
-    })),
-  });
-  return useMemo(() => {
-    const valid: Array<{ symbol: string; profile: ApiCompanyProfile }> = [];
-    const invalid: string[] = [];
-    for (let i = 0; i < bounded.length; i++) {
-      const sym = bounded[i];
-      const q = results[i];
-      const data = q?.data;
-      if (data && typeof data.symbol === "string" && data.symbol.length > 0) {
-        valid.push({ symbol: data.symbol.toUpperCase(), profile: data });
-      } else if (data === null || (data === undefined && q?.isError)) {
-        invalid.push(sym);
+  const validation = useQuery({
+    queryKey: ["validateStockProfiles", [...normalized].sort().join(",")],
+    queryFn: async ({ signal }) => {
+      const profiles: Array<{ symbol: string; profile: ApiCompanyProfile }> = [];
+      const invalid: string[] = [];
+      const unavailable: string[] = [];
+      const batchSize = 8;
+
+      // Validate every format-clean candidate, but keep upstream concurrency
+      // bounded so a large paste cannot create an unbounded request burst.
+      const throwIfAborted = () => {
+        if (signal.aborted) {
+          throw new DOMException("Validation aborted", "AbortError");
+        }
+      };
+
+      for (let i = 0; i < normalized.length; i += batchSize) {
+        throwIfAborted();
+        const batch = normalized.slice(i, i + batchSize);
+        const settled = await Promise.all(
+          batch.map(async (sym) => {
+            try {
+              const response = await fetch(
+                `/api/stock-overview?symbol=${encodeURIComponent(sym)}`,
+                { signal },
+              );
+              if (response.status === 503) {
+                return { sym, profile: null, unavailable: true };
+              }
+              if (!response.ok) {
+                throw new Error(`Request failed (${response.status})`);
+              }
+              const profile = (await response.json()) as ApiCompanyProfile | null;
+              return { sym, profile, unavailable: false };
+            } catch (error) {
+              if (signal.aborted) throw error;
+              // A timeout, 429, or provider outage is not proof that the
+              // ticker is invalid. Keep it separate so the UI can ask the
+              // user to retry rather than silently dropping it.
+              return { sym, profile: null, unavailable: true };
+            }
+          }),
+        );
+        // Do not cache partial results if the query was superseded while the
+        // current batch was in flight.
+        throwIfAborted();
+        for (const { sym, profile, unavailable: requestUnavailable } of settled) {
+          if (requestUnavailable) {
+            unavailable.push(sym);
+          } else if (
+            profile &&
+            typeof profile.symbol === "string" &&
+            profile.symbol.toUpperCase() === sym
+          ) {
+            profiles.push({ symbol: sym, profile });
+          } else {
+            // Do not accept a provider response for a different security.
+            invalid.push(sym);
+          }
+        }
       }
-    }
-    return {
-      valid,
-      invalid,
-      unverified,
-      isValidating: results.some((q) => q.isLoading),
-      isError: results.some((q) => q.isError),
-    };
-  }, [bounded, results, unverified]);
+      return { profiles, invalid, unavailable };
+    },
+    enabled: normalized.length > 0,
+    staleTime: 5 * 60_000,
+  });
+
+  return useMemo(() => ({
+    valid: validation.data?.profiles ?? [],
+    invalid: validation.data?.invalid ?? [],
+    unavailable: validation.data?.unavailable ?? [],
+    isValidating: validation.isPending || validation.isFetching,
+  }), [validation.data, validation.isPending, validation.isFetching]);
 }
 
 export type { IndexQuotesResponse };

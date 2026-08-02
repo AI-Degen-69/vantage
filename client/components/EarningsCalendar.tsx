@@ -99,15 +99,17 @@ export const mockEarningsEvents = [
  * Determines whether a market capitalization matches the selected filter.
  *
  * @param mc - The market capitalization to evaluate.
- * @param filter - The market-capacity bucket to apply
+ * @param filter - The market-cap bucket to apply: large $10B+, mid $2B–<$10B, or small <$2B
  * @returns `true` if the market capitalization matches the filter, `false` otherwise.
  */
-function inMarketCapBucket(mc: number | undefined, filter: MarketCapFilter): boolean {
+function inMarketCapBucket(mc: number | null | undefined, filter: MarketCapFilter): boolean {
   if (filter === "all") return true;
-  if (mc === undefined) return false; // no marketCap data → only shown under "All"
-  if (filter === "large") return mc > 200_000_000_000;
-  if (filter === "mid") return mc >= 10_000_000_000 && mc <= 200_000_000_000;
-  if (filter === "small") return mc < 10_000_000_000;
+  // Unknown market caps must not be classified as small (`null < threshold`
+  // is true in JavaScript). They remain visible only under "All Caps".
+  if (mc === null || mc === undefined || !Number.isFinite(mc)) return false;
+  if (filter === "large") return mc >= 10_000_000_000;
+  if (filter === "mid") return mc >= 2_000_000_000 && mc < 10_000_000_000;
+  if (filter === "small") return mc < 2_000_000_000;
   return true;
 }
 
