@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import type { NextFunction, Request, Response } from "express";
 import { handleDemo } from "./routes/demo";
 import {
   handleStockQuote,
@@ -25,13 +26,55 @@ import {
  *
  * @returns The configured Express application
  */
+const API_RATE_WINDOW_MS = 60_000;
+const API_RATE_LIMIT = 120;
+const apiRateState = new Map<string, { count: number; resetAt: number }>();
+
+function apiRateLimit(req: Request, res: Response, next: NextFunction): void {
+  const now = Date.now();
+  const key = req.ip || req.socket.remoteAddress || "unknown";
+  const current = apiRateState.get(key);
+  const state = !current || current.resetAt <= now
+    ? { count: 0, resetAt: now + API_RATE_WINDOW_MS }
+    : current;
+
+  state.count += 1;
+  apiRateState.set(key, state);
+
+  if (apiRateState.size > 10_000) {
+    for (const [candidate, value] of apiRateState) {
+      if (value.resetAt <= now) apiRateState.delete(candidate);
+    }
+  }
+
+  if (state.count > API_RATE_LIMIT) {
+    res.setHeader("Retry-After", Math.ceil((state.resetAt - now) / 1000));
+    res.status(429).json({ error: "Too many API requests; please retry shortly" });
+    return;
+  }
+
+  next();
+}
+
 export function createServer() {
   const app = express();
 
-  // Middleware
-  app.use(cors());
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+  // Trust the hosting proxy only when deployment explicitly opts in. This
+  // prevents a directly reachable instance from accepting a spoofed
+  // X-Forwarded-For header as the rate-limit identity.
+  const proxyHops = Number.parseInt(process.env.TRUST_PROXY_HOPS ?? "0", 10);
+  app.set("trust proxy", Number.isFinite(proxyHops) && proxyHops > 0 ? proxyHops : false);
+
+  // The API is consumed by the same-origin SPA. Cross-origin access is opt-in
+  // for local integrations/deployments rather than being open by default.
+  const allowedOrigins = (process.env.CORS_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  app.use(cors({ origin: allowedOrigins.length > 0 ? allowedOrigins : false }));
+  app.use(express.json({ limit: "100kb" }));
+  app.use(express.urlencoded({ extended: true, limit: "100kb" }));
+  app.use("/api", apiRateLimit);
 
   // Example API routes
   app.get("/api/ping", (_req, res) => {

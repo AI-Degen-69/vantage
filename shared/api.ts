@@ -276,6 +276,8 @@ export interface EarningsEvent {
   symbol: string;
   /** FMP returns an ISO date, e.g. "2024-08-01". */
   date: string;
+  /** Optional market cap enrichment used by earnings filters. */
+  marketCap?: number | null;
   epsEstimated: number | null;
   /** FMP gives this only if actual EPS is reported. */
   eps: number | null;
@@ -362,7 +364,7 @@ export interface SmaDistanceRow {
   distancePct: number | null;
   /** Number of closes used to compute the SMA — surfaces under-N as [PARTIAL]. */
   sampleSize: number;
-  /** That symbol's current price if it came along with the chart fetch. */
+  /** That symbol's latest quote price, falling back to the latest historical close. */
   price: number | null;
 }
 

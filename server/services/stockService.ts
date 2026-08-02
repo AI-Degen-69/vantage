@@ -123,7 +123,7 @@ async function fetchJSON<T = any>(url: string, label: string, timeoutMs = 12000)
     clearTimeout(t);
     if (!res.ok) {
       // 404 / 403 from FMP shows up here — caller decides what to do.
-      throttledWarn(`fetcher:${label}`, `[stockService] ${label} HTTP ${res.status} for ${url}`);
+      throttledWarn(`fetcher:${label}`, `[stockService] ${label} HTTP ${res.status}`);
       return null;
     }
     return (await res.json()) as T;
@@ -237,10 +237,12 @@ function normalizeQuote(raw: any): StockQuote | null {
     const n = typeof v === 'string' ? Number(v) : (v as number);
     return Number.isFinite(n) ? n : undefined;
   };
+  const price = toNum(raw.price);
+  if (price === undefined || price <= 0) return null;
   return {
     symbol: String(raw.symbol ?? ''),
     name: raw.name ?? raw.companyName,
-    price: toNum(raw.price) ?? 0,
+    price,
     change: toNum(raw.change) ?? 0,
     // /stable/ returns `changePercentage` (no 's'); legacy v3 returns
     // `changesPercentage`; very-legacy returns `changePercent`. Maintain
@@ -346,6 +348,7 @@ function normalizeEarningEvent(raw: any): EarningsEvent {
   return {
     symbol: String(raw.symbol ?? ''),
     date: String(raw.date ?? ''),
+    marketCap: toNum(raw.marketCap ?? raw.mktCap),
     epsEstimated: toNum(raw.epsEstimated ?? raw.epsEstimate),
     eps: toNum(raw.eps),
     revenueEstimated: toNum(raw.revenueEstimated ?? raw.revenueEstimate),
@@ -472,10 +475,12 @@ async function yahooQuote(symbol: string): Promise<StockQuote | null> {
     // yahoo-finance2 v4 returns camelCase already for the regularMarket* fields.
     const q: any = await yahooFinance.quote(symbol);
     if (!q) return null;
+    const price = Number(q.regularMarketPrice ?? 0);
+    if (!Number.isFinite(price) || price <= 0) return null;
     return {
       symbol: String(q.symbol ?? symbol),
       name: q.longName ?? q.shortName ?? q.displayName,
-      price: Number(q.regularMarketPrice ?? 0),
+      price,
       change: Number(q.regularMarketChange ?? 0),
       changesPercentage: Number(q.regularMarketChangePercent ?? 0),
       previousClose: Number(q.regularMarketPreviousClose ?? 0),
@@ -601,8 +606,14 @@ export const stockService = {
     if (!rawArr) {
       // Yahoo path — primary on /stable/, fallback on v3. Each per-symbol
       // getQuote is cached, so sibling ticks within a batch are one upstream
-      // call each (Yahoo's HTTP/1.1 concurrency handle absorbs the burst).
-      const results = await Promise.all(ordered.map(s => this.getQuote(s)));
+      // call each. Keep the upstream fan-out bounded because this method is
+      // also used by earnings enrichment, not only by the public batch route.
+      const results: (StockQuote | null)[] = [];
+      const BATCH_SIZE = 8;
+      for (let i = 0; i < ordered.length; i += BATCH_SIZE) {
+        const batch = ordered.slice(i, i + BATCH_SIZE);
+        results.push(...(await Promise.all(batch.map((s) => this.getQuote(s)))));
+      }
       const payload: BatchQuoteResponse = { quotes: results };
       cache.set(cacheKey, payload, QUOTE_TTL);
       return payload;
@@ -746,6 +757,23 @@ export const stockService = {
     if (!hasFmp()) return [];
     const raw = await fetchJSON<any[]>(fmpUrl(EARNINGS_ENDPOINT, { from, to }), `earnings ${from}..${to}`);
     const result: EarningsEvent[] = Array.isArray(raw) ? raw.map(normalizeEarningEvent) : [];
+
+    // FMP's calendar often omits market cap, while the client uses it for
+    // the large/mid/small filters. Enrich a bounded set from the same quote
+    // cache without turning one calendar request into an unbounded fan-out.
+    const symbols = Array.from(new Set(result.map((event) => event.symbol.toUpperCase()))).slice(0, 50);
+    if (symbols.length > 0) {
+      const quotes = await this.getBatchQuotes(symbols);
+      const marketCaps = new Map<string, number>();
+      for (const quote of quotes.quotes) {
+        if (!quote?.symbol || quote.marketCap === undefined || quote.marketCap <= 0) continue;
+        marketCaps.set(quote.symbol.toUpperCase(), quote.marketCap);
+      }
+      for (const event of result) {
+        event.marketCap ??= marketCaps.get(event.symbol.toUpperCase()) ?? null;
+      }
+    }
+
     cache.set(cacheKey, result);
     return result;
   },
@@ -996,7 +1024,10 @@ export const stockService = {
     const rows: SmaDistanceRow[] = await Promise.all(
       symbols.map(async (sym): Promise<SmaDistanceRow> => {
         try {
-          const chart = await this.getChart(sym.toUpperCase());
+          const [chart, quote] = await Promise.all([
+            this.getChart(sym.toUpperCase()),
+            this.getQuote(sym.toUpperCase()),
+          ]);
           if (!chart || chart.historical.length === 0) {
             return { symbol: sym, sma200: null, distancePct: null, sampleSize: 0, price: null };
           }
@@ -1015,7 +1046,7 @@ export const stockService = {
           }
           const sum = tail.reduce((s, n) => s + n, 0);
           const mean = sum / tail.length;
-          const price = tail[tail.length - 1];
+          const price = quote?.price ?? tail[tail.length - 1];
           const distancePct = mean > 0 ? ((price - mean) / mean) * 100 : null;
           return { symbol: sym, sma200: mean, distancePct, sampleSize: tail.length, price };
         } catch (e: any) {
