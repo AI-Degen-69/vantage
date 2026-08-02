@@ -102,8 +102,8 @@ export function SectorHeatsheet({ heatmap, days, isLoading }: SectorHeatsheetPro
           </span>
         )}
         {isLoading && hasRows && (
-          <span className="text-[10px] text-amber-300 ml-auto" dir="ltr">
-            ● loading…
+          <span className="text-[10px] text-amber-300 ml-auto">
+            {t("insights.heatsheet.loading", { days })}
           </span>
         )}
       </div>
@@ -175,8 +175,11 @@ export function SectorHeatsheet({ heatmap, days, isLoading }: SectorHeatsheetPro
           couldn't attribute to any sector — keeps the denominator honest
           (same transparency as the previous single-column Spotlight). */}
       {hasRows && heatmap!.untagged.length > 0 && (
-        <div className="text-[10px] text-slate-500 mt-2 uppercase tracking-wide" dir="ltr">
-          {heatmap!.untagged.length} untagged {heatmap!.untagged.length === 1 ? "symbol" : "symbols"}
+        <div className="text-[10px] text-slate-500 mt-2 uppercase tracking-wide">
+          <span dir="ltr">{heatmap!.untagged.length}</span>{" "}
+          {t("insights.heatsheet.untaggedSymbols", {
+            count: heatmap!.untagged.length,
+          })}
         </div>
       )}
     </div>
@@ -202,7 +205,9 @@ function HeatsheetRow({
       {/* Sector name + universe count tooltip */}
       <div
         className="text-sm font-medium text-foreground px-1 self-center truncate"
-        title={`${row.sector} · ${row.universeCount} ${row.universeCount === 1 ? "symbol" : "symbols"}`}
+        title={`${row.sector} · ${t("insights.heatsheet.symbolCount", {
+          count: row.universeCount,
+        })}`}
       >
         {row.sector}
       </div>

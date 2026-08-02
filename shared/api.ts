@@ -420,6 +420,15 @@ export interface SectorHeatmapUntagged {
 }
 
 /**
+ * Optional curated symbol→sector map attached to a heatmap request. The
+ * Insights universe ships editorial tags per ticker; when present, the
+ * server groups by these tags and only falls back to provider profile
+ * sectors for symbols without a curated tag. Wire form (query param
+ * `sectorMeta`): `SYM:SECTOR,SYM2:SECTOR2` — see `shared/sectorMeta.ts`.
+ */
+export type SectorHeatmapMetadata = Record<string, string>;
+
+/**
  * Server response for `GET /api/sector-heatmap?symbols=…&days=5`. Column
  * axis (`days`) is oldest → newest ISO dates, matching `rows[*].cells` index
  * order. `generatedAt` is the server's cache-write ISO timestamp so the

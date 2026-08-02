@@ -78,17 +78,26 @@ export default function Insights() {
   }, [merged, searchQuery]);
 
   // Sector × 5-day heatmap. Lives entirely on the server side
-  // (`/api/sector-heatmap`): the route fans out `getChart` + `getProfile`
-  // per symbol, aggregates by sector tag in one pass, and node-caches the
-  // full response for 15 minutes. Client staleTime matches the server
-  // TTL with a 5-minute loop so the user sees fresh intraday without
-  // hammering the cache.
+  // (`/api/sector-heatmap`): the route fans out `getChart` per symbol and
+  // aggregates by sector tag in one pass, node-caching the full response
+  // for 15 minutes. Curated sectors from the universe travel WITH the
+  // request so the server groups by the editorial tags even when provider
+  // profiles are unavailable; provider sectors fill only the gaps. Client
+  // staleTime matches the server TTL with a 5-minute loop so the user sees
+  // fresh intraday without hammering the cache.
   const heatmapSymbols = useMemo(() => merged.map((r) => r.symbol), [merged]);
+  const heatmapSectors = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const row of merged) {
+      if (row.sector) map[row.symbol.toUpperCase()] = row.sector;
+    }
+    return map;
+  }, [merged]);
   const {
     data: heatmapData,
     isLoading: heatmapLoading,
     isFetching: heatmapFetching,
-  } = useSectorHeatmap(heatmapSymbols, 5);
+  } = useSectorHeatmap(heatmapSymbols, 5, heatmapSectors);
 
   // Card-level [LIVE] / [MOCK] comes from whether ANY quote landed.
   const liveCount = merged.filter((r) => r.price !== undefined).length;

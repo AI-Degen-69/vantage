@@ -28,14 +28,13 @@ Tested live on 28 July 2026. Schema-drift observations refreshed after the
    `/stable/losers`, `/stable/actives`, `/stable/sectors-performance`,
    `/stable/company-screener`. The Insights tabs still fall back to the
    curated `server/services/insightsUniverses.ts` for those views.
-5. **Batch quote path mismatch** — this key surfaces batch as
-   `/stable/batch-quote?symbols=A,B,C` (query-param), but
-   `stockService.getBatchQuotes` currently calls
-   `quote/${list}` (path-segment). On `/stable/` that's a 404.
-   The code still works because the single-ticker fallback (Yahoo loop) runs
-   in parallel when the batch call 404s. **Future hardening**: switch
-   `getBatchQuotes` to the query-param shape when this regresses on the
-   dashboard's hot path. Tracked as a TODO in this doc.
+5. **Batch quotes** — `stockService.getBatchQuotes` now uses the verified
+   `/stable/batch-quote?symbols=A,B,C` (query-param) shape when
+   `FMP_USE_STABLE=1` (fixed 2026-08-02; previously it probed the v3
+   path-segment shape and 404'd). Missing symbols in a partial provider
+   response are filled with bounded, per-symbol fallback through the cached
+   single-quote chain (Yahoo → FMP → AV); in-flight duplicate requests are
+   coalesced and short negative TTLs suppress retry storms during outages.
 6. **Earnings calendar path** — v3 used `/api/v3/earning_calendar` (singular,
    underscore). On `/stable/` the path is `/stable/earnings-calendar`
    (plural, hyphen). `stockService.getEarningsCalendar` now branches on
@@ -124,8 +123,27 @@ affected field starts misbehaving in the UI:
 | Profile extras       | core profile only          | **`+cik, +isin, +cusip, +exchangeFullName, +lastDividend, +ipoDate, +defaultImage, +isEtf, +isFund, +isAdr, +isActivelyTrading, +zip, +address, +phone`** | N/A (additive) |
 | `changePercent`      | legacy                     | dropped                     | YES — super-ceded by `changePercentage` / `changesPercentage` |
 | Earnings calendar path | `/earning_calendar`        | `/earnings-calendar`        | YES — `stockService.getEarningsCalendar` branches on `FMP_USE_STABLE === '1'` (fixed 2026-07-28). See FMP plan §6. |
-| Batch quote shape    | `quote/A,B,C` (path)       | `batch-quote?symbols=A,B,C` (query) | NO — `getBatchQuotes` still calls the path shape. Returns 404 on `/stable/`; Yahoo single-ticker fallback runs so the UI doesn't break, just slower. See FMP plan §5. |
-| Chart path           | `/historical-price-full/<sym>?timeseries=150` | moved (exact stable shape under verification — likely `/historical-chart/<sym>/1day?from=&to=`) | NO — `getChart` still asks v3 shape. /stable/ likely returns 404 here too; Yahoo fallback covers it. |
+| Batch quote shape    | `quote/A,B,C` (path)       | `batch-quote?symbols=A,B,C` (query) | **YES** — `getBatchQuotes` now branches on `FMP_USE_STABLE` (fixed 2026-08-02) via `buildFmpBatchUrl` in `server/services/marketDataReliability.ts`. Partial responses fall back per missing symbol with bounded concurrency. |
+| Chart path           | `/historical-price-full/<sym>?timeseries=150` | `/stable/historical-price-eod/full?symbol=<sym>` | **YES** — `getChart` branches on `FMP_USE_STABLE` via `CHART_ENDPOINT` + `QUOTE_USE_QUERY_PARAM`; Yahoo historical remains the fallback. |
+
+### Sector heatmap curated metadata (Workstream 2)
+
+`GET /api/sector-heatmap` accepts an optional `sectorMeta=SYM:SECTOR,SYM2:SECTOR2`
+query parameter carrying the Insights universe's editorial sector tags:
+
+- **Precedence** — curated tags win outright; provider (`getProfile`) sectors
+  are consulted only for symbols without a curated tag. Symbols with neither
+  fall into `untagged[]`.
+- **Skipped provider calls** — when a symbol has a curated tag the profile
+  call is skipped entirely, so a fully-tagged universe costs zero profile
+  requests.
+- **Cache correctness** — the aggregation cache key embeds the canonicalized
+  metadata string (`shared/sectorMeta.ts` `serializeSectorMeta`), so two
+  requests with different sector mappings never share a cached aggregation.
+- **Validation** — tickers must match the route's symbol pattern, sector
+  names are capped at 64 chars, and at most `MAX_SYMBOLS` (50) entries are
+  accepted; malformed payloads return `400 invalid sector metadata
+  parameter` without weakening the `symbols` validation.
 
 ### How to validate the flip
 

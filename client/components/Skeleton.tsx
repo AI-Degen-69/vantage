@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
 
 interface SkeletonProps {
   className?: string;
@@ -69,6 +70,36 @@ export function SectionCardSkeleton({ height = 200 }: { height?: number }) {
       <Skeleton className="h-3 w-full" />
       <Skeleton className="h-3 w-3/4" />
       <Skeleton className="w-full" rounded="rounded" style={{ height }} />
+    </div>
+  );
+}
+
+/**
+ * Shared Suspense fallback for route-level lazy chunks.
+ *
+ * Renders a localized, keyboard-safe loading block inside the app shell
+ * (the Sidebar/TopBar layout stays mounted because Suspense wraps only the
+ * routed `<Outlet />` content). `role="status"` announces the state to
+ * screen readers; the skeleton blocks keep the viewport from collapsing
+ * to a blank screen while the chunk streams in.
+ *
+ * Layout stability: the grid template mirrors a typical page's card grid,
+ * so the fallback occupies roughly the same vertical space as the content
+ * it replaces instead of snapping to a tiny block.
+ */
+export function RouteFallback() {
+  const { t } = useI18n();
+  return (
+    // role="status" already implies aria-live="polite" — the container is a
+    // live region announcing the sr-only localized label below.
+    <div role="status" className="w-full px-4 md:px-8 py-8 space-y-6">
+      <Skeleton className="h-10 w-48" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <Skeleton key={`route-skel-${i}`} className="h-[150px]" />
+        ))}
+      </div>
+      <span className="sr-only">{t("route.loading")}</span>
     </div>
   );
 }

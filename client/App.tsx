@@ -1,6 +1,6 @@
 import "./global.css";
 
-import { Component, ReactNode } from "react";
+import { Component, ReactNode, Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,14 +12,40 @@ import Sidebar from "@/components/Sidebar";
 import { WatchlistsProvider } from "@/hooks/useWatchlists";
 import { EarningsAlertEngine } from "@/hooks/useEarningsAlerts";
 import TopBar from "@/components/TopBar";
-import Index from "./pages/Index";
-import I18nDebug from "./pages/I18nDebug";
-import Insights from "./pages/Insights";
-import Charts from "./pages/Charts";
-import Watchlists from "./pages/Watchlists";
-import Earnings from "./pages/Earnings";
-import Portfolios from "./pages/Portfolios";
+import { RouteFallback } from "@/components/Skeleton";
 import NotFound from "./pages/NotFound";
+
+// ----------------------------------------------------------------------------
+// Route-level code splitting (Workstream 3)
+// ----------------------------------------------------------------------------
+// Every page is loaded via React.lazy so the initial bundle only carries the
+// app shell. Each feature route's JS chunk streams in on first navigation,
+// which keeps chart/portfolio dependencies out of the home/insights load.
+// The existing per-route <ErrorBoundary> wraps the lazy elements below, so a
+// failed chunk fetch or render crash surfaces the recoverable error screen
+// instead of white-screening the app.
+const Index = lazy(() => import("./pages/Index"));
+// Dev-only translator QA route. The lazy() call itself is gated behind
+// import.meta.env.DEV so the I18nDebug chunk is excluded from production
+// builds entirely (Vite statically replaces the flag with `false` and the
+// dead branch is dropped) — a top-level lazy() here would emit an unused
+// chunk that prod never references.
+const I18nDebug = import.meta.env.DEV ? lazy(() => import("./pages/I18nDebug")) : null;
+const Insights = lazy(() => import("./pages/Insights"));
+const Charts = lazy(() => import("./pages/Charts"));
+const Watchlists = lazy(() => import("./pages/Watchlists"));
+const Earnings = lazy(() => import("./pages/Earnings"));
+const Portfolios = lazy(() => import("./pages/Portfolios"));
+// NotFound stays a static import: it's the catch-all error route, so it must
+// render immediately on unknown URLs (no loading flash) and survive a chunk
+// fetch failure without replacing the 404 with the error boundary. At ~0.7 kB
+// it costs nothing meaningful in the entry chunk.
+
+// Shared Suspense fallback for lazy routes — localized, keyboard-safe, and
+// layout-stable (the shell stays mounted; only the routed content suspends).
+const withFallback = (element: ReactNode) => (
+  <Suspense fallback={<RouteFallback />}>{element}</Suspense>
+);
 
 // ----------------------------------------------------------------------------
 // QueryClient — shared defaults (Phase 0 — C4)
@@ -172,22 +198,22 @@ export default function App() {
             <Routes>
               <Route element={<AppLayout />}>
                 <Route path="/" element={<SplashPage />} />
-                <Route path="/portfolios" element={<ErrorBoundary><Portfolios /></ErrorBoundary>} />
-                <Route path="/stock/:ticker" element={<ErrorBoundary><Index /></ErrorBoundary>} />
-                <Route path="/insights" element={<ErrorBoundary><Insights /></ErrorBoundary>} />
-                <Route path="/watchlists" element={<ErrorBoundary><Watchlists /></ErrorBoundary>} />
-                <Route path="/charts" element={<ErrorBoundary><Charts /></ErrorBoundary>} />
-                <Route path="/earnings" element={<ErrorBoundary><Earnings /></ErrorBoundary>} />
+                <Route path="/portfolios" element={<ErrorBoundary>{withFallback(<Portfolios />)}</ErrorBoundary>} />
+                <Route path="/stock/:ticker" element={<ErrorBoundary>{withFallback(<Index />)}</ErrorBoundary>} />
+                <Route path="/insights" element={<ErrorBoundary>{withFallback(<Insights />)}</ErrorBoundary>} />
+                <Route path="/watchlists" element={<ErrorBoundary>{withFallback(<Watchlists />)}</ErrorBoundary>} />
+                <Route path="/charts" element={<ErrorBoundary>{withFallback(<Charts />)}</ErrorBoundary>} />
+                <Route path="/earnings" element={<ErrorBoundary>{withFallback(<Earnings />)}</ErrorBoundary>} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 {/* Dev-only `/i18n` translator QA route — gated so the bundle
                     is excluded from production builds via Vite tree-shake on
                     the dead branch. Tree-shake succeeds because `import.meta.env.DEV`
                     is statically replaced with `false` at build time. */}
-                {import.meta.env.DEV && (
-                  <Route path="/i18n" element={<ErrorBoundary><I18nDebug /></ErrorBoundary>} />
+                {import.meta.env.DEV && I18nDebug && (
+                  <Route path="/i18n" element={<ErrorBoundary>{withFallback(<I18nDebug />)}</ErrorBoundary>} />
                 )}
               </Route>
-              <Route path="*" element={<NotFound />} />
+              <Route path="*" element={<ErrorBoundary>{withFallback(<NotFound />)}</ErrorBoundary>} />
             </Routes>
           </ErrorBoundary>
         </BrowserRouter>

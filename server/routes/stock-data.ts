@@ -13,6 +13,7 @@ import type {
   SmaDistanceResponse,
   StockMetrics,
   StockQuote,
+  SectorHeatmapMetadata,
   SectorHeatmapResponse,
 } from "../../shared/api";
 
@@ -47,6 +48,35 @@ function parseSymbolList(value: unknown): { symbols: string[]; invalid: string[]
     }
   }
   return { symbols, invalid };
+}
+
+const MAX_SECTOR_LEN = 64;
+
+/**
+ * Parse the optional `sectorMeta=SYM:SECTOR,SYM2:SECTOR2` query parameter
+ * into a symbol→sector map. Returns `null` when the payload is malformed
+ * (bad ticker, blank/oversized sector, too many entries) so the route can
+ * reject it safely — curated metadata must never loosen the symbol
+ * validation guarantees the route already enforces for `symbols`.
+ */
+function parseSectorMeta(value: unknown): SectorHeatmapMetadata | null {
+  if (value === undefined) return {};
+  if (typeof value !== "string" || value.trim().length === 0) return {};
+  const entries = value.split(",");
+  if (entries.length > MAX_SYMBOLS) return null;
+  const out: SectorHeatmapMetadata = {};
+  for (const entry of entries) {
+    const pair = entry.trim();
+    if (!pair) continue;
+    const sep = pair.indexOf(":");
+    if (sep <= 0 || sep === pair.length - 1) return null;
+    const symbol = parseTicker(pair.slice(0, sep));
+    if (!symbol) return null;
+    const sector = pair.slice(sep + 1).trim();
+    if (!sector || sector.length > MAX_SECTOR_LEN) return null;
+    out[symbol] = sector;
+  }
+  return out;
 }
 
 function isIsoDate(value: unknown): value is string {
@@ -178,6 +208,9 @@ export const handleIndexQuotes: RequestHandler = async (_req, res) => {
  *   - `days=5` (optional, clamped 3-10; default 5)
  *   - `sectors=Technology,Healthcare` (optional allowlist; rows outside the
  *     allowlist flow into `untagged[]` instead of `rows`)
+ *   - `sectorMeta=AAPL:Technology,MSFT:Technology` (optional curated
+ *     symbol→sector map from the Insights universe; validated tickers,
+ *     sector names ≤ 64 chars, max `MAX_SYMBOLS` entries)
  */
 export const handleSectorHeatmap: RequestHandler = async (req, res) => {
   const { symbols, invalid } = parseSymbolList(req.query.symbols);
@@ -195,10 +228,18 @@ export const handleSectorHeatmap: RequestHandler = async (req, res) => {
     sectorsRaw.length > 0
       ? sectorsRaw.split(",").map((s) => s.trim()).filter(Boolean)
       : null;
+  // Optional curated symbol→sector metadata from the Insights universe.
+  // Malformed or oversized payloads are rejected without touching the
+  // symbol validation guarantees above.
+  const sectorMeta = parseSectorMeta(req.query.sectorMeta);
+  if (sectorMeta === null) {
+    return res.status(400).json({ error: "invalid sector metadata parameter" });
+  }
   const data: SectorHeatmapResponse = await stockService.getSectorHeatmap(
     symbols,
     days,
     sectorAllow,
+    sectorMeta,
   );
   res.json(data);
 };

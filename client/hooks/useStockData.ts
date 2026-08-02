@@ -15,11 +15,13 @@ import type {
   InsiderTransaction,
   NewsItem,
   SmaDistanceResponse,
+  SectorHeatmapMetadata,
   SectorHeatmapResponse,
   StockMetrics,
   StockQuote,
 } from "@shared/api";
 import type { QuickStat } from "@/lib/mockData";
+import { serializeSectorMeta } from "@shared/sectorMeta";
 import type { CompanyProfile as ApiCompanyProfile } from "@shared/api";
 
 interface IndexQuotesResponse {
@@ -445,21 +447,34 @@ export function useStockData(ticker: string) {
 
 /**
  * Sector × days heatmap for the live Insights universe. Server fans out
- * `getChart` + `getProfile` per symbol, aggregates by sector tag in one
- * pass, and caches the entire heatmap server-side for 15 minutes. The
- * query key embeds the sorted symbol list + day count so distinct calls
- * don't collide; client staleTime below lets React Query refetch slightly
- * faster than the server TTL for snappier UX.
+ * `getChart` (and `getProfile` only for symbols lacking a curated tag),
+ * aggregates by sector tag in one pass, and caches the entire heatmap
+ * server-side for 15 minutes. The query key embeds the sorted symbol list,
+ * day count, AND the normalized curated sector map so a changed mapping
+ * never reuses a stale cached aggregation. Client staleTime below lets
+ * React Query refetch slightly faster than the server TTL for snappier UX.
+ *
+ * @param sectors Optional curated symbol→sector map from the Insights
+ *   universe; the server prefers these tags and falls back to provider
+ *   profile sectors only for symbols without a curated tag.
  */
-export function useSectorHeatmap(symbols: string[], days: number = 5) {
+export function useSectorHeatmap(
+  symbols: string[],
+  days: number = 5,
+  sectors?: SectorHeatmapMetadata,
+) {
   const sortedSyms = symbols.slice().sort();
   const key = sortedSyms.join(",");
+  const metaKey = serializeSectorMeta(sectors ?? {});
   return useQuery({
-    queryKey: ["sectorHeatmap", key, `d=${days}`],
-    queryFn: () =>
-      fetchJSON<SectorHeatmapResponse>(
-        `/api/sector-heatmap?symbols=${encodeURIComponent(key)}&days=${encodeURIComponent(String(days))}`,
-      ),
+    queryKey: ["sectorHeatmap", key, `d=${days}`, `m=${metaKey || "*"}`],
+    queryFn: () => {
+      const url = `/api/sector-heatmap?symbols=${encodeURIComponent(key)}&days=${encodeURIComponent(String(days))}`;
+      const metaUrl = metaKey
+        ? `${url}&sectorMeta=${encodeURIComponent(metaKey)}`
+        : url;
+      return fetchJSON<SectorHeatmapResponse>(metaUrl);
+    },
     enabled: symbols.length > 0,
     staleTime: 5 * 60_000,
     refetchInterval: 5 * 60_000,

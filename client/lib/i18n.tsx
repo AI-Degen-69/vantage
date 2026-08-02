@@ -11,6 +11,9 @@ const en = {
   "source.yahoo": "Yahoo Finance",
   "source.finnhub": "Finnhub",
 
+  // Route-level lazy-chunk fallback
+  "route.loading": "Loading page…",
+
   // Top-level navigation (sidebar + breadcrumb + page headings)
   "nav.insights": "Insights",
   "nav.watchlists": "Watchlists",
@@ -350,6 +353,10 @@ const en = {
   "insights.heatsheet.weekNetLabel": "5-day Σ",
   "insights.heatsheet.weekNetNoData": "no bookend",
   "insights.heatsheet.loading": "Computing sector heatmap from {{days}}-day closes…",
+  "insights.heatsheet.untaggedSymbols_one": "untagged symbol",
+  "insights.heatsheet.untaggedSymbols_other": "untagged symbols",
+  "insights.heatsheet.symbolCount_one": "1 symbol",
+  "insights.heatsheet.symbolCount_other": "{{count}} symbols",
 
   // Splash / login
   "splash.email": "Email address",
@@ -405,6 +412,9 @@ const he: Record<string, string> = {
   "error.generic": "משהו השתבש",
   "source.yahoo": "Yahoo Finance",
   "source.finnhub": "Finnhub",
+
+  // Route-level lazy-chunk fallback
+  "route.loading": "טוען עמוד…",
 
   "nav.insights": "תובנות",
   "nav.watchlists": "רשימות מעקב",
@@ -752,6 +762,12 @@ const he: Record<string, string> = {
   "insights.heatsheet.weekNetLabel": "סיכום 5 ימים",
   "insights.heatsheet.weekNetNoData": "אין קצוות",
   "insights.heatsheet.loading": "מחשב מפת חום מסגירות {{days}}-יום…",
+  "insights.heatsheet.untaggedSymbols_one": "סמל ללא ענף",
+  "insights.heatsheet.untaggedSymbols_two": "שני סמלים ללא ענף",
+  "insights.heatsheet.untaggedSymbols_other": "סמלים ללא ענף",
+  "insights.heatsheet.symbolCount_one": "סמל אחד",
+  "insights.heatsheet.symbolCount_two": "שני סמלים",
+  "insights.heatsheet.symbolCount_other": "{{count}} סמלים",
   // Hebrew word order mirrors English ("N priced · M total") so the
   // bilingual copy stays symmetric. Both halves are placeholders, so
   // translators can re-order without code changes.

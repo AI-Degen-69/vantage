@@ -21,6 +21,7 @@ import {
   KeyMetricsTTM,
   NewsItem,
   RatiosTTM,
+  SectorHeatmapMetadata,
   SectorHeatmapResponse,
   SmaDistanceResponse,
   SmaDistanceRow,
@@ -33,6 +34,16 @@ import { insightsTabUniverses } from './insightsUniverses';
 // bundling vite.config.ts at startup. The TS path alias still works — this is
 // purely a runtime resolution concern at config-load time.
 import { aggregateSectorHeatmap, type SectorHeatmapInputRow } from '../../shared/aggregateSectorHeatmap';
+import {
+  buildFmpBatchUrl,
+  buildHeatmapRows,
+  buildSectorHeatmapCacheKey,
+  canonicalSymbols,
+  createInFlightRegistry,
+  orderByRequestedSymbols,
+  resolveOrderedBatch,
+} from './marketDataReliability';
+import { normalizeSectorMeta } from '../../shared/sectorMeta';
 
 // yahoo-finance2 v4 ships the class as its default export. Use one shared
 // instance per process; constructing it "throwaway" per call degrades
@@ -55,12 +66,21 @@ const yahooFinance = new yahooFinanceDefault({ suppressNotices: ['yahooSurvey'] 
 // ---- Cache ----------------------------------------------------------------
 const cache = new NodeCache({ stdTTL: 3600 });
 const QUOTE_TTL = 60; // 1 min — quotes are the only thing we ever refetch live
+const QUOTE_NEGATIVE_TTL = 15; // Briefly suppress repeated misses without hiding recovery.
+const PROFILE_NEGATIVE_TTL = 30; // Provider outages/not-found responses are retryable.
+const CHART_NEGATIVE_TTL = 30; // Avoid retry storms while preserving recovery from provider outages.
 const SECTOR_HEATMAP_TTL = 900; // 15 min — heatmap recomputation cache (day deltas are slow-moving)
 const MAX_EARNINGS_ENRICH_SYMBOLS = 100; // protect provider quotas on unusually large calendars
 
 // ---- Warn throttling --------------------------------------
 const lastWarnAt = new Map<string, number>();
 const WARN_THROTTLE_MS = 60_000;
+
+const quoteInFlight = createInFlightRegistry();
+const batchQuoteInFlight = createInFlightRegistry();
+const profileInFlight = createInFlightRegistry();
+const chartInFlight = createInFlightRegistry();
+const heatmapInFlight = createInFlightRegistry();
 
 /** Throttle to once-per-key per minute. Logs once per (function, symbol) per minute. */
 function throttledWarn(key: string, ...args: unknown[]): void {
@@ -111,26 +131,38 @@ function hasFmp(): boolean {
 /**
  * Fetches JSON data from a URL within the specified timeout.
  *
+ * Exported only as a test seam: the diagnostic classification
+ * (http_<status> / invalid_json / timeout / network_error) is exercised
+ * deterministically in server/services/stockService.spec.ts with a mocked
+ * global fetch. Not part of the public service API.
+ *
  * @param url - The URL to request
  * @param label - Identifier used for warning messages
  * @param timeoutMs - Maximum request duration in milliseconds
  * @returns The parsed response data, or `null` when the request fails
  */
-async function fetchJSON<T = any>(url: string, label: string, timeoutMs = 12000): Promise<T | null> {
+export async function fetchJSON<T = any>(url: string, label: string, timeoutMs = 12000): Promise<T | null> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), timeoutMs);
     const res = await fetch(url, { signal: ctrl.signal });
-    clearTimeout(t);
     if (!res.ok) {
       // 404 / 403 from FMP shows up here — caller decides what to do.
-      throttledWarn(`fetcher:${label}`, `[stockService] ${label} HTTP ${res.status}`);
+      throttledWarn(`fetcher:${label}:http`, `[stockService] ${label} failed: http_${res.status}`);
       return null;
     }
-    return (await res.json()) as T;
+    try {
+      return (await res.json()) as T;
+    } catch {
+      throttledWarn(`fetcher:${label}:json`, `[stockService] ${label} failed: invalid_json`);
+      return null;
+    }
   } catch (e: any) {
-    throttledWarn(`fetcher:${label}`, `[stockService] ${label} failed: ${e?.message || e}`);
+    const kind = e?.name === 'AbortError' ? 'timeout' : 'network_error';
+    throttledWarn(`fetcher:${label}:${kind}`, `[stockService] ${label} failed: ${kind}`);
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -563,120 +595,99 @@ export const stockService = {
    * from `ratios-ttm.priceEarningsRatioTTM` when Yahoo's trailingPE is null.
    */
   async getQuote(symbol: string): Promise<StockQuote | null> {
-    const cacheKey = `quote_${symbol}`;
+    const normalizedSymbol = symbol.trim().toUpperCase();
+    const cacheKey = `quote_${normalizedSymbol}`;
     if (cache.has(cacheKey)) return cache.get(cacheKey) as StockQuote | null;
 
-    let result: StockQuote | null = null;
-    // Try Yahoo first (richest field set including earningsTimestamp).
-    result = await yahooQuote(symbol);
-    if (!result && hasFmp()) {
-      // Branch query-param (works on /stable/) vs path-segment (legacy v3).
-      const url = QUOTE_USE_QUERY_PARAM
-        ? fmpUrl('quote', { symbol })
-        : fmpUrl(`quote/${symbol}`);
-      const raw = await fetchJSON<any>(url, `quote/${symbol}`);
-      if (raw) {
-        // FMP returns an array even for single symbols.
-        const row = Array.isArray(raw) ? raw[0] : raw;
-        result = normalizeQuote(row);
-        // Defensive back-fill: /stable/quote strips `eps` and a numeric `pe`
-        // (the legacy v3 shape carried both). We trust Yahoo first — by the
-        // time we hit this branch, Yahoo returned something but probably with
-        // epsTrailingTwelveMonths or trailingPE missing for this ticker.
-        // One cached round-trip to getMetrics() covers both fields atomically.
-        if (result && (result.eps === undefined || result.pe === undefined)) {
-          const metrics = await this.getMetrics(symbol);
-          if (result.eps === undefined) {
-            const eps = metrics.metrics?.netIncomePerShareTTM;
-            if (eps && Number.isFinite(eps)) result.eps = eps;
-          }
-          if (result.pe === undefined) {
-            const ratiosPe = metrics.ratios?.priceEarningsRatioTTM ?? null;
-            if (ratiosPe && Number.isFinite(ratiosPe)) result.pe = ratiosPe;
+    return quoteInFlight.getOrCreate(cacheKey, async () => {
+      if (cache.has(cacheKey)) return cache.get(cacheKey) as StockQuote | null;
+
+      let result: StockQuote | null = await yahooQuote(normalizedSymbol);
+      if (!result && hasFmp()) {
+        const url = QUOTE_USE_QUERY_PARAM
+          ? fmpUrl('quote', { symbol: normalizedSymbol })
+          : fmpUrl(`quote/${normalizedSymbol}`);
+        const raw = await fetchJSON<any>(url, `quote/${normalizedSymbol}`);
+        if (raw) {
+          const row = Array.isArray(raw) ? raw[0] : raw;
+          result = normalizeQuote(row);
+          if (result && (result.eps === undefined || result.pe === undefined)) {
+            const metrics = await this.getMetrics(normalizedSymbol);
+            if (result.eps === undefined) {
+              const eps = metrics.metrics?.netIncomePerShareTTM;
+              if (eps && Number.isFinite(eps)) result.eps = eps;
+            }
+            if (result.pe === undefined) {
+              const ratiosPe = metrics.ratios?.priceEarningsRatioTTM ?? null;
+              if (ratiosPe && Number.isFinite(ratiosPe)) result.pe = ratiosPe;
+            }
           }
         }
       }
-    }
-    if (!result && AV_KEY) {
-      // Alpha Vantage fallback — normalize through the same positive-price
-      // guard used by FMP so empty/error payloads never become quotes.
-      const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${AV_KEY}`;
-      const raw = await fetchJSON<any>(url, `av quote/${symbol}`);
-      const g = raw?.['Global Quote'];
-      if (g) {
-        const toNum = (s: unknown) => {
-          const n = Number(String(s ?? '').replace(/[%,$]/g, ''));
-          return Number.isFinite(n) ? n : undefined;
-        };
-        result = normalizeQuote({
-          symbol: g['01. symbol'] ?? symbol,
-          price: toNum(g['05. price']),
-          change: toNum(g['09. change']),
-          changesPercentage: toNum(g['10. change percent']),
-          previousClose: toNum(g['08. previous close']),
-        });
+      if (!result && AV_KEY) {
+        const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${normalizedSymbol}&apikey=${AV_KEY}`;
+        const raw = await fetchJSON<any>(url, `av quote/${normalizedSymbol}`);
+        const g = raw?.['Global Quote'];
+        if (g) {
+          const toNum = (s: unknown) => {
+            const n = Number(String(s ?? '').replace(/[%,$]/g, ''));
+            return Number.isFinite(n) ? n : undefined;
+          };
+          result = normalizeQuote({
+            symbol: g['01. symbol'] ?? normalizedSymbol,
+            price: toNum(g['05. price']),
+            change: toNum(g['09. change']),
+            changesPercentage: toNum(g['10. change percent']),
+            previousClose: toNum(g['08. previous close']),
+          });
+        }
       }
-    }
-    cache.set(cacheKey, result, QUOTE_TTL);
-    return result;
+
+      cache.set(cacheKey, result, result ? QUOTE_TTL : QUOTE_NEGATIVE_TTL);
+      return result;
+    });
   },
 
   /**
-   * Batch quotes.
-   *
-   * The FMP /stable/ multi-symbol endpoint is gated behind the PAID plan
-   * (402). On free-tier / stable-tier we ALWAYS use Yahoo — parallel
-   * Promise.all over cached `getQuote` calls (each individual cache entry
-   * is shared across siblings so a 30-ticker batch is one upstream trip per
-   * ticker total, not 30). The legacy v3 multi-symbol path is kept as an
-   * opportunistic fallback if someone re-enables it via FMP_USE_STABLE!=1.
-   *
-   * Cache key includes the symbol list so distinct orderings don't collide.
+   * Batch quotes use the verified active FMP shape when configured. A partial
+   * provider response falls back only for missing symbols, with bounded
+   * concurrency, and every caller receives its own requested order.
    */
   async getBatchQuotes(symbols: string[]): Promise<BatchQuoteResponse> {
     if (symbols.length === 0) return { quotes: [] };
-    const ordered = symbols.map(s => s.toUpperCase());
-    const cacheKey = `batch_${ordered.join(',')}`;
-    if (cache.has(cacheKey)) return cache.get(cacheKey) as BatchQuoteResponse;
+    const requested = symbols.map((symbol) => symbol.trim().toUpperCase());
+    const canonical = canonicalSymbols(requested);
+    const cacheKey = `batch_${canonical.join(',')}`;
+    const cached = cache.get<BatchQuoteResponse>(cacheKey);
+    if (cached) return { quotes: orderByRequestedSymbols(requested, cached.quotes) };
 
-    let rawArr: any[] | null = null;
+    const canonicalPayload = await batchQuoteInFlight.getOrCreate(cacheKey, async () => {
+      const existing = cache.get<BatchQuoteResponse>(cacheKey);
+      if (existing) return existing;
 
-    // /stable/ batch is paid-tier — skip unless explicitly on legacy v3.
-    if (hasFmp() && !QUOTE_USE_QUERY_PARAM) {
-      const raw = await fetchJSON<any>(
-        fmpUrl(`quote/${ordered.join(',')}`),
-        `batch quote: ${ordered.length}`,
-        18000,
-      );
-      if (Array.isArray(raw)) rawArr = raw;
-    }
-
-    if (!rawArr) {
-      // Yahoo path — primary on /stable/, fallback on v3. Each per-symbol
-      // getQuote is cached, so sibling ticks within a batch are one upstream
-      // call each. Keep the upstream fan-out bounded because this method is
-      // also used by earnings enrichment, not only by the public batch route.
-      const results: (StockQuote | null)[] = [];
-      const BATCH_SIZE = 8;
-      for (let i = 0; i < ordered.length; i += BATCH_SIZE) {
-        const batch = ordered.slice(i, i + BATCH_SIZE);
-        results.push(...(await Promise.all(batch.map((s) => this.getQuote(s)))));
-      }
-      const payload: BatchQuoteResponse = { quotes: results };
-      cache.set(cacheKey, payload, QUOTE_TTL);
+      const quotes = await resolveOrderedBatch<StockQuote>({
+        symbols: canonical,
+        concurrency: 8,
+        fetchBatch: async (batchSymbols) => {
+          if (!hasFmp()) return null;
+          const raw = await fetchJSON<any>(
+            buildFmpBatchUrl(FMP_BASE, FMP_KEY, batchSymbols, QUOTE_USE_QUERY_PARAM),
+            `batch quote: ${batchSymbols.length}`,
+            18000,
+          );
+          const rows = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : null;
+          if (!rows) return null;
+          return rows.map(normalizeQuote).filter((quote): quote is StockQuote => quote !== null);
+        },
+        fetchSingle: (singleSymbol) => this.getQuote(singleSymbol),
+      });
+      const payload: BatchQuoteResponse = { quotes };
+      const hasLiveQuote = quotes.some(Boolean);
+      cache.set(cacheKey, payload, hasLiveQuote ? QUOTE_TTL : QUOTE_NEGATIVE_TTL);
       return payload;
-    }
+    });
 
-    // Map results back into the input order so the UI can index by ticker.
-    const bySymbol = new Map<string, StockQuote>();
-    for (const row of rawArr) {
-      const nq = normalizeQuote(row);
-      if (nq?.symbol) bySymbol.set(nq.symbol.toUpperCase(), nq);
-    }
-    const quotes = ordered.map(s => bySymbol.get(s) ?? null);
-    const payload: BatchQuoteResponse = { quotes };
-    cache.set(cacheKey, payload, QUOTE_TTL);
-    return payload;
+    return { quotes: orderByRequestedSymbols(requested, canonicalPayload.quotes) };
   },
 
   async getProfile(symbol: string): Promise<CompanyProfile | null> {
@@ -686,13 +697,18 @@ export const stockService = {
   async getProfileValidation(
     symbol: string,
   ): Promise<{ profile: CompanyProfile | null; unavailable: boolean }> {
-    const cacheKey = `profile_${symbol}`;
-    if (cache.has(cacheKey)) {
-      return { profile: cache.get(cacheKey) as CompanyProfile, unavailable: false };
-    }
-    const result = await fetchProfileWithAvailability(symbol);
-    if (result.profile) cache.set(cacheKey, result.profile);
-    return result;
+    const normalizedSymbol = symbol.trim().toUpperCase();
+    const cacheKey = `profile_${normalizedSymbol}`;
+    const cached = cache.get<{ profile: CompanyProfile | null; unavailable: boolean }>(cacheKey);
+    if (cached) return cached;
+
+    return profileInFlight.getOrCreate(cacheKey, async () => {
+      const inFlightCached = cache.get<{ profile: CompanyProfile | null; unavailable: boolean }>(cacheKey);
+      if (inFlightCached) return inFlightCached;
+      const result = await fetchProfileWithAvailability(normalizedSymbol);
+      cache.set(cacheKey, result, result.profile ? 3600 : PROFILE_NEGATIVE_TTL);
+      return result;
+    });
   },
 
   async getFinancialStatements(symbol: string): Promise<FinancialStatements> {
@@ -841,40 +857,47 @@ export const stockService = {
   },
 
   async getChart(symbol: string): Promise<ChartSeries | null> {
-    const cacheKey = `chart_${symbol}`;
-    if (cache.has(cacheKey)) return cache.get(cacheKey) as ChartSeries;
-    // Try FMP first using the path shape that works on the active base:
-    //   /stable/ → historical-price-eod/light?symbol=X (1 year daily)
-    //   /api/v3/ → historical-price-full/X?timeseries=N (1 year daily)
-    // On failure (404/402/403) fall back to Yahoo historical which is always on.
-    if (hasFmp()) {
-      const url = QUOTE_USE_QUERY_PARAM
-        ? fmpUrl(CHART_ENDPOINT, { symbol })
-        : fmpUrl(`${CHART_ENDPOINT}/${symbol}`, { timeseries: 200 });
-      const raw = await fetchJSON<any>(url, `chart/${symbol}`);
-      if (raw) {
-        // /stable/ of {symbol, historical: [...]}; v3 same shape (keyed under "historical").
-        const rows = Array.isArray(raw.historical)
-          ? raw.historical
-          : Array.isArray(raw)
-          ? raw
-          : [];
-        const series: ChartSeries = {
-          symbol: String(raw.symbol ?? symbol),
-          historical: rows.map(normalizeChartPoint),
-        };
-        if (series.historical.length > 0) {
-          cache.set(cacheKey, series);
-          return series;
+    const normalizedSymbol = symbol.trim().toUpperCase();
+    const cacheKey = `chart_${normalizedSymbol}`;
+    if (cache.has(cacheKey)) return cache.get(cacheKey) as ChartSeries | null;
+
+    return chartInFlight.getOrCreate(cacheKey, async () => {
+      if (cache.has(cacheKey)) return cache.get(cacheKey) as ChartSeries | null;
+
+      // Try FMP first using the path shape that works on the active base:
+      //   /stable/ → historical-price-eod/full?symbol=X (1 year daily OHLC)
+      //   /api/v3/ → historical-price-full/X?timeseries=N (1 year daily)
+      // On failure (404/402/403) fall back to Yahoo historical which is always on.
+      if (hasFmp()) {
+        const url = QUOTE_USE_QUERY_PARAM
+          ? fmpUrl(CHART_ENDPOINT, { symbol: normalizedSymbol })
+          : fmpUrl(`${CHART_ENDPOINT}/${normalizedSymbol}`, { timeseries: 200 });
+        const raw = await fetchJSON<any>(url, `chart/${normalizedSymbol}`);
+        if (raw) {
+          // /stable/ of {symbol, historical: [...]}; v3 same shape (keyed under "historical").
+          const rows = Array.isArray(raw.historical)
+            ? raw.historical
+            : Array.isArray(raw)
+            ? raw
+            : [];
+          const series: ChartSeries = {
+            symbol: String(raw.symbol ?? normalizedSymbol),
+            historical: rows.map(normalizeChartPoint),
+          };
+          if (series.historical.length > 0) {
+            cache.set(cacheKey, series);
+            return series;
+          }
         }
       }
-    }
-    const yahoo = await yahooChart(symbol);
-    if (yahoo) {
-      cache.set(cacheKey, yahoo);
-      return yahoo;
-    }
-    return null;
+      const yahoo = await yahooChart(normalizedSymbol);
+      if (yahoo) {
+        cache.set(cacheKey, yahoo);
+        return yahoo;
+      }
+      cache.set(cacheKey, null, CHART_NEGATIVE_TTL);
+      return null;
+    });
   },
 
   /**
@@ -1008,70 +1031,69 @@ export const stockService = {
    * the first warm call burns ~30 upstream Yahoo requests; subsequent
    * refreshes inside the TTL window are pure node-cache reads.
    *
+   * Curated sector metadata from the Insights universe (`sectorMeta`) is
+   * the trusted source for sector assignment: when a symbol has a curated
+   * tag, the provider profile call is skipped entirely and the tag is used
+   * as-is. Provider profile sectors are consulted only for symbols without
+   * a curated tag. Symbols with neither fall into `untagged`.
+   *
    * The `sectors` arg lets the caller scope the heatmap to a subset of
    * sectors (e.g. "Tech only"); rows whose sector isn't in the allowlist
    * flow into `untagged` so the UI can still count them. Pass `[]` to
    * include every distinct sector in `symbols`.
    *
-   * Cache key includes the sorted symbol list, the day count, and the
-   * sector allowlist so distinct calls don't collide.
+   * Cache key includes the sorted symbol list, the day count, the sector
+   * allowlist, and the normalized sector metadata so distinct calls never
+   * reuse an aggregation computed for a different sector mapping.
    */
   async getSectorHeatmap(
     symbols: string[],
     days: number = 5,
     sectorAllow: string[] | null = null,
+    sectorMeta: SectorHeatmapMetadata = {},
   ): Promise<SectorHeatmapResponse> {
     if (symbols.length === 0) {
       return { days: [], rows: [], untagged: [], generatedAt: new Date().toISOString() };
     }
-    const sortedSyms = symbols.slice().map((s) => s.toUpperCase()).sort();
+    const sortedSyms = canonicalSymbols(symbols);
     const allowKey =
       sectorAllow && sectorAllow.length > 0 ? sectorAllow.slice().sort().join(',') : '*';
-    const cacheKey = `sector_heatmap_${days}_${allowKey}_${sortedSyms.join(',')}`;
-    if (cache.has(cacheKey)) return cache.get(cacheKey) as SectorHeatmapResponse;
-
-    // Fan out `getChart` + `getProfile` per symbol. Both are independently
-    // cached (1h for chart, 1h for profile), so a 30-ticker universe on
-    // the first warm call costs ~60 upstream calls (parallel). Subsequent
-    // calls inside the 15-min node-cache TTL are pure in-memory reads.
-    // Profile.sector is canonical: FMP's `/stable/profile` returns it
-    // cleanly on free-tier keys (the editor-curated fallback in
-    // insightsUniverses is only consulted when the universe already
-    // ships a static tag, e.g. when the caller passes an overrides map).
-    //
-    // Process symbols in bounded batches (8 at a time) to throttle the
-    // fan-out, while retaining parallel getChart/getProfile requests
-    // within each batch and preserving result ordering.
-    const rows: SectorHeatmapInputRow[] = [];
-    const BATCH_SIZE = 8;
-    for (let i = 0; i < sortedSyms.length; i += BATCH_SIZE) {
-      const batch = sortedSyms.slice(i, i + BATCH_SIZE);
-      const batchResults = await Promise.all(
-        batch.map(async (sym): Promise<SectorHeatmapInputRow> => {
-          const [chart, profile] = await Promise.all([
-            this.getChart(sym),
-            this.getProfile(sym),
-          ]);
-          return {
-            symbol: sym,
-            sector: profile?.sector?.trim() || null,
-            chart,
-          };
-        }),
-      );
-      rows.push(...batchResults);
+    // Normalize curated metadata once and keep only entries for symbols that
+    // are actually part of this request — stray metadata for other tickers
+    // would otherwise pollute the cache key without changing the result.
+    const requestedSet = new Set(sortedSyms);
+    const curated = normalizeSectorMeta(sectorMeta);
+    const curatedForRequest: Record<string, string> = {};
+    for (const [sym, sector] of Object.entries(curated)) {
+      if (requestedSet.has(sym)) curatedForRequest[sym] = sector;
     }
+    const cacheKey = buildSectorHeatmapCacheKey({ days, allowKey, meta: curatedForRequest, symbols: sortedSyms });
+    const cached = cache.get<SectorHeatmapResponse>(cacheKey);
+    if (cached) return cached;
 
-    // Today's ISO date (server local) → `isPartial` on the rightmost cell.
-    // On weekends the server treats the most recent settled bar as "today",
-    // so callers don't see "today (partial)" on Saturday/Sunday landings.
-    const todayIso = new Date().toISOString().slice(0, 10);
-    const result = aggregateSectorHeatmap(rows, days, {
-      allowedSectors: sectorAllow,
-      todayIso,
+    return heatmapInFlight.getOrCreate(cacheKey, async () => {
+      const inFlightCached = cache.get<SectorHeatmapResponse>(cacheKey);
+      if (inFlightCached) return inFlightCached;
+
+      // Fan out `getChart` per symbol; `getProfile` only for symbols lacking
+      // a curated tag (curated tags are trusted universe metadata). Both
+      // operations coalesce independently, so overlapping heatmap requests
+      // share work.
+      const rows = await buildHeatmapRows<SectorHeatmapInputRow>({
+        symbols: sortedSyms,
+        curated: curatedForRequest,
+        getChart: (sym) => this.getChart(sym),
+        getProfile: (sym) => this.getProfile(sym),
+      });
+
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const result = aggregateSectorHeatmap(rows, days, {
+        allowedSectors: sectorAllow,
+        todayIso,
+      });
+      cache.set(cacheKey, result, SECTOR_HEATMAP_TTL);
+      return result;
     });
-    cache.set(cacheKey, result, SECTOR_HEATMAP_TTL);
-    return result;
   },
 
   /**
