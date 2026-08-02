@@ -1,0 +1,43 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies and build output
+node_modules
+dist
+dist-ssr
+*.local
+.vercel
+
+# Local application state
+.freebuff/
+
+# AI tooling / agent config (never pushed — not part of the app)
+.agents/
+.builder/
+.claude/
+.codex/
+.dev-port/
+.backup/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Local configuration and secrets
+.config/
+.env
+.env.local
+.env.*.local
