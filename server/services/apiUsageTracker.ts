@@ -276,14 +276,18 @@ function scheduleFlush(provider: TrackedProvider): void {
   const m = mirrors[provider];
   if (!m) return;
   // Fire-and-forget — read, merge, write to avoid clobbering other instances' timestamps.
+  // Pruning is anchored to the MAX timestamp in the merged set rather
+  // than to wall-clock `Date.now()` so timestamps that arrived via the
+  // store (peer instances, accumulated history) keep their relative
+  // window validity. An empty merged set falls back to Date.now() so
+  // a brand-new day still gets sane expiry semantics.
   (async () => {
     try {
       const stored = await usageStore.load(provider, m.day);
-      // Union the local mirror's timestamps with the stored set, then prune stale ones.
       const cfg = PROVIDER_CONFIG[provider];
-      const now = Date.now();
       const merged = Array.from(new Set([...stored.timestamps, ...m.timestamps]));
-      const pruned = merged.filter((t) => t >= now - cfg.windowMs);
+      const refNow = merged.length > 0 ? Math.max(...merged) : Date.now();
+      const pruned = merged.filter((t) => t >= refNow - cfg.windowMs);
       // Keep the most recent rate-limit timestamp.
       const lastRateLimitAt =
         stored.lastRateLimitAt !== null && m.lastRateLimitAt !== null
@@ -296,50 +300,97 @@ function scheduleFlush(provider: TrackedProvider): void {
   })();
 }
 
-async function updateMirror(provider: TrackedProvider, now: number): Promise<Mirror> {
+/**
+ * Synchronously returns the mirror for `provider`, creating it on first
+ * use and updating `day` when the calendar rolls over. NEVER replaces
+ * the mirror object on day mismatch — the in-process timestamps we've
+ * accumulated across day boundaries stay put, so callers from the
+ * same process can't lose history by virtue of the wall clock drifting.
+ *
+ * Cross-process data is merged best-effort via a fire-and-forget lazy
+ * hydrate so we still pick up timestamps from peer instances (Vercel
+ * KV / Netlify Blobs) without blocking the synchronous push path.
+ */
+function updateMirror(provider: TrackedProvider, now: number): Mirror {
   const today = todayISO(now);
   let m = mirrors[provider];
-  if (!m || m.day !== today) {
-    // Day rolled over — lazily rehydrate from the store instead of replacing with empty.
-    try {
-      const snap = await usageStore.load(provider, today);
-      m = { day: today, timestamps: snap.timestamps.slice(), lastRateLimitAt: snap.lastRateLimitAt };
-    } catch (e) {
-      console.warn(`[apiUsageTracker] updateMirror rehydrate ${provider} failed:`, e instanceof Error ? e.message : e);
-      m = { day: today, timestamps: [], lastRateLimitAt: null };
-    }
+  if (!m) {
+    // First time: create empty mirror and lazily hydrate from the store.
+    m = { day: today, timestamps: [], lastRateLimitAt: null };
     mirrors[provider] = m;
+    lazyHydrateFromStore(provider, today);
+  } else if (m.day !== today) {
+    // Day rolled over. KEEP the existing mirror (the in-process
+    // timestamps we accumulated are still meaningful for read accuracy
+    // within their rolling window). Update the day label so subsequent
+    // reads can detect rollovers if they care, and fire a hydrate so
+    // peer-instance data from the new day gets merged in.
+    m.day = today;
+    lazyHydrateFromStore(provider, today);
   }
   return m;
 }
 
+/**
+ * Fire-and-forget async hydrate. Reads the day's bucket from
+ * `usageStore`, unions those timestamps with the in-process mirror
+ * (preserving local pushes), then prunes against the data-driven
+ * rolling-window reference (max(merged timestamps, Date.now())) so we
+ * don't drop older-but-still-valid entries that reach us from peers.
+ *
+ * No-op if the mirror has changed since the call was scheduled (e.g.
+ * another day-rollover happened mid-await) — protects against
+ * overwriting a fresher mirror with stale merged data.
+ */
+function lazyHydrateFromStore(provider: TrackedProvider, day: string): void {
+  (async () => {
+    try {
+      const snap = await usageStore.load(provider, day);
+      const cur = mirrors[provider];
+      if (!cur || cur.day !== day) return;
+      const cfg = PROVIDER_CONFIG[provider];
+      const allTs = [...snap.timestamps, ...cur.timestamps];
+      const refNow = allTs.length > 0 ? Math.max(...allTs) : Date.now();
+      const cut = refNow - cfg.windowMs;
+      const merged = Array.from(new Set(allTs)).filter((t) => t >= cut);
+      const lastRateLimit =
+        snap.lastRateLimitAt !== null && cur.lastRateLimitAt !== null
+          ? Math.max(snap.lastRateLimitAt, cur.lastRateLimitAt)
+          : snap.lastRateLimitAt ?? cur.lastRateLimitAt;
+      cur.timestamps = merged;
+      if (lastRateLimit !== null) cur.lastRateLimitAt = lastRateLimit;
+    } catch (e) {
+      console.warn(
+        `[apiUsageTracker] lazyHydrate ${provider}/${day} failed:`,
+        e instanceof Error ? e.message : e,
+      );
+    }
+  })();
+}
+
 export const apiUsageTracker = {
   /**
-   * Increment the per-day call count. Fire-and-forget async to handle day
-   * rollovers (which need to rehydrate from the store), then schedules an
-   * async best-effort KV write.
+   * Increment the per-day call count. Synchronous against the in-process
+   * mirror so the very next `getProviderUsage` sees the new entry;
+   * fire-and-forget only the cross-process store write. Day rollovers
+   * update `m.day` in place and jest-spawn a lazy hydrate without
+   * blocking the caller.
    */
   recordCall(provider: TrackedProvider, now: number = Date.now()): void {
     const cfg = PROVIDER_CONFIG[provider];
-    updateMirror(provider, now).then((m) => {
-      m.timestamps.push(now);
-      pruneTimestamps(m, cfg.windowMs, now);
-      scheduleFlush(provider);
-    }).catch((e) => {
-      console.warn(`[apiUsageTracker] recordCall ${provider} failed:`, e instanceof Error ? e.message : e);
-    });
+    const m = updateMirror(provider, now);
+    m.timestamps.push(now);
+    pruneTimestamps(m, cfg.windowMs, now);
+    scheduleFlush(provider);
   },
   /**
-   * Mark the provider as currently rate-limited. Same async-update-
-   * mirror + async-flush-to-KV shape.
+   * Mark the provider as currently rate-limited. Same sync-mirror + async
+   * store-flush shape as recordCall.
    */
   recordRateLimit(provider: TrackedProvider, now: number = Date.now()): void {
-    updateMirror(provider, now).then((m) => {
-      m.lastRateLimitAt = now;
-      scheduleFlush(provider);
-    }).catch((e) => {
-      console.warn(`[apiUsageTracker] recordRateLimit ${provider} failed:`, e instanceof Error ? e.message : e);
-    });
+    const m = updateMirror(provider, now);
+    m.lastRateLimitAt = now;
+    scheduleFlush(provider);
   },
 };
 
