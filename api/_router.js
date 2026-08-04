@@ -15,8 +15,24 @@
 
 import yfDefault from 'yahoo-finance2';
 import NodeCache from 'node-cache';
+import apiUsageTracker from '../server/services/apiUsageTracker.js';
 
-const yf = new yfDefault({ suppressNotices: ['yahooSurvey'] });
+const yfInner = new yfDefault({ suppressNotices: ['yahooSurvey'] });
+// Proxy-wrap yf so every method invocation auto-records one Yahoo call
+// in apiUsageTracker — mirrors the TS-side wrap in stockService.ts so
+// the parity router also feeds the /api/provider-usage footer pill.
+const yf = new Proxy(yfInner, {
+  get(target, prop) {
+    const value = target[prop];
+    if (typeof value === 'function') {
+      return (...args) => {
+        apiUsageTracker.recordCall ? apiUsageTracker.recordCall('yahoo') : null;
+        return value.apply(target, args);
+      };
+    }
+    return value;
+  },
+});
 const cache = new NodeCache({ stdTTL: 300 });
 const QUOTE_TTL = 60;
 const CHART_TTL = 600;
@@ -92,6 +108,31 @@ async function getYahooQuote(symbol) {
 }
 
 // ── Handlers ─────────────────────────────────────────────────────────────────
+
+/**
+ * Classifies an HTTP probe status into a provider status label.
+ *
+ * Intentionally DUPLICATES `classifyProviderResult` in
+ * `shared/providerHealth.ts` — this file is plain JS that Vercel's bundler
+ * refuses to link against TS imports (see the header comment). Keep the two
+ * in lockstep; `api/_router.classify.spec.ts` asserts parity across the
+ * status matrix, so a drift fails CI instead of shipping silently.
+ *
+ * `handleProviderHealth` MUST keep calling this module-scope function —
+ * re-inlining the logic there would bypass the parity net while the spec
+ * still passes.
+ *
+ * 402 = endpoint not on the current plan (known restriction, e.g. FMP
+ * batch-quote on the free tier). 403 stays degraded — ambiguous between
+ * plan gating and a revoked/broken key, so it keeps surfacing. 429 =
+ * temporary rate limit (degraded).
+ */
+export function classify(status, errorMessage) {
+  if (status === 200) return errorMessage ? 'degraded' : 'ok';
+  if (status === 402) return 'known_restriction';
+  if (status === 403 || status === 429) return 'degraded';
+  return 'down';
+}
 
 export async function handleDemo(req, res) {
   res.json({ message: 'Hello from Vantage API' });
@@ -497,6 +538,84 @@ export async function handleStockAnalyst(req, res) {
   }
 }
 
+/**
+ * Pulls a numeric value out of one of several real-world Yahoo shapes:
+ *   - plain number,
+ *   - numeric string,
+ *   - `{ raw: <number>, fmt: "<formatted>" }` object (legacy / some sessions).
+ * Returns `null` for anything else (including the literal `null` and `""`)
+ * so the caller decides on `—` instead of receiving a phantom 0.
+ *
+ * Mirrors `toNumberLoose` in `server/services/stockService.ts` \u2014 keep in
+ * lockstep so the Vercel/Netlify router and the local-server router return
+ * the same shape for the same upstream record.
+ */
+function toNumberLoose(value) {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  if (typeof value === "object") {
+    const raw = value.raw;
+    if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+    if (typeof raw === "string") {
+      const n = Number(raw);
+      if (Number.isFinite(n)) return n;
+    }
+    const fmt = value.fmt;
+    if (typeof fmt === "string") {
+      const n = Number(fmt);
+      if (Number.isFinite(n)) return n;
+    }
+  }
+  return null;
+}
+
+/**
+ * Pulls a UTC-ms timestamp out of one of several real-world Yahoo
+ * `startDate` shapes: `Date` object, ISO string, `{raw, fmt}` object, or
+ * plain number (treated as unix-seconds when < 1e12, ms otherwise).
+ *
+ * Returns `null` for anything pre-1990 so the UI renders "—" instead of
+ * `1/1/1970` for genuinely missing / unparseable dates.
+ *
+ * Mirrors `toDateMs` in `server/services/stockService.ts`.
+ */
+function toDateMs(value) {
+  if (value === undefined || value === null || value === "") return null;
+  if (value instanceof Date) {
+    const ms = value.getTime();
+    return Number.isFinite(ms) && ms >= Date.UTC(1990, 0, 1) ? ms : null;
+  }
+  if (typeof value === "number") {
+    const ms = value < 1e12 ? value * 1000 : value;
+    return Number.isFinite(ms) && ms >= Date.UTC(1990, 0, 1) ? ms : null;
+  }
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed) && parsed >= Date.UTC(1990, 0, 1)) return parsed;
+    return null;
+  }
+  if (typeof value === "object") {
+    const raw = value.raw;
+    if (typeof raw === "number") {
+      const ms = raw < 1e12 ? raw * 1000 : raw;
+      if (Number.isFinite(ms) && ms >= Date.UTC(1990, 0, 1)) return ms;
+    } else if (typeof raw === "string") {
+      const parsed = Date.parse(raw);
+      if (Number.isFinite(parsed) && parsed >= Date.UTC(1990, 0, 1)) return parsed;
+    }
+    const fmt = value.fmt;
+    if (typeof fmt === "string") {
+      const parsed = Date.parse(fmt);
+      if (Number.isFinite(parsed) && parsed >= Date.UTC(1990, 0, 1)) return parsed;
+    }
+  }
+  return null;
+}
+
 export async function handleStockInsider(req, res) {
   const symbol = String(req.query?.symbol || '').toUpperCase();
   if (!symbol) return res.status(400).json({ error: 'symbol parameter required' });
@@ -507,14 +626,26 @@ export async function handleStockInsider(req, res) {
     const raw = await yf.quoteSummary(symbol, { modules: ['insiderTransactions'] });
     const txs = raw?.insiderTransactions?.transactions ?? [];
     const result = txs.map(t => {
-      const shares = t.shares?.raw ?? Number(t.shares ?? 0);
-      const value = t.value?.raw ?? Number(t.value ?? 0);
+      const shares = toNumberLoose(t.shares);
+      const value = toNumberLoose(t.value);
+      const startDate = toDateMs(t.startDate);
+      const safeShares = shares ?? 0;
+      const safeValue = value ?? 0;
+      // `price` is meaningful only for cash transactions; UI labels the
+      // row with the free-text `transactionText` but the per-code price/
+      // value render relies on `transactionCode`.
       return {
         filerName: String(t.filerName || t.name || 'Insider'),
-        filerRelation: t.filerRelation?.raw ?? t.filerRelation,
+        filerRelation: typeof t.filerRelation === 'string' ? t.filerRelation : (t.filerRelation?.raw ?? undefined),
         transactionText: String(t.transactionText || t.type || 'Transaction'),
-        startDate: t.startDate?.raw ?? t.startDate ?? 0,
-        shares, value, price: shares > 0 ? value / shares : 0,
+        transactionCode: typeof t.transactionCode === 'string' ? t.transactionCode.trim().toUpperCase() || null : null,
+        startDate,
+        shares: safeShares,
+        value: safeValue,
+        // Cap by non-negative so a fishy upstream `value < 0` can't crash
+        // the renderer; UI uses price only for cash transactions so this
+        // is harmless there.
+        price: safeShares > 0 && safeValue > 0 ? safeValue / safeShares : 0,
       };
     });
     cache.set(ck, result);
@@ -532,7 +663,12 @@ export async function handleStockNews(req, res) {
   const cached = cache.get(ck);
   if (cached) return res.json(cached);
   try {
-    const raw = await yf.search(symbol, { newsCount: 5 });
+    // newsCount: 12 — bumped from 5 so the in-app news card on
+    // /stock/:ticker has enough rows for a real news-feed feel
+    // (with thumbnails). 12 is comfortable under Yahoo's
+    // ~20-25 free-tier ceiling. Keep in lockstep with
+    // server/services/stockService.ts getNews.
+    const raw = await yf.search(symbol, { newsCount: 12 });
     const items = raw?.news ?? [];
     const result = items.map(n => {
       const c = n.content ?? n;
@@ -541,6 +677,10 @@ export async function handleStockNews(req, res) {
         publisher: String(c.providerName || c.publisher || n.publisher || 'News'),
         providerPublishTime: typeof c.providerPublishTime === 'number' ? c.providerPublishTime : Math.floor(Date.now() / 1000),
         link: String(c.clickUrl || c.url || c.link || n.link || '#'),
+        // Yahoo v4 returns thumbnails under `c.thumbnail.resolutions[]` for
+        // most items; older sessions put it at the top level. Pick the
+        // highest-resolution variant and let the renderer fall back to a
+        // gradient placeholder if both are missing.
         thumbnail: c.thumbnail?.resolutions?.[0]?.url || c.thumbnail,
         type: c.type,
       };
@@ -645,6 +785,255 @@ export async function handleSmaDistances(req, res) {
   res.json({ rows });
 }
 
+export async function handleProviderHealth(req, res) {
+  const TIMEOUT_MS = 8000;
+  // FMP/AV return HTTP 200 with an error body for rate limits / bad keys —
+  // detect those and treat as degraded (mirrors stockService.getProviderHealth).
+  const detectError = (text) => {
+    try {
+      const parsed = JSON.parse(text);
+      if (!parsed || typeof parsed !== 'object') return null;
+      const msg = parsed['Error Message'] ?? parsed.Note ?? parsed.Information ?? parsed.error ?? parsed.message ?? null;
+      return typeof msg === 'string' && msg.length > 0 ? msg : null;
+    } catch {
+      return null;
+    }
+  };
+  const probeUrl = async (url) => {
+    const t0 = Date.now();
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+    try {
+      const r = await fetch(url, { signal: ctrl.signal });
+      const text = await r.text();
+      const errorMessage = detectError(text);
+      const httpStatus = r.status;
+      const classifiedStatus = classify(httpStatus, errorMessage);
+      return { httpStatus, status: classifiedStatus, latencyMs: Date.now() - t0, detail: errorMessage || (r.ok ? undefined : `http_${httpStatus}`) };
+    } catch {
+      return { status: 'down', latencyMs: Date.now() - t0, detail: 'network error' };
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  const withTimeout = (promise, ms) =>
+    new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('timeout')), ms);
+      promise.then(
+        (v) => { clearTimeout(timer); resolve(v); },
+        (e) => { clearTimeout(timer); reject(e); },
+      );
+    });
+
+  const FMP_KEY = process.env.FMP_KEY || process.env.VITE_FMP_KEY || '';
+  const [yahoo, yahooChart, fmpEntries, av] = await Promise.all([
+    (async () => {
+      const t0 = Date.now();
+      try {
+        const q = await withTimeout(yf.quote('AAPL'), TIMEOUT_MS);
+        const price = Number(q?.regularMarketPrice ?? 0);
+        return {
+          provider: 'yahoo',
+          feature: 'quote',
+          status: price > 0 ? 'ok' : 'down',
+          latencyMs: Date.now() - t0,
+          detail: price > 0 ? undefined : 'empty quote',
+        };
+      } catch (e) {
+        return { provider: 'yahoo', feature: 'quote', status: 'down', latencyMs: Date.now() - t0, detail: e?.message ?? 'error' };
+      }
+    })(),
+    // Yahoo — chart round-trip distinguishes chart-only outages (Charts
+    // page, heatmaps, SMA) from quote outages. Mirrors handleStockChart's
+    // yf.historical call; any positive close counts as data.
+    (async () => {
+      const t0 = Date.now();
+      try {
+        const period1 = new Date();
+        period1.setFullYear(period1.getFullYear() - 1);
+        const r = await withTimeout(yf.historical('AAPL', { period1, interval: '1d' }), TIMEOUT_MS);
+        const rows = Array.isArray(r) ? r : r?.quotes ?? [];
+        const hasClose = rows.some((p) => Number(p?.close ?? 0) > 0);
+        return {
+          provider: 'yahoo',
+          feature: 'chart',
+          status: hasClose ? 'ok' : 'down',
+          latencyMs: Date.now() - t0,
+          detail: hasClose ? undefined : 'empty chart',
+        };
+      } catch (e) {
+        return { provider: 'yahoo', feature: 'chart', status: 'down', latencyMs: Date.now() - t0, detail: e?.message ?? 'error' };
+      }
+    })(),
+    // FMP — quote + batch-quote probes (batch-quote is 402 paid-gated on
+    // the free tier → known_restriction, not a temporary outage). Each
+    // upstream call is recorded through apiUsageTracker so /api/provider-usage
+    // reflects the additional probe budget cost regardless of which
+    // router served the request.
+    FMP_KEY
+      ? Promise.all([
+          probeUrl(`https://financialmodelingprep.com/stable/quote?symbol=AAPL&apikey=${FMP_KEY}`).then((r) => {
+            if (r.httpStatus === 429 || r.httpStatus === 403) apiUsageTracker.recordRateLimit && apiUsageTracker.recordRateLimit('fmp');
+            apiUsageTracker.recordCall && apiUsageTracker.recordCall('fmp');
+            const { httpStatus, ...entry } = r;
+            return { provider: 'fmp', feature: 'quote', ...entry };
+          }),
+          probeUrl(`https://financialmodelingprep.com/stable/batch-quote?symbols=AAPL,MSFT,NVDA&apikey=${FMP_KEY}`).then((r) => {
+            if (r.httpStatus === 429 || r.httpStatus === 403) apiUsageTracker.recordRateLimit && apiUsageTracker.recordRateLimit('fmp');
+            apiUsageTracker.recordCall && apiUsageTracker.recordCall('fmp');
+            const { httpStatus, ...entry } = r;
+            return { provider: 'fmp', feature: 'batch-quote', ...entry };
+          }),
+        ])
+      : Promise.resolve([
+          { provider: 'fmp', feature: 'quote', status: 'not_configured', latencyMs: null },
+          { provider: 'fmp', feature: 'batch-quote', status: 'not_configured', latencyMs: null },
+        ]),
+    process.env.AV_KEY
+      ? probeUrl(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=${process.env.AV_KEY}`).then((r) => {
+          if (apiUsageTracker.recordCall) apiUsageTracker.recordCall('alphavantage');
+          if (r.httpStatus === 429 || r.httpStatus === 403) apiUsageTracker.recordRateLimit && apiUsageTracker.recordRateLimit('alphavantage');
+          const { httpStatus, ...entry } = r;
+          return { provider: 'alphavantage', feature: 'quote', ...entry };
+        })
+      : Promise.resolve({ provider: 'alphavantage', feature: 'quote', status: 'not_configured', latencyMs: null }),
+  ]);
+
+  const providers = [yahoo, yahooChart, ...(Array.isArray(fmpEntries) ? fmpEntries : [fmpEntries]), av];
+  res.json({
+    checkedAt: new Date().toISOString(),
+    providers,
+    // known_restriction is an expected plan limitation, not an outage.
+    healthy: providers.every((p) => p.status === 'ok' || p.status === 'known_restriction'),
+  });
+}
+
+/**
+ * Yahoo-driven fallback for the Index financial-metrics grid when FMP is
+ * rate-limited (HTTP 429 from `/stable/`). Mirrors the parity method
+ * `getYahooFallbackFinancials` in server/services/stockService.ts so the
+ * Vercel / Netlify deployment (which uses this plain-JS router) returns
+ * the same response shape as the local TypeScript path. Always returns a
+ * strict-shape object (never throws): missing upstream values normalise
+ * to `null` so the client renders em-dashes instead of a misleading
+ * zero.
+ */
+export async function handleStockYahooFallbackFinancials(req, res) {
+  const symbol = String(req.query?.symbol || '').toUpperCase();
+  if (!symbol) return res.status(400).json({ error: 'symbol parameter required' });
+  const ck = `yahoo_fallback_financials_${symbol}`;
+  const cached = cache.get(ck);
+  if (cached) return res.json(cached);
+  // Null-safe numeric extractor — coerce both `{ raw, fmt }` objects and
+  // bare numbers; missing anything → `null`. Mirrors the TS-side helper
+  // in stockService.getYahooFallbackFinancials.
+  const extractNum = (v) => {
+    if (v === undefined || v === null) return null;
+    if (typeof v === "number") return Number.isFinite(v) ? v : null;
+    if (typeof v === "string") {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    }
+    if (typeof v === "object" && v !== null) {
+      const raw = v.raw;
+      const fmt = v.fmt;
+      if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+      if (typeof raw === "string") {
+        const n = Number(raw);
+        if (Number.isFinite(n)) return n;
+      }
+      if (typeof fmt === "string") {
+        const n = Number(fmt);
+        if (Number.isFinite(n)) return n;
+      }
+    }
+    return null;
+  };
+  // `margin: 0.18` (a fraction) is what Yahoo ships; downstream UI
+  // treats margin fields as percent so multiply by 100 here.
+  const extractMarginPct = (v) => {
+    const n = extractNum(v);
+    return n == null ? null : n * 100;
+  };
+  try {
+    // Modules mirror the TS path exactly: defaultKeyStatistics (EV, eps,
+    // debt), financialData (revenue, EBITDA, margins), earningsTrend
+    // (next-quarter consensus EPS / revenue).
+    const raw = await yf.quoteSummary(symbol, {
+      modules: ['defaultKeyStatistics', 'financialData', 'earningsTrend'],
+    });
+    const dks = raw?.defaultKeyStatistics || {};
+    const fd = raw?.financialData || {};
+    const trends = raw?.earningsTrend?.trend || [];
+    const nextQtr = trends.find((t) => t?.period === '+1q');
+    const result = {
+      revenue: extractNum(fd.totalRevenue),
+      ebitda: extractNum(fd.ebitda),
+      grossProfit: extractNum(fd.grossProfits),
+      operatingMargin: extractMarginPct(fd.operatingMargins),
+      profitMargin: extractMarginPct(fd.profitMargins),
+      grossMargin: extractMarginPct(fd.grossMargins),
+      revenueGrowth: extractMarginPct(fd.revenueGrowth),
+      earningsGrowth: extractMarginPct(fd.earningsGrowth),
+      totalCash: extractNum(fd.totalCash),
+      totalDebt: extractNum(fd.totalDebt),
+      enterpriseValue: extractNum(dks.enterpriseValue),
+      trailingEps: extractNum(dks.trailingEps),
+      forwardEps: extractNum(dks.forwardEps),
+      epsEstimateNextQtr: extractNum(nextQtr?.earningsEstimate?.avg),
+      revenueEstimateNextQtr: extractNum(nextQtr?.revenueEstimate?.avg),
+    };
+    cache.set(ck, result, 300);
+    res.json(result);
+  } catch (e) {
+    throttledWarn(`yahoo-fallback:${symbol}`, `yahoo fallback ${symbol}:`, e?.message);
+    res.json({
+      revenue: null, ebitda: null, grossProfit: null,
+      operatingMargin: null, profitMargin: null, grossMargin: null,
+      revenueGrowth: null, earningsGrowth: null,
+      totalCash: null, totalDebt: null, enterpriseValue: null,
+      trailingEps: null, forwardEps: null,
+      epsEstimateNextQtr: null, revenueEstimateNextQtr: null,
+    });
+  }
+}
+
+/**
+ * Per-provider API usage for the footer's progress bars. Mirrors the
+ * parity handler `handleProviderUsage` in server/routes/stock-data.ts
+ * so Vercel / Netlify returns the same rolling-window counts. Cheap
+ * (in-process singleton), so no server-side cache layer needed.
+ */
+export async function handleProviderUsage(req, res) {
+  try {
+    // Diagnostic mode: `?mode=status` returns the active store type so
+    // the user can verify post-provisioning that Vercel KV has taken
+    // over from the in-process store. Probe with:
+    //   curl 'https://vantage.vercel.app/api/provider-usage?mode=status'
+    if (String(req.query?.mode ?? '') === 'status') {
+      const usageStoreModule = await import('../server/services/usageStore.js');
+      const storeName = usageStoreModule.__test__.current().constructor.name;
+      res.json({
+        store: storeName,
+        kvConfigured: storeName === 'VercelKvStore',
+        ready: true,
+        checkedAt: new Date().toISOString(),
+      });
+      return;
+    }
+    const { getProviderUsage } = await import('../server/services/apiUsageTracker.js');
+    // getProviderUsage is async because KV-backed deployments need to
+    // await cold-start hydration. Local dev (no KV env vars) resolves
+    // the wait synchronously inside the await microtask.
+    res.json(await getProviderUsage());
+  } catch {
+    // Tracker module resolution failed (e.g. deployed without src/);
+    // surface an empty snapshot rather than a 500 so the footer never
+    // crashes the page.
+    res.json({ checkedAt: new Date().toISOString(), entries: [] });
+  }
+}
+
 export async function handleFxRates(req, res) {
   const raw = String(req.query?.currencies || 'USD,ILS,EUR');
   const valid = new Set(['USD', 'ILS', 'EUR', 'GBP']);
@@ -667,45 +1056,9 @@ export async function handleFxRates(req, res) {
   res.json(result);
 }
 
-// Deprecated 2026-07: logos moved client-side to Logo.dev's direct CDN
-// (see `client/lib/logoDev.ts`). The publishable `pk_` key is designed for
-// `<img src>` use, so the proxy no longer adds latency or privacy advantage.
-// Removed from the router map below; this handler stays exported in case
-// a future route needs first-party branding. Calls to /api/company-logo
-// now 404 from the catch-all — migrating callers should switch to `import
-// { getLogoDevUrl } from '@/lib/logoDev'` and embed the URL directly.
-export async function handleCompanyLogo(req, res) {
-  const ticker = String(req.query?.ticker || '').toUpperCase();
-  if (!ticker) return res.status(400).json({ error: 'ticker parameter required' });
-  const token = process.env.LOGO_DEV_TOKEN || '';
-  if (!token) return res.status(503).json({ error: 'LOGO_DEV_TOKEN not configured' });
-  try {
-    const url = `https://img.logo.dev/ticker/${ticker}?token=${token}`;
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 5000);
-    const response = await fetch(url, { signal: ctrl.signal });
-    clearTimeout(t);
-    if (!response.ok) {
-      res.setHeader('Content-Type', 'application/json');
-      return res.status(200).json({ error: `logo not found: ${response.status}` });
-    }
-    const arrayBuf = await response.arrayBuffer();
-    res.setHeader('Content-Type', response.headers.get('content-type') || 'image/png');
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-    res.send(Buffer.from(arrayBuf));
-  } catch (e) {
-    if (e?.name === 'AbortError') return res.status(504).json({ error: 'Logo request timed out' });
-    res.status(500).json({ error: 'Failed to fetch logo' });
-  }
-}
-
 // ── Router ────────────────────────────────────────────────────────────────────
-// `/api/company-logo` is intentionally OMITTED from the routes map: logos now
-// load client-side directly from Logo.dev's CDN (publishable key is safe for
-// `<img src>`s, see `client/lib/logoDev.ts`). A curl to the previous URL
-// returns 404 from the catch-all router. The `handleCompanyLogo` handler is
-// still exported — kept in case a future proxy requires server-side caching
-// or first-party branding.
+// Logos load client-side directly from Logo.dev's CDN (see `client/lib/logoDev.ts`).
+// There is no longer a server-side proxy route.
 const routes = {
   '/api/demo': handleDemo,
   '/api/stock-quote': handleStockQuote,
@@ -724,6 +1077,9 @@ const routes = {
   '/api/insights-tab': handleInsightsTab,
   '/api/sma-distances': handleSmaDistances,
   '/api/fx-rates': handleFxRates,
+  '/api/provider-health': handleProviderHealth,
+  '/api/stock-yahoo-fallback-financials': handleStockYahooFallbackFinancials,
+  '/api/provider-usage': handleProviderUsage,
 };
 
 export async function router(req, res) {

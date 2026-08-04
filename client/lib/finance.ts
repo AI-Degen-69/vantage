@@ -117,6 +117,205 @@ export function cagr(startValue: number, endValue: number, years: number): numbe
 }
 
 /**
+ * Map a FinanceMetric `name` (the same key passed into `t()`) to the
+ * statement source + column + display divisor the ChartModal needs to
+ * project a `FinancialStatements` row into a `(date, value)` bar.
+ *
+ * Centralising this here means:
+ *   - the ChartModal does not hardcode metric-key wiring (full-card view
+ *     and modal view stay in lockstep),
+ *   - quarterly-mode projection uses the SAME map as annual-mode so a
+ *     future contributor adding a new metric only writes one row,
+ *   - the spec can pin the map without spinning up React.
+ *
+ * The `name` argument accepts any of the keys Index.tsx puts inside a
+ * `FinancialMetric.name` (`insights.revenue`, `insights.eps`, ...). The
+ * `EPS` and dollar-denominated metrics pass through with `divisor: 1`
+ * because the raw `eps` field is already in $/share.
+ */
+export interface MetricStatementKey {
+  statement: "income" | "balance" | "cash";
+  /** Key on IncomeStatementRow / BalanceSheetRow / CashFlowRow. */
+  key: string;
+  /** Divide raw value for display (revenue/EBITDA/etc → B = 1e9). */
+  divisor: number;
+}
+
+const METRIC_KEY_MAP: Record<string, MetricStatementKey> = {
+  "insights.revenue":           { statement: "income",   key: "revenue",              divisor: 1e9 },
+  "insights.ebitda":            { statement: "income",   key: "ebitda",               divisor: 1e9 },
+  "insights.grossProfit":       { statement: "income",   key: "grossProfit",          divisor: 1e9 },
+  "insights.operatingIncome":   { statement: "income",   key: "operatingIncome",      divisor: 1e9 },
+  "insights.netIncome":         { statement: "income",   key: "netIncome",            divisor: 1e9 },
+  "insights.eps":               { statement: "income",   key: "eps",                  divisor: 1    },
+  "insights.cashAndEquivalents":{ statement: "balance",  key: "cashAndCashEquivalents", divisor: 1e9 },
+  "insights.totalAssets":       { statement: "balance",  key: "totalAssets",          divisor: 1e9 },
+};
+
+export function metricStatementKey(name: string): MetricStatementKey | null {
+  return METRIC_KEY_MAP[name] ?? null;
+}
+
+/**
+ * Project a `FinancialStatements` shape for the active metric into
+ * `(date, value)` points for the chart, ordered ASCENDING by date so the
+ * caller can `.slice(-quarterCount)` to apply a 1Y/3Y/5Y window in both
+ * annual AND quarterly modes without re-sorting.
+ *
+ * The `date` label prefers `Qx FY` for quarterly rows (e.g. "Q2 2025")
+ * and `FY <year>` for annual rows — the tooltip renders this string
+ * verbatim and this layout keeps quarters searchable in the chart.
+ *
+ * Returns `[]` when the metric key can't be resolved or the chosen
+ * statement table is missing; callers render an empty chart rather than
+ * passing a single-point series to recharts (which would error on its
+ * axis builder).
+ *
+ * Parameter type: accepts `Pick<FinancialStatements, …>` (the full
+ * shared API shape) without forcing the caller to cast `IncomeStatementRow[]`
+ * to a wider type. We read `row[meta.key]` and `row.period` /
+ * `row.calendarYear` defensively with internal casts because the typed
+ * rows do not declare an index signature.
+ */
+export function projectMetricSeries(
+  metricName: string,
+  statements: {
+    income?: ReadonlyArray<unknown>;
+    balance?: ReadonlyArray<unknown>;
+    cash?: ReadonlyArray<unknown>;
+  } | null | undefined,
+): { date: string; value: number }[] {
+  const meta = metricStatementKey(metricName);
+  if (!meta || !statements) return [];
+  const rows = (statements[meta.statement] ?? []) as ReadonlyArray<unknown>;
+  const projected = rows
+    .map((row) => {
+      const raw = Number((row as Record<string, unknown>)[meta.key]);
+      if (!Number.isFinite(raw)) return null;
+      const safeRow = row as { period?: unknown; calendarYear?: unknown };
+      const isQuarter = /^Q[1-4]$/.test(String(safeRow.period ?? "").trim());
+      const yearPart = String(safeRow.calendarYear ?? "").trim();
+      const periodLabel = String(safeRow.period ?? "").trim();
+      const date = isQuarter
+        ? `${periodLabel} ${yearPart}`
+        : `FY ${yearPart}`;
+      // Compute a numeric chronological sort key for quarters. Extract quarter
+      // number from "Q1"-"Q4"; for annual rows the key is just the year *
+      // 10 so Q* keys (year * 10 + 1..4) sort naturally alongside FY keys.
+      const year = Number(yearPart) || 0;
+      const qMatch = /^Q([1-4])$/.exec(periodLabel);
+      const chronoKey = qMatch
+        ? year * 10 + Number(qMatch[1])
+        : year * 10;
+      return { date, value: raw / meta.divisor, chronoKey };
+    })
+    .filter((p): p is { date: string; value: number; chronoKey: number } => p !== null);
+  // Sort by the numeric chronological key instead of the display label so
+  // quarters spanning a year boundary (Q4 2024, Q1 2025, Q2 2025) appear
+  // in correct order.
+  projected.sort((a, b) => a.chronoKey - b.chronoKey);
+  // Drop the chronoKey from the returned shape — callers only need date/value.
+  return projected.map(({ date, value }) => ({ date, value }));
+}
+
+/**
+ * Inspect financial-statement row `period` labels to decide whether a
+ * series is ANNUAL (`period === "FY"` or blank) or QUARTERLY
+ * (`period === "Q1"` – `"Q4"`). Empty arrays + unrecognised labels fall
+ * back to `'annual'` so the caller always gets a deterministic answer.
+ *
+ * Used by `cagrAtYearsBack` to pick the right stride back: 4 quarters
+ * per year vs. 1 row per year. Without this, an annual series and a
+ * quarterly series of the same length would compute wildly different
+ * CAGRs.
+ */
+export type FinancialPeriod = "annual" | "quarter";
+
+export function detectPeriodGranularity(
+  rows: ReadonlyArray<{ readonly period?: string | null }>,
+): FinancialPeriod {
+  if (!Array.isArray(rows) || rows.length === 0) return "annual";
+  const lastPeriod = String(rows[rows.length - 1].period ?? "").trim();
+  return /^Q[1-4]$/.test(lastPeriod) ? "quarter" : "annual";
+}
+
+/**
+ * Walks the financial series back `years` years (annual = 1 row / year,
+ * quarterly = 4 rows / year) and returns the annualized growth rate
+ * expressed as **percent** (e.g. `18.32` for 18.32%/yr). Returns `null`
+ * for any case that can't produce a valid number so callers can render
+ * "-" instead of `NaN%`.
+ *
+ * Why percent, not decimal: the rest of the UI renders growth as
+ * `"65.47%"` (×100 string), and CAGR renders need to plug into the same
+ * `value.toFixed(2) + "%"` template in the modal. Returning the
+ * already-scaled percent keeps the JSX uniform and prevents the old
+ * "0.18%" typo when a contributor renders a decimal straight.
+ *
+ * Failure modes:
+ *   - fewer than 2 rows in the series
+ *   - the stride back would underflow `arr.length`
+ *   - either endpoint is non-positive, non-finite, or otherwise unsuited
+ *     to a power-of-(1/years) calculation
+ *
+ * Note: this is *close-to-close* CAGR — the straight ratio between
+ * `arr[end]` and `arr[startIdx]`, geometrically annualized. If a future
+ * reader wants "mean of year-over-year returns within the window", add
+ * a sibling helper (`cagrMeanYoY`) rather than overloading this one.
+ *
+ * Parameter type uses `any[]`: stripped-of-intent but the
+ * strictly-typed alternatives (`ReadonlyArray<unknown>`, generic over
+ * `T extends object`) all fail to accept `IncomeStatementRow[]` /
+ * `BalanceSheetRow[]` because those interfaces from `shared/api.ts`
+ * intentionally omit index signatures. The function only reads
+ * `arr[startIdx][key]` and feeds the values to `Number(...)`, so any
+ * payload type is safe — the `any[]` is a deliberate seam, not lazily
+ * typed. Document this so a future contributor doesn't try to tighten
+ * the signature without first adding index-signature support upstream.
+ */
+export function cagrAtYearsBack<T>(
+  arr: ReadonlyArray<T>,
+  key: string,
+  years: number,
+  granularity: FinancialPeriod,
+): number | null {
+  if (!Array.isArray(arr) || arr.length < 2) return null;
+  if (!Number.isFinite(years) || years <= 0) return null;
+  const stepBack = granularity === "quarter" ? years * 4 : years;
+  const lastIdx = arr.length - 1;
+  const startIdx = lastIdx - stepBack;
+  if (startIdx < 0) return null;
+  const start = Number((arr[startIdx] as Record<string, unknown>)[key]);
+  const end = Number((arr[lastIdx] as Record<string, unknown>)[key]);
+  const raw = cagr(start, end, years);
+  return raw === null ? null : raw * 100;
+}
+
+/**
+ * Locale-aware "short month + day + year" formatter for a trade-date value.
+ * Returns `null` for invalid or nullish input so callers can render their
+ * own placeholder. This is what the stock banner uses for the
+ * "Earnings: <date>" line (was previously rendering as bare ISO
+ * `2026-04-22`, which read like a YAML key to non-technical users).
+ *
+ * Locale behaviour: `Intl.DateTimeFormat` inherits the browser locale
+ * and falls back to en-US server-side, so HE users see e.g.
+ * "22 באפר 2026" and EN users see "Apr 22, 2026" without any extra
+ * wiring.
+ */
+export function formatEarningsDate(
+  value: string | number | null | undefined,
+): string | null {
+  const ms = parseTradeDate(value);
+  if (ms === null) return null;
+  return new Date(ms).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+/**
  * Computes returns between consecutive positive closing prices.
  *
  * @returns The day-over-day returns for adjacent pairs with positive prices.

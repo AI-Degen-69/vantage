@@ -5,6 +5,7 @@ import { useIndexQuotes } from "@/hooks/useStockData";
 import type { IndexQuote } from "@shared/api";
 import { EarningsAlertStrip } from "@/components/EarningsAlertStrip";
 import { EarningsAlertHistoryButton } from "@/components/EarningsAlertHistoryPanel";
+import TickerLogo from "@/components/TickerLogo";
 
 /**
  * Provides the styling classes for an index quote pill container.
@@ -102,19 +103,27 @@ export default function TopBar() {
   const location = useLocation();
   const { data, isLoading, dataUpdatedAt } = useIndexQuotes();
 
-  // Helper to generate breadcrumb from current path
-  const getBreadcrumb = () => {
+  // Helper to generate the breadcrumb label for the current path. The
+  // /stock/:ticker case renders the nav label + logo + ticker as separate
+  // elements below, so this exposes just the label.
+  const getBreadcrumbLabel = () => {
     const path = location.pathname;
-    if (path === "/insights" || path.startsWith("/stock/")) {
-      const ticker = path.startsWith("/stock/") ? path.replace("/stock/", "").toUpperCase() : "";
-      return ticker ? `${t("nav.insights")} · ${ticker}` : t("nav.insights");
-    }
+    if (path === "/insights" || path.startsWith("/stock/")) return t("nav.insights");
     if (path === "/watchlists") return t("nav.watchlists");
     if (path === "/charts") return t("nav.charts");
     if (path === "/earnings") return t("nav.earnings");
     if (path === "/portfolios") return t("nav.portfolios");
     return "";
   };
+
+  // On /stock/<ticker> pages, surface the company logo in the breadcrumb
+  // next to the ticker so the stock context is identifiable at a glance
+  // (the page header already shows a larger logo). An empty ticker
+  // (`/stock/` with nothing after) stays falsy and falls back to the
+  // plain label breadcrumb.
+  const stockTicker = location.pathname.startsWith("/stock/")
+    ? location.pathname.replace("/stock/", "").toUpperCase()
+    : null;
 
   // Use lang directly from the I18nProvider context — flips on toggle.
   const language = lang;
@@ -127,9 +136,18 @@ export default function TopBar() {
           VANTAGE
         </Link>
         <div className="h-4 w-[1px] bg-slate-700 mx-2" />
-        <span className="text-sm font-medium text-slate-300">
-          {getBreadcrumb()}
-        </span>
+        {stockTicker ? (
+          <span className="flex items-center gap-2 text-sm font-medium text-slate-300">
+            <span>{getBreadcrumbLabel()}</span>
+            <span className="text-slate-600">·</span>
+            <TickerLogo ticker={stockTicker} size="xs" ariaLabel={`${stockTicker} logo`} />
+            <span dir="ltr">{stockTicker}</span>
+          </span>
+        ) : (
+          <span className="text-sm font-medium text-slate-300">
+            {getBreadcrumbLabel()}
+          </span>
+        )}
       </div>
 
       {/* Center section */}

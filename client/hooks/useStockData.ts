@@ -14,11 +14,14 @@ import type {
   InsightsTabResponse,
   InsiderTransaction,
   NewsItem,
+  ProviderHealthResponse,
+  ProviderUsageResponse,
   SmaDistanceResponse,
   SectorHeatmapMetadata,
   SectorHeatmapResponse,
   StockMetrics,
   StockQuote,
+  YahooFallbackFinancials,
 } from "@shared/api";
 import type { QuickStat } from "@/lib/mockData";
 import { serializeSectorMeta } from "@shared/sectorMeta";
@@ -125,6 +128,127 @@ export function useSmaDistances(symbols: string[], windowSize: number = 200) {
 }
 
 /**
+ * Live provider health (Yahoo / FMP / AlphaVantage) for the global status
+ * indicator and the [MOCK]-badge wiring. Polled every minute against a
+ * 5-min server cache (the cache is the FMP-budget control — each probe run
+ * costs 2 FMP calls — so the poll mostly re-reads the same payload; the
+ * fresh payload lands within ~60s of a server re-probe).
+ */
+export function useProviderHealth() {
+  return useQuery({
+    queryKey: ["providerHealth"],
+    queryFn: () => fetchJSON<ProviderHealthResponse>(`/api/provider-health`),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * True while Yahoo's QUOTE health probe reports `down`.
+ *
+ * Yahoo is the keyless workhorse behind batch-quote fallbacks (free FMP
+ * tier 402s on `batch-quote`, so per-symbol Yahoo is what keeps those
+ * widgets alive) and the sole source for news / analyst / insider data.
+ * Widgets that render mock fallbacks for those features OR this into
+ * their [MOCK] badge condition so an outage reads on the widget itself
+ * instead of only the top banner — this also catches the case where a
+ * stale payload lingers in the React Query cache and would otherwise
+ * look live.
+ *
+ * Scoped to `feature: "quote"` (NOT the chart probe): Yahoo now reports
+ * two features, and a chart-only outage (Charts page, heatmaps, SMA) must
+ * not flip the [MOCK] badges on quote/news widgets — those don't consume
+ * charts. The global banner in `ProviderHealthIndicator` still surfaces
+ * the chart outage independently via its per-feature detail lines.
+ *
+ * Shares the same query key as `ProviderHealthIndicator`; React Query
+ * dedupes the fetch across observers, so every extra caller costs zero
+ * additional requests.
+ */
+export function useYahooDown() {
+  const { data } = useProviderHealth();
+  return (
+    data?.providers?.some(
+      (p) => p.provider === "yahoo" && p.feature === "quote" && p.status === "down",
+    ) ?? false
+  );
+}
+
+/**
+ * True while Yahoo's CHART health probe reports `down`.
+ *
+ * Charts are FMP-primary with a Yahoo fallback, so this flags the fallback
+ * being unavailable — chart-driven widgets (Charts page, sector heatmap,
+ * SMA/DipFinder) may be showing stale history even while a fresh payload
+ * lingers in the React Query cache. They OR this into their [MOCK] badge
+ * condition so a chart-only outage reads on the widget itself instead of
+ * only the top banner.
+ *
+ * NOTE: because FMP `/stable/historical-price-eod/full` is live on the free
+ * tier, this can fire while FMP still serves fresh bars — conservative by
+ * design (stale-looking data is worse than a yellow badge). Gate harder
+ * (e.g. on FMP chart availability) if that ever reads too noisy.
+ *
+ * Scoped to `feature: "chart"` (NOT the quote probe): a chart outage must
+ * not flip the quote/news [MOCK] badges, and vice versa.
+ *
+ * Shares the same query key as `useProviderHealth`; React Query dedupes the
+ * fetch across observers, so every extra caller costs zero requests.
+ */
+export function useYahooChartDown() {
+  const { data } = useProviderHealth();
+  return (
+    data?.providers?.some(
+      (p) => p.provider === "yahoo" && p.feature === "chart" && p.status === "down",
+    ) ?? false
+  );
+}
+
+/**
+ * True while FMP's `batch-quote` health probe reports `known_restriction` —
+ * the endpoint is not on the current plan (HTTP 402 on the free tier), so
+ * batch quotes fall back to per-symbol Yahoo calls. Quote-table widgets show
+ * a small "Yahoo fallback" chip off this so users understand why prices are
+ * fetched one ticker at a time instead of in one batch request.
+ *
+ * Shares the same query key as `useProviderHealth`; React Query dedupes the
+ * fetch across observers, so every extra caller costs zero requests.
+ */
+export function useFmpBatchQuoteRestricted() {
+  const { data } = useProviderHealth();
+  return (
+    data?.providers?.some(
+      (p) =>
+        p.provider === "fmp" && p.feature === "batch-quote" && p.status === "known_restriction",
+    ) ?? false
+  );
+}
+
+/**
+ * Live rolling-window per-provider API usage for the footer pills.
+ *
+ * The server keeps a process-singleton tracker that increments on every
+ * upstream call (`fmp.ts`, wrapped `yahooFinance`, AV probes, etc.) and
+ * reports back the `used` count + a `secondsToReset` horizon. The footer
+ * renders a progress bar per provider; ResetsAt is reset to zero once
+ * the oldest in-window call drops off.
+ *
+ * - `staleTime: 5_000` keeps the footer reactive to incoming calls
+ *   without hammering the API — every 5s the bar nudges.
+ * - `refetchInterval: 15_000` re-polls on a slow cadence, so a stale
+ *   burst of upstream calls shows up within ~15s instead of after the
+ *   next navigation.
+ */
+export function useProviderUsage() {
+  return useQuery({
+    queryKey: ["providerUsage"],
+    queryFn: () => fetchJSON<ProviderUsageResponse>(`/api/provider-usage`),
+    staleTime: 5_000,
+    refetchInterval: 15_000,
+  });
+}
+
+/**
  * Retrieves exchange rates for the requested currencies.
  *
  * @param currencies - The currencies to include in the exchange-rate response.
@@ -159,13 +283,24 @@ export function useStockProfile(ticker: string) {
  * Fetches financial statements for a stock ticker.
  *
  * @param ticker - The stock ticker symbol
+ * @param opts - Optional granularity: `'annual'` (default) or `'quarter'`.
+ *   Annual and quarterly calls use different cache keys so both can run in
+ *   parallel without colliding. Annual is the historical default; quarterly
+ *   powers the new chart-modal granularity toggle (Q1..Q4 bars instead of
+ *   full-year bars). The `enabled` flag gates the query so quarterly requests
+ *   only fire when the modal is open in quarterly mode.
  * @returns The query result containing the stock's financial statements
  */
-export function useStockFinancials(ticker: string) {
+export function useStockFinancials(
+  ticker: string,
+  opts?: { period?: "annual" | "quarter"; enabled?: boolean },
+) {
+  const period = opts?.period ?? "annual";
+  const enabled = opts?.enabled ?? true;
   return useQuery({
-    queryKey: ["stockFinancials", ticker],
-    queryFn: () => fetchJSON<FinancialStatements>(`/api/stock-financials?symbol=${encodeURIComponent(ticker)}`),
-    enabled: !!ticker,
+    queryKey: ["stockFinancials", ticker, period],
+    queryFn: () => fetchJSON<FinancialStatements>(`/api/stock-financials?symbol=${encodeURIComponent(ticker)}&period=${period}`),
+    enabled: !!ticker && enabled,
   });
 }
 
@@ -194,6 +329,38 @@ export function useStockAnalyst(ticker: string) {
     queryKey: ["stockAnalyst", ticker],
     queryFn: () => fetchJSON<AnalystTrends>(`/api/stock-analyst?symbol=${encodeURIComponent(ticker)}`),
     enabled: !!ticker,
+  });
+}
+
+/**
+ * Yahoo-driven fallback for the Index financial-metrics grid when the
+ * FMP primary is rate-limited (HTTP 429 from `/stable/`). The
+ * `enabled` flag should be `true` ONLY when:
+ *
+ *   1. `useProviderHealth()` reports FMP `quote` is `down` or `degraded`,
+ *      AND
+ *   2. `useStockFinancials(ticker)` has resolved with an empty income
+ *      series (`metrics.length === 0`).
+ *
+ * Gating the query itself (rather than rendering-conditionally) keeps
+ * Yahoo load at zero during healthy operation. `staleTime: 5min` matches
+ * the server-side cache TTL so a switch back to "healthy" doesn't keep
+ * re-fetching stale Yahoo data unnecessarily. Shares the same query key
+ * seed `["stockYahooFallbackFinancials", ticker]` so React Query dedupes
+ * across observers.
+ */
+export function useStockYahooFallbackFinancials(
+  ticker: string,
+  opts?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: ["stockYahooFallbackFinancials", ticker],
+    queryFn: () =>
+      fetchJSON<YahooFallbackFinancials>(
+        `/api/stock-yahoo-fallback-financials?symbol=${encodeURIComponent(ticker)}`,
+      ),
+    enabled: !!ticker && (opts?.enabled ?? true),
+    staleTime: 5 * 60_000,
   });
 }
 

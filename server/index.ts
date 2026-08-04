@@ -18,6 +18,9 @@ import {
   handleInsightsTab,
   handleSmaDistances,
   handleFxRates,
+  handleProviderHealth,
+  handleStockYahooFallbackFinancials,
+  handleProviderUsage,
   handleSectorHeatmap,
 } from "./routes/stock-data";
 
@@ -108,7 +111,10 @@ export function createServer() {
   app.get("/api/insights-tab", handleInsightsTab);
   app.get("/api/sma-distances", handleSmaDistances);
   app.get("/api/fx-rates", handleFxRates);
+  app.get("/api/provider-health", handleProviderHealth);
   app.get("/api/sector-heatmap", handleSectorHeatmap);
+  app.get("/api/stock-yahoo-fallback-financials", handleStockYahooFallbackFinancials);
+  app.get("/api/provider-usage", handleProviderUsage);
 
   return app;
 }

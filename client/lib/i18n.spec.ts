@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { getPluralCategory, resolvePluralKey, enDict, heDict } from "./i18n";
+import {
+  getPluralCategory,
+  resolvePluralKey,
+  translateSector,
+  enDict,
+  heDict,
+} from "./i18n";
 import { solveTemplate } from "./icu";
 import { readFileSync } from "node:fs";
 import { globSync } from "node:fs";
@@ -319,6 +325,136 @@ describe("t() pipeline integration — resolvePluralKey → solveTemplate", () =
     expect(
       tProdStyle("metrics", { count: 5, ticker: "AAPL" }, dict, "en"),
     ).toBe("Metrics unavailable for AAPL");
+  });
+});
+
+describe("translateSector", () => {
+  // Build a `t`-shaped adapter that reads from a literal dictionary.
+  // Production `t()` also runs `solveTemplate` ICU + missing-key warnings;
+  // for these tests we only need the lookup chain (no template interpolation
+  // in sector.* entries).
+  const enT = (key: string) => enDict[key] ?? key;
+  const heT = (key: string) => heDict[key] ?? key;
+
+  describe("English locale", () => {
+    it("returns the canonical English label for known FMP sectors", () => {
+      expect(translateSector(enT, "Technology")).toBe("Technology");
+      expect(translateSector(enT, "Healthcare")).toBe("Healthcare");
+      expect(translateSector(enT, "Financial Services")).toBe(
+        "Financial Services",
+      );
+      expect(translateSector(enT, "Consumer Cyclical")).toBe(
+        "Consumer Cyclical",
+      );
+      expect(translateSector(enT, "Communication Services")).toBe(
+        "Communication Services",
+      );
+      expect(translateSector(enT, "Real Estate")).toBe("Real Estate");
+      expect(translateSector(enT, "Basic Materials")).toBe("Basic Materials");
+    });
+
+    it("EN label matches the enDict value (parity sanity)", () => {
+      expect(translateSector(enT, "Technology")).toBe(enDict["sector.technology"]);
+      expect(translateSector(enT, "Healthcare")).toBe(enDict["sector.healthcare"]);
+    });
+  });
+
+  describe("Hebrew locale", () => {
+    it("returns the localized label for known FMP sectors", () => {
+      expect(translateSector(heT, "Technology")).toBe("טכנולוגיה");
+      expect(translateSector(heT, "Healthcare")).toBe("בריאות");
+      expect(translateSector(heT, "Financial Services")).toBe(
+        "שירותים פיננסיים",
+      );
+      expect(translateSector(heT, "Consumer Cyclical")).toBe("צרכנות מחזורית");
+      expect(translateSector(heT, "Communication Services")).toBe(
+        "שירותי תקשורת",
+      );
+      expect(translateSector(heT, "Real Estate")).toBe("נדל\"ן");
+      expect(translateSector(heT, "Utilities")).toBe("שירותים ציבוריים");
+    });
+
+    it("HE label matches the heDict value (no hardcoded Hebrew in helper)", () => {
+      expect(translateSector(heT, "Technology")).toBe(heDict["sector.technology"]);
+      expect(translateSector(heT, "Healthcare")).toBe(heDict["sector.healthcare"]);
+      expect(translateSector(heT, "Real Estate")).toBe(heDict["sector.realEstate"]);
+    });
+  });
+
+  describe("graceful fallback for unknown / empty input", () => {
+    it("returns raw English when the sector is not in the lookup table", () => {
+      // A new FMP sector arriving before translators cover it should
+      // surface visibly — both in the heatmap row label and in tooltips —
+      // rather than rendering as empty / "sector.unknown".
+      expect(translateSector(enT, "Quantum Computing")).toBe("Quantum Computing");
+      expect(translateSector(heT, "Quantum Computing")).toBe("Quantum Computing");
+    });
+
+    it("returns empty string for null", () => {
+      expect(translateSector(enT, null)).toBe("");
+      expect(translateSector(heT, null)).toBe("");
+    });
+
+    it("returns empty string for undefined", () => {
+      expect(translateSector(enT, undefined)).toBe("");
+      expect(translateSector(heT, undefined)).toBe("");
+    });
+
+    it("returns empty string for empty string", () => {
+      expect(translateSector(enT, "")).toBe("");
+      expect(translateSector(heT, "")).toBe("");
+    });
+
+    it("returns empty string for whitespace-only input", () => {
+      expect(translateSector(enT, "   \t\n")).toBe("");
+      expect(translateSector(heT, "   \t\n")).toBe("");
+    });
+
+    it("trims around known sectors", () => {
+      expect(translateSector(enT, "  Technology  ")).toBe("Technology");
+      expect(translateSector(heT, "  Technology  ")).toBe("טכנולוגיה");
+    });
+
+    it("trims around unrecognized sectors before returning raw", () => {
+      expect(translateSector(enT, "  Quantum Computing  ")).toBe("Quantum Computing");
+    });
+  });
+
+  describe("dictionary parity — every sector key exists in BOTH enDict and heDict", () => {
+    // Pins down the comment-side-of-the-contract: if a translator adds
+    // a `sector.*` entry to one language but forgets the other, the
+    // localized column will show "sector.<key>" as a missing-key
+    // sentinel while the other renders correctly. Catch it here.
+    const allDictKeys = Object.keys(enDict).filter((k) => k.startsWith("sector."));
+    const enSet = new Set(allDictKeys);
+    const heSet = new Set(Object.keys(heDict).filter((k) => k.startsWith("sector.")));
+
+    it("has at least one sector key in enDict", () => {
+      expect(allDictKeys.length).toBeGreaterThan(0);
+    });
+
+    it("every sector.* key in enDict also exists in heDict", () => {
+      const missing = allDictKeys.filter((k) => !heSet.has(k));
+      expect(
+        missing,
+        `sector.* present in enDict but missing from heDict: ${missing.join(", ")}`,
+      ).toEqual([]);
+    });
+
+    it("every sector.* key in heDict also exists in enDict", () => {
+      const extra = Array.from(heSet).filter((k) => !enSet.has(k));
+      expect(
+        extra,
+        `sector.* present in heDict but missing from enDict: ${extra.join(", ")}`,
+      ).toEqual([]);
+    });
+
+    it("every sector.* value is non-empty in both dictionaries", () => {
+      for (const k of allDictKeys) {
+        expect(enDict[k].length).toBeGreaterThan(0);
+        expect(heDict[k].length).toBeGreaterThan(0);
+      }
+    });
   });
 });
 

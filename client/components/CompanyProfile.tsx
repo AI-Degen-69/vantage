@@ -5,6 +5,7 @@ import {
   useStockInsider,
   useStockNews,
   useStockMetrics,
+  useYahooDown,
 } from "@/hooks/useStockData";
 import {
   mockCompanyProfile,
@@ -31,6 +32,11 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
   const { data: insiderData } = useStockInsider(ticker);
   const { data: newsData } = useStockNews(ticker);
   const { data: metricsData } = useStockMetrics(ticker);
+
+  // News / analyst / insider all come from Yahoo — when it's down those
+  // sections render mock fallbacks (and stale cached payloads look live),
+  // so surface [MOCK] from the health probe rather than waiting on data.
+  const yahooDown = useYahooDown();
 
   const description =
     overviewData?.description ||
@@ -73,33 +79,56 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
           timestamp: n.providerPublishTime
             ? formatTradeDateLocale(n.providerPublishTime) ?? "Recent"
             : "Recent",
+          // Pass `thumbnail` through so the render can build a news-card
+          // layout. Most Yahoo v4 news items carry `thumbnail.resolutions[]`
+          // upscaled already; the server normalizers extract one URL.
+          thumbnail: n.thumbnail ?? null,
+          // Type lets the UI hint "video" / "article" badges when Yahoo
+          // ships that classification (some sessions expose `type`).
+          type: n.type ?? null,
           url: n.link || "#",
         }))
       : mockNews;
-  const isNewsMock = !newsData || newsData.length === 0;
+  const isNewsMock = !newsData || newsData.length === 0 || yahooDown;
 
   // ---- Insider mapping (Yahoo raw: shares/value come as {raw, fmt} objects) ----
-  // Sort on the RAW upstream `startDate` (string|number) BEFORE mapping to
-  // a render shape. Sorting the rendered locale-formatted string would be
-  // fragile — browsers don't all re-parse every locale output via Date.parse.
+  // Sort on the RAW upstream `startDate` (number|string|null) BEFORE mapping
+  // to a render shape. Sorting the rendered locale-formatted string would
+  // be fragile — browsers don't all re-parse every locale output via
+  // Date.parse.
+  //
+  // Branching: `transactionCode` (Yahoo single-letter code) drives which
+  // short label we render AND whether the price/value columns are cash
+  // numbers vs "—". Without this branch, Award / Gift / Tax Withholding
+  // rows showed `0.00` and `$0` because the upstream `value` field was
+  // null/0 — the price column was `value / shares`, which is meaningless
+  // for non-cash grants and read as "the grant price was $0".
   const insiders =
     insiderData && insiderData.length > 0
       ? [...insiderData]
           .sort((a, b) => parseTradeDateMs(b.startDate) - parseTradeDateMs(a.startDate))
-          .map((i) => ({
-            name: i.filerName,
-            // formatTradeDateLocale accepts both unix-seconds and ISO; null
-            // is rendered as "—" rather than "Invalid Date" or "1/1/1970".
-            date: formatTradeDateLocale(i.startDate) ?? "—",
-            type: i.transactionText,
-            price: i.price,
-            transacted: i.shares,
-            value: i.value,
-          }))
+          .map((i) => {
+            const code = (i.transactionCode ?? "").toUpperCase();
+            const typeLabel = i18nInsiderType(t, code, i.transactionText);
+            const isCash = code === "P" || code === "S";
+            return {
+              name: i.filerName,
+              // formatTradeDateLocale accepts UTC ms via parseTradeDate
+              // (the normalizer now guarantees UTC ms). Null renders as
+              // "—" rather than "Invalid Date" or "1/1/1970".
+              date: formatTradeDateLocale(i.startDate) ?? "—",
+              typeLabel,
+              code: code || "—",
+              isCash,
+              price: isCash && i.price > 0 ? i.price : null,
+              transacted: i.shares,
+              value: isCash && i.value !== 0 ? Math.abs(i.value) : null,
+            };
+          })
       : [...mockInsiderTrades].sort(
           (a, b) => parseTradeDateMs(b.date) - parseTradeDateMs(a.date)
         );
-  const isInsiderMock = !insiderData || insiderData.length === 0;
+  const isInsiderMock = !insiderData || insiderData.length === 0 || yahooDown;
 
   // ---- Analyst trends (normalized upstream: earningsEstimate.avg is plain number) ----
   let epsEstimates = mockAnalystEstimates.filter((e) => e.metric === "EPS");
@@ -107,36 +136,83 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
   let isAnalystMock = true;
 
   if (analystData && analystData.length > 0) {
-    isAnalystMock = false;
+    // Keep rendering real (possibly cached) estimates, but badge MOCK while
+    // Yahoo is down — the estimates are not live during the outage.
+    isAnalystMock = yahooDown;
     epsEstimates = [];
     revEstimates = [];
     analystData.forEach((trend) => {
       if (trend.period === "0q" || trend.period === "0y" || trend.period === "+1y") {
         if (trend.earningsEstimate) {
+          // Preserve `null` from upstream — `?? 0` previously rendered every
+          // missing value as "0.00" which read like a real estimate of zero.
+          // The renderer falls back to `insights.unavailable` (\u2014) for
+          // genuinely missing cells so analysts can tell data absence from a real zero.
           epsEstimates.push({
             metric: "EPS",
             period: trend.period as never,
-            avg: trend.earningsEstimate.avg ?? 0,
-            low: trend.earningsEstimate.low ?? 0,
-            high: trend.earningsEstimate.high ?? 0,
+            avg: trend.earningsEstimate.avg ?? null,
+            low: trend.earningsEstimate.low ?? null,
+            high: trend.earningsEstimate.high ?? null,
           });
         }
         if (trend.revenueEstimate) {
           revEstimates.push({
             metric: "Revenue",
             period: trend.period as never,
-            avg: (trend.revenueEstimate.avg ?? 0) / 1e9,
-            low: (trend.revenueEstimate.low ?? 0) / 1e9,
-            high: (trend.revenueEstimate.high ?? 0) / 1e9,
+            avg: trend.revenueEstimate.avg === null || trend.revenueEstimate.avg === undefined
+              ? null
+              : trend.revenueEstimate.avg / 1e9,
+            low: trend.revenueEstimate.low === null || trend.revenueEstimate.low === undefined
+              ? null
+              : trend.revenueEstimate.low / 1e9,
+            high: trend.revenueEstimate.high === null || trend.revenueEstimate.high === undefined
+              ? null
+              : trend.revenueEstimate.high / 1e9,
           });
         }
       }
     });
   }
 
-  // Employee-count historical series is rarely free-Tier-available — keep as MOCK.
-  const employeeCount = mockEmployeeCount;
-  const isEmployeeMock = true;
+  // Render an em-dash for any estimate that the server returned as null.
+  // Mirrors the upstream's "missing data" sentinel — keeps the row width
+  // intact so an all-missing row visually reads as "no live estimates"
+  // instead of "6.55 + 0.00 + 0.00".
+  const formatEstimate = (value: number | null): string =>
+    value === null || value === undefined || !Number.isFinite(value)
+      ? t("insights.unavailable")
+      : value.toFixed(2);
+  // Revenue is rendered in $B with a single decimal; EPS keeps two.
+  // Split helpers (instead of a precision arg) so each call site reads
+  // cleanly and a future refactor into a shared "<Metric>Estimate" row
+  // component stays a search-and-replace away.
+  const formatEstimateRev = (value: number | null): string =>
+    value === null || value === undefined || !Number.isFinite(value)
+      ? t("insights.unavailable")
+      : value.toFixed(1);
+
+  // Employee count: pull the *current* full-time-equivalent from FMP profile
+  // and inject it as the latest-year bar. Historical years stay mock-backed
+  // because the free tier has no historical employee-count endpoint (FMP
+  // `/stable/profile` is a current snapshot only). When the FTE is live the
+  // card drops `[MOCK]`; otherwise it stays to flag the gap honestly.
+  const currentYear = String(new Date().getFullYear());
+  const currentFte =
+    typeof overviewData?.fullTimeEmployees === "number" &&
+    Number.isFinite(overviewData.fullTimeEmployees) &&
+    overviewData.fullTimeEmployees > 0
+      ? overviewData.fullTimeEmployees
+      : null;
+  // Display only the live current-year snapshot when available (no mock history
+  // mix). If currentFte is null, keep the entire mock series with [MOCK] indicator.
+  const employeeCount =
+    currentFte !== null
+      ? [{ year: currentYear, count: currentFte }]
+      : mockEmployeeCount;
+  // Keep [MOCK] indicator enabled whenever synthetic history remains in the chart
+  // (which is whenever currentFte is null).
+  const isEmployeeMock = currentFte === null;
 
   const isProfileMock = !overviewData && !overviewLoading;
 
@@ -287,9 +363,15 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
                     <tr key={i} className="hover:bg-slate-800/50 transition-colors">
                       <td className="py-3 font-medium">{trade.name}</td>
                       <td className="py-3 text-muted-foreground">{trade.date}</td>
-                      <td className="py-3 truncate max-w-[150px]">{trade.type}</td>
+                      <td className="py-3 truncate max-w-[150px]">
+                        <span data-code={trade.code} title={trade.code}>
+                          {trade.typeLabel ?? "—"}
+                        </span>
+                      </td>
                       <td className="py-3" dir="ltr">
-                        ${(trade.price || 0).toFixed(2)}
+                        {trade.price !== null && trade.price !== undefined
+                          ? `$${trade.price.toFixed(2)}`
+                          : <span className="text-slate-500">—</span>}
                       </td>
                       <td
                         className={`py-3 ${trade.transacted > 0 ? "text-green-400" : "text-red-400"}`}
@@ -299,7 +381,9 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
                         {(trade.transacted || 0).toLocaleString()}
                       </td>
                       <td className="py-3 text-right" dir="ltr">
-                        ${Math.abs(trade.value || 0).toLocaleString()}
+                        {trade.value !== null && trade.value !== undefined && trade.value !== 0
+                          ? `$${trade.value.toLocaleString()}`
+                          : <span className="text-slate-500">—</span>}
                       </td>
                     </tr>
                   ))}
@@ -334,14 +418,14 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
                   <div className="text-muted-foreground">{translatePeriod(est.period)}</div>
                   <div className="text-right font-bold text-blue-400" dir="ltr">
                     <span className="bg-blue-500/10 px-2 py-0.5 rounded">
-                      {(est.avg ?? 0).toFixed(2)}
+                      {formatEstimate(est.avg)}
                     </span>
                   </div>
                   <div className="text-right text-slate-400" dir="ltr">
-                    {(est.low ?? 0).toFixed(2)}
+                    {formatEstimate(est.low)}
                   </div>
                   <div className="text-right text-slate-400" dir="ltr">
-                    {(est.high ?? 0).toFixed(2)}
+                    {formatEstimate(est.high)}
                   </div>
                 </div>
               ))}
@@ -351,21 +435,24 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
                   <div className="text-muted-foreground">{translatePeriod(est.period)}</div>
                   <div className="text-right font-bold text-blue-400" dir="ltr">
                     <span className="bg-blue-500/10 px-2 py-0.5 rounded">
-                      {(est.avg ?? 0).toFixed(1)}
+                      {formatEstimateRev(est.avg)}
                     </span>
                   </div>
                   <div className="text-right text-slate-400" dir="ltr">
-                    {(est.low ?? 0).toFixed(1)}
+                    {formatEstimateRev(est.low)}
                   </div>
                   <div className="text-right text-slate-400" dir="ltr">
-                    {(est.high ?? 0).toFixed(1)}
+                    {formatEstimateRev(est.high)}
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Employee Count Chart (stays [MOCK] — free tier has no historical series) */}
+          {/* Employee Count Chart — latest year is live from FMP profile;
+              historical years stay mock-backed (free tier has no historical
+              employee-count endpoint). We surface the gap with a footnote
+              rather than a [MOCK] chip when only the snapshot is live. */}
           <div className="bg-card border border-border rounded-xl p-6">
             <h3 className="text-lg font-semibold mb-4">
               {t("insights.employeeCount")}
@@ -417,8 +504,15 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            {!isEmployeeMock && (
+              <p
+                className="text-[11px] text-muted-foreground mt-2 leading-snug"
+                title={t("insights.chartLiveSingleYear")}
+              >
+                {t("insights.chartLiveSingleYear")}
+              </p>
+            )}
           </div>
-
           {/* News Aggregator */}
           <div className="bg-card border border-border rounded-xl p-6">
             <h3 className="text-lg font-semibold mb-4">
@@ -429,26 +523,55 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
                 </span>
               )}
             </h3>
-            <div className="space-y-4">
-              {news.slice(0, 5).map((n, i) => (
-                <a
-                  key={i}
-                  href={n.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block group border-b border-border last:border-0 pb-4 last:pb-0"
-                >
-                  <p className="text-sm font-medium group-hover:text-blue-400 transition-colors line-clamp-2 mb-1">
-                    {n.headline}
-                  </p>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className="font-semibold">{n.publisher}</span>
-                    <span>&bull;</span>
-                    <span>{n.timestamp}</span>
-                  </div>
-                </a>
-              ))}
+            <div className="space-y-3">
+              {news.slice(0, 8).map((n, i) => {
+                // Gradient placeholder when Yahoo didn't ship a thumbnail.
+                // Falls back to a single-letter chip with the publisher so the
+                // row still reads as "news" rather than a giant empty box.
+                const initial = (n.publisher || "?").trim().charAt(0).toUpperCase();
+                return (
+                  <a
+                    key={i}
+                    href={n.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-start gap-3 group border-b border-border last:border-0 pb-3 last:pb-0"
+                  >
+                    {n.thumbnail ? (
+                      <img
+                        src={n.thumbnail}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className="w-16 h-16 rounded-md object-cover bg-slate-800 flex-shrink-0"
+                      />
+                    ) : (
+                      <div
+                        className="w-16 h-16 rounded-md bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-base font-bold text-slate-300 flex-shrink-0"
+                        aria-hidden="true"
+                      >
+                        {initial}
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium group-hover:text-blue-400 transition-colors line-clamp-2 mb-1">
+                        {n.headline}
+                      </p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span className="font-semibold truncate max-w-[140px]">{n.publisher}</span>
+                        <span>&bull;</span>
+                        <span>{n.timestamp}</span>
+                      </div>
+                    </div>
+                  </a>
+                );
+              })}
             </div>
+            {!isNewsMock && news.length > 0 && (
+              <p className="text-[11px] text-muted-foreground mt-3 pt-3 border-t border-border">
+                {t("news.footer", { count: Math.min(news.length, 8) })}
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -549,4 +672,46 @@ function SkeletonHeader() {
   return (
     <div className="h-7 w-48 bg-slate-800/60 rounded-md relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.4s_infinite] before:bg-gradient-to-r before:from-transparent before:via-slate-700/40 before:to-transparent" />
   );
+}
+
+/**
+ * Map Yahoo's single-letter `transactionCode` to a short localised label.
+ *
+ * Yahoo's `quoteSummary.insiderTransactions.transactions[]` exposes a
+ * `transactionCode` per row (`P`urchase / `S`ale / `A`ward / `G`ift /
+ * `M` option-exercise / `F` tax-withholding / `D`isposal / `X` option
+ * grant / `C` conversion / etc). The upstream `transactionText`
+ * ("Stock Gift at price 0.00 per share.") doesn't fit a table cell, so
+ * this helper reduces each row to a short noun via `t("insider.type.X")`,
+ * falling back to the upstream text on `""` / unknown codes so legacy
+ * rows still render something readable.
+ *
+ * Pure function — module scope rather than inline so the i18n-audit
+ * static scanner picks up each literal `t("insider.type.X")` call site
+ * independently. (A `\`insider.type.${code}\`` template literal would
+ * collapse to `"insider.type.<code>"` in static scan, missing the 9
+ * distinct keys; this switch exposes all of them to the audit.)
+ *
+ * Pure function — kept at module scope because the mapping is data-side,
+ * not React-side, and unit tests can pin both known + unknown codes
+ * without spinning up a renderer.
+ */
+function i18nInsiderType(
+  t: (key: string) => string,
+  code: string,
+  fallback: string,
+): string {
+  if (!code) return fallback || t("insider.type.other");
+  switch (code) {
+    case "P": return t("insider.type.P");
+    case "S": return t("insider.type.S");
+    case "A": return t("insider.type.A");
+    case "G": return t("insider.type.G");
+    case "M": return t("insider.type.M");
+    case "F": return t("insider.type.F");
+    case "D": return t("insider.type.D");
+    case "X": return t("insider.type.X");
+    case "C": return t("insider.type.C");
+    default:  return fallback || code;
+  }
 }
