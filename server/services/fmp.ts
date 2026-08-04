@@ -1,4 +1,5 @@
 import NodeCache from "node-cache";
+import { apiUsageTracker } from "./apiUsageTracker";
 
 // Cache FMP responses for 12 hours (fundamentals don't change frequently)
 const cache = new NodeCache({ stdTTL: 43200, checkperiod: 600 });
@@ -12,6 +13,24 @@ async function fetchFMP(path: string, useCache: boolean = true): Promise<any | n
     return null;
   }
 
+  // ── Cost accounting ─────────────────────────────────────────────────────
+  // Count every invocation of `fetchFMP` (cache hit OR miss) so the
+  // user-facing budget pill tracks surface-frequency — i.e. "every time
+  // the app needed an FMP-shaped answer". This intentionally OVER-counts
+  // relative to FMP's server-side dashboard (which only sees cache misses
+  // as real upstream HTTP requests) but is conservative-by-design:
+  //
+  //   * FMP dashboard refuses calls past 250/day.
+  //   * Our tracker reflects the user-facing rate of asking for fresh
+  //     data, which is what the user perceives as "using the API".
+  //
+  // The tracker is in-process (singleton `buckets` map). On every dev
+  // server restart / Vercel cold-start the counter resets to 0 — which
+  // is the dominant source of divergence with FMP's dashboard. Until
+  // we move to a persistent store, surface this in the UI tooltip
+  // ("usage.singleInstanceNote") rather than mask it.
+  apiUsageTracker.recordCall("fmp");
+
   const cacheKey = `fmp:${path}`;
   if (useCache) {
     const cached = cache.get<any>(cacheKey);
@@ -22,15 +41,25 @@ async function fetchFMP(path: string, useCache: boolean = true): Promise<any | n
     const separator = path.includes("?") ? "&" : "?";
     const url = `${BASE_URL}/${path}${separator}apikey=${FMP_KEY}`;
     const res = await fetch(url);
+    // Re-arm the rate-limit flag on a hard 4xx — a 429 is the canonical
+    // signal, 403 is reported by FMP for some revokes, both are surfaced
+    // on the footer's pill. The pre-fetch `recordCall` fired above; we
+    // don't double-count here.
+    if (res.status === 429 || res.status === 403) {
+      apiUsageTracker.recordRateLimit("fmp");
+    }
     if (!res.ok) {
       console.error(`[FMP] Error ${res.status} for ${path}`);
+      if (res.status === 429 || res.status === 403) return null;
       return null;
     }
     const data = await res.json();
 
-    // FMP returns { "Error Message": "..." } on rate limit / errors
+    // FMP returns { "Error Message": "..." } on rate limit / errors —
+    // also a 200 OK from FMP's perspective but rate-limited content.
     if (data && data["Error Message"]) {
       console.error(`[FMP] Error for ${path}:`, data["Error Message"]);
+      apiUsageTracker.recordRateLimit("fmp");
       return null;
     }
 

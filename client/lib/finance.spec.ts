@@ -2,12 +2,17 @@ import { describe, expect, it } from "vitest";
 import {
   annualizedVolatility,
   cagr,
+  cagrAtYearsBack,
+  detectPeriodGranularity,
+  formatEarningsDate,
   formatTradeDateLocale,
   formatTradeDateShort,
   irrBisection,
+  metricStatementKey,
   parseTradeDate,
   parseTradeDateAsc,
   parseTradeDateMs,
+  projectMetricSeries,
   sharpeRatio,
   sortinoRatio,
   totalReturn,
@@ -342,5 +347,213 @@ describe("formatTradeDateLocale", () => {
 
   it("returns null for invalid input", () => {
     expect(formatTradeDateLocale("garbage")).toBeNull();
+  });
+});
+
+describe("formatEarningsDate", () => {
+  it("formats a YYYY-MM-DD input as a locale-aware Apr 22/May 22/etc label", () => {
+    const out = formatEarningsDate("2026-04-22");
+    expect(out).not.toBeNull();
+    // Locale output is dependent on the test runner locale; the EXACT
+    // rendering differs (en-US emits "Apr 22, 2026", he-IL emits
+    // "22 באפר 2026", ja emits "2026/04/22"). Pin the year + month-digit
+    // anchor instead so the spec stays portable.
+    expect(out!.length).toBeGreaterThan(0);
+    expect(out).toContain("2026");
+    expect(out).toContain("22");
+    expect(out).toMatch(/4|04|אפר/); // Apr / 04 / Hebrew "אפר"
+  });
+
+  it("accepts unix-seconds input (Yahoo earningsTimestamp shape)", () => {
+    // 2026-04-22T00:00:00Z = 1776816000 unix-seconds
+    const out = formatEarningsDate(1776816000);
+    expect(out).not.toBeNull();
+    expect(out).toContain("2026");
+  });
+
+  it("accepts unix-milliseconds input (FMP /api/insights shape)", () => {
+    // Same instant in milliseconds
+    const out = formatEarningsDate(1776816000_000);
+    expect(out).not.toBeNull();
+    expect(out).toContain("2026");
+  });
+
+  it("returns null for nullish / empty / implausibly early / invalid", () => {
+    expect(formatEarningsDate(null)).toBeNull();
+    expect(formatEarningsDate(undefined)).toBeNull();
+    expect(formatEarningsDate("")).toBeNull();
+    expect(formatEarningsDate("garbage")).toBeNull();
+    // Pre-1990 dates are rejected by the PLAUSIBLE_DATE_MIN_MS bound.
+    // Note: single-character strings like "0" are locale-dependent in V8
+    // (US parses to 1970-01-01; HE may parse to 2000-01-01) — neither
+    // lands under 1990, so the bound would accept 2000 if a build ran
+    // there. We don't pin "0" to keep the spec portable across CI nodes.
+    expect(formatEarningsDate("1989-12-31")).toBeNull();
+  });
+});
+
+describe("detectPeriodGranularity", () => {
+  it("returns 'quarter' when the last row is Q1..Q4", () => {
+    expect(detectPeriodGranularity([{ period: "FY" }, { period: "FY" }, { period: "Q1" }])).toBe(
+      "quarter",
+    );
+  });
+
+  it("returns 'annual' when the last row is FY or blank", () => {
+    expect(detectPeriodGranularity([{ period: "Q1" }, { period: "FY" }])).toBe("annual");
+    expect(detectPeriodGranularity([{ period: "" }, { period: "FY" }])).toBe("annual");
+    expect(detectPeriodGranularity([{ period: null }, { period: undefined }])).toBe("annual");
+  });
+
+  it("returns 'annual' for empty / unrecognised input", () => {
+    expect(detectPeriodGranularity([])).toBe("annual");
+    expect(detectPeriodGranularity([{ period: "TBD" }])).toBe("annual");
+  });
+});
+
+describe("cagrAtYearsBack", () => {
+  it("returns annual percent (×100) for a 5-row annual series", () => {
+    // 100 → 200 over 4 years (rows 0..4); close-to-close CAGR = 2^(1/4)-1 ≈ 0.189
+    const rows = [
+      { revenue: 100, calendarYear: "2021", period: "FY" },
+      { revenue: 120, calendarYear: "2022", period: "FY" },
+      { revenue: 145, calendarYear: "2023", period: "FY" },
+      { revenue: 170, calendarYear: "2024", period: "FY" },
+      { revenue: 200, calendarYear: "2025", period: "FY" },
+    ];
+    const r = cagrAtYearsBack(rows, "revenue", 4, "annual");
+    expect(r).not.toBeNull();
+    if (r !== null) expect(r).toBeCloseTo(18.92, 1); // ~18.92%
+  });
+
+  it("walks back 4 rows per year in quarter mode (5Y = 20 stride, needs ≥21 rows)", () => {
+    // Each "year" is 4 rows of identical revenue so CAGR is exactly zero
+    // across any window — confirms the stride independent of value scale.
+    // 24 rows covers the 5Y + 4Q window with one extra year of slack so
+    // a future contributor adding a 1-row buffer doesn't shrink-flake.
+    const rows = Array.from({ length: 24 }, (_, i) => ({
+      revenue: 100,
+      calendarYear: String(2020 + Math.floor(i / 4)),
+      period: `Q${(i % 4) + 1}`,
+    }));
+    const r = cagrAtYearsBack(rows, "revenue", 5, "quarter");
+    expect(r).not.toBeNull();
+    if (r !== null) expect(r).toBeCloseTo(0, 5);
+  });
+
+  it("returns null when the series is too short for the stride", () => {
+    const rows = [
+      { revenue: 100, period: "FY" },
+      { revenue: 120, period: "FY" },
+    ];
+    // 5Y annual needs at least 6 rows (5 stride-back) — 2 rows is short.
+    expect(cagrAtYearsBack(rows, "revenue", 5, "annual")).toBeNull();
+    // 5Y quarter needs at least 21 rows — far short.
+    expect(cagrAtYearsBack(rows, "revenue", 5, "quarter")).toBeNull();
+  });
+
+  it("returns null when either endpoint is non-positive", () => {
+    const rows = [
+      { revenue: -50, period: "FY" },
+      { revenue: 0, period: "FY" },
+      { revenue: 100, period: "FY" },
+    ];
+    expect(cagrAtYearsBack(rows, "revenue", 2, "annual")).toBeNull();
+  });
+});
+
+describe("metricStatementKey", () => {
+  it("resolves every metric name used in Index.tsx", () => {
+    expect(metricStatementKey("insights.revenue")).toEqual({
+      statement: "income",
+      key: "revenue",
+      divisor: 1e9,
+    });
+    expect(metricStatementKey("insights.eps")).toEqual({
+      statement: "income",
+      key: "eps",
+      divisor: 1,
+    });
+    expect(metricStatementKey("insights.totalAssets")).toEqual({
+      statement: "balance",
+      key: "totalAssets",
+      divisor: 1e9,
+    });
+  });
+
+  it("returns null for unknown metric names", () => {
+    expect(metricStatementKey("insights.unknown")).toBeNull();
+    expect(metricStatementKey("")).toBeNull();
+  });
+});
+
+describe("projectMetricSeries", () => {
+  it("projects annual rows with `FY <year>` date labels", () => {
+    const out = projectMetricSeries("insights.revenue", {
+      income: [
+        { revenue: 100e9, calendarYear: "2023", period: "FY" },
+        { revenue: 110e9, calendarYear: "2024", period: "FY" },
+        { revenue: 120e9, calendarYear: "2025", period: "FY" },
+      ],
+      balance: [],
+      cash: [],
+    });
+    expect(out.map((p) => p.date)).toEqual(["FY 2023", "FY 2024", "FY 2025"]);
+    expect(out.map((p) => p.value)).toEqual([100, 110, 120]);
+  });
+
+  it("projects quarterly rows with `Qx <year>` date labels, ascending order", () => {
+    const out = projectMetricSeries("insights.revenue", {
+      // Intentionally passed in descending order to verify the sort.
+      income: [
+        { revenue: 30e9, calendarYear: "2025", period: "Q2" },
+        { revenue: 28e9, calendarYear: "2025", period: "Q1" },
+        { revenue: 35e9, calendarYear: "2025", period: "Q4" },
+        { revenue: 32e9, calendarYear: "2025", period: "Q3" },
+      ],
+      balance: [],
+      cash: [],
+    });
+    expect(out.map((p) => p.date)).toEqual([
+      "Q1 2025",
+      "Q2 2025",
+      "Q3 2025",
+      "Q4 2025",
+    ]);
+  });
+
+  it("returns [] for an unknown metric name", () => {
+    expect(
+      projectMetricSeries("insights.unknown", {
+        income: [],
+        balance: [],
+        cash: [],
+      }),
+    ).toEqual([]);
+  });
+
+  it("skips rows whose key is non-finite rather than rendering NaN%", () => {
+    const out = projectMetricSeries("insights.revenue", {
+      income: [
+        { revenue: Number.NaN, calendarYear: "2024", period: "FY" },
+        { revenue: 100e9, calendarYear: "2025", period: "FY" },
+      ],
+      balance: [],
+      cash: [],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0]).toEqual({ date: "FY 2025", value: 100 });
+  });
+
+  it("projects EPS without dividing (shares are already in $/share)", () => {
+    const out = projectMetricSeries("insights.eps", {
+      income: [
+        { eps: 2.5, calendarYear: "2024", period: "FY" },
+        { eps: 3.1, calendarYear: "2025", period: "FY" },
+      ],
+      balance: [],
+      cash: [],
+    });
+    expect(out.map((p) => p.value)).toEqual([2.5, 3.1]);
   });
 });

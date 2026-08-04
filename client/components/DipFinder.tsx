@@ -1,7 +1,7 @@
 import { useI18n } from "@/lib/i18n";
 import { defaultWatchlist } from "@/lib/mockData";
 import { ChevronDown } from "lucide-react";
-import { useSmaDistances } from "@/hooks/useStockData";
+import { useSmaDistances, useYahooChartDown } from "@/hooks/useStockData";
 import { useMemo, useState } from "react";
 
 type SmaWindow = "20day" | "50day" | "100day" | "150day" | "200day";
@@ -30,6 +30,11 @@ export default function DipFinder() {
   const symbols = useMemo(() => defaultWatchlist.map((w) => w.symbol), []);
   const { data, isLoading } = useSmaDistances(symbols, windowSize);
 
+  // SMA distances are computed from chart closes — when Yahoo chart history
+  // is down the rows can't be fresh, so force every row (and the badge) to
+  // mock even while a stale payload lingers in the query cache.
+  const yahooChartDown = useYahooChartDown();
+
   // Build a per-symbol map and recompute distances for the active window.
   // We send the full 200 always because the server already stores cache per
   // request; trimming to N on the client keeps it free for window switches.
@@ -45,14 +50,21 @@ export default function DipFinder() {
           : null;
       const isLive = liveDistance !== null && (liveRow?.sampleSize ?? 0) >= Math.min(windowSize, 200);
       const isPartial = liveDistance !== null && !isLive;
+      const state: "live" | "partial" | "mock" = yahooChartDown
+        ? "mock"
+        : isLive
+        ? "live"
+        : isPartial
+        ? "partial"
+        : "mock";
       return {
         symbol: w.symbol,
         name: w.name,
         distance: isLive || isPartial ? (liveDistance as number) : w.sma200Distance,
-        state: isLive ? "live" : isPartial ? "partial" : "mock",
+        state,
       };
     });
-  }, [data, windowSize]);
+  }, [data, windowSize, yahooChartDown]);
 
   const sortedTickers = useMemo(
     () => [...rows].sort((a, b) => a.distance - b.distance),
@@ -81,6 +93,7 @@ export default function DipFinder() {
                 ? "text-amber-300 bg-amber-500/10"
                 : "text-yellow-400 bg-yellow-500/10"
             }`}
+            title={yahooChartDown ? t("providerHealth.chartDownHint") : undefined}
           >
             {badgeKind === "live"
               ? t("dipFinder.liveBadge")

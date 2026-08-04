@@ -215,6 +215,68 @@ export interface StockMetrics {
 }
 
 /* ------------------------------------------------------------------ *
+ * Yahoo fallback financials (FMP rate-limited path)                 *
+ * ------------------------------------------------------------------ */
+
+/**
+ * Single-point fundamentals surfaced via Yahoo's `defaultKeyStatistics` /
+ * `financialData` / `earningsTrend` modules. Used ONLY when FMP is
+ * rate-limited (HTTP 429) AND the primary `/api/stock-financials`
+ * payload is empty — a compact 4-card view of the same shape the user
+ * would have seen, with every value labeled "(Yahoo estimate)" so
+ * stale-free-tier data can't read as a real primary source.
+ *
+ * The grid can't show YoY / CAGR series here — Yahoo free tier doesn't
+ * ship historical fundamentals — so the page renders 4 single-point
+ * cards (Revenue, EBITDA, Gross Profit, EPS-est) instead of the
+ * 8-card YoY/CAGR grid the FMP path uses.
+ *
+ * Numbers are NEVER coerced from null/missing to 0: a missing
+ * `revenue` renders `—` on the card so users don't read a real value
+ * of zero. Money figures are in raw USD; the page divides by 1e9 for
+ * the B-suffix display.
+ */
+export interface YahooFallbackFinancials {
+  /** TTM revenue in raw USD (Yahoo `financialData.totalRevenue`). */
+  revenue: number | null;
+  /** TTM EBITDA in raw USD (Yahoo `financialData.ebitda`). */
+  ebitda: number | null;
+  /** TTM gross profit in raw USD (Yahoo `financialData.grossProfits`). */
+  grossProfit: number | null;
+  /** TTM operating margin as percent (e.g. 18.5 = 18.5%). */
+  operatingMargin: number | null;
+  /** TTM profit margin as percent. */
+  profitMargin: number | null;
+  /** TTM gross margin as percent. */
+  grossMargin: number | null;
+  /** Yahoo-reported revenue growth as percent (most recent YoY). */
+  revenueGrowth: number | null;
+  /** Yahoo-reported earnings growth as percent (most recent YoY). */
+  earningsGrowth: number | null;
+  /** Cash + equivalents in raw USD (balance sheet snapshot). */
+  totalCash: number | null;
+  /** Total debt in raw USD (balance sheet snapshot). */
+  totalDebt: number | null;
+  /** Enterprise value in raw USD (Yahoo `defaultKeyStatistics.enterpriseValue`). */
+  enterpriseValue: number | null;
+  /** Trailing EPS (TTM USD per share). */
+  trailingEps: number | null;
+  /** Forward EPS (next FY USD per share) from analyst consensus. */
+  forwardEps: number | null;
+  /**
+   * Next-quarter EPS estimate (consensus avg, $/share). Sourced from
+   * `earningsTrend` row where `period === "+1q"`. Used as the EPS card
+   * value in the fallback grid because forward EPS is annual.
+   */
+  epsEstimateNextQtr: number | null;
+  /**
+   * Next-quarter revenue estimate (consensus avg, raw USD). Empty data
+   * points render `—` rather than a derived 0.
+   */
+  revenueEstimateNextQtr: number | null;
+}
+
+/* ------------------------------------------------------------------ *
  * Analyst estimates (Yahoo earningsTrend)                          *
  * ------------------------------------------------------------------ */
 export type AnalystPeriodCode = "-1y" | "-7d" | "0q" | "0y" | "+1q" | "+1y";
@@ -246,10 +308,32 @@ export interface InsiderTransaction {
   filerName: string;
   filerRelation?: string;
   transactionText: string;
-  startDate: string | number; // ISO or unix seconds (Yahoo uses unix)
+  /**
+   * Trade-date as a UTC ms number. Upstream Yahoo `quoteSummary` returns
+   * several real-world shapes:
+   *   - a native `Date` object,
+   *   - an ISO `YYYY-MM-DD` string,
+   *   - a `{ raw: <epoch seconds>, fmt: "..." }` object (legacy / some sessions),
+   *   - a plain unix-second number.
+   * The normalizer in `stockService.normalizeInsider` collapses all four to
+   * a safe UTC ms (or `null` for everything pre-1990 / unparseable). UI
+   * text uses `Finance.formatTradeDateLocale` over UTC ms.
+   */
+  startDate: number | null;
+  /** Yahoo single-letter code: `P`urchase, `S`ale, `A`ward, `G`ift, `M` option
+   * exercise, `F` tax withholding, `D`isposal, `C`onversion, etc. Drives the
+   * type-label and the price/value rendering branches in CompanyProfile.
+   * Optional because some legacy payloads and the mock path omit it. */
+  transactionCode?: string | null;
   shares: number;
   value: number;
-  /** Computed on the server (value / shares) so the UI doesn't have to. */
+  /**
+   * Computed on the server (`value / shares`) ONLY when both upstream values
+   * are present and the transaction is a real cash flow — for `A`/
+   * `G`/`F`/`M`/`D`/`C` rows the derived price is meaningless, so the UI
+   * renders `—` instead. The server still computes and ships it because
+   * downstream aggregations (Sum-of-cash-flows) want the raw denominator.
+   */
   price: number;
 }
 
@@ -482,6 +566,106 @@ export interface PortfolioMetrics {
   beta: number | null;
   /** Free-text note flagging anything derived. */
   derived: string[];
+}
+
+/* ------------------------------------------------------------------ *
+ * Provider health (GET /api/provider-health)                        *
+ * ------------------------------------------------------------------ */
+export type ProviderName = "yahoo" | "fmp" | "alphavantage";
+
+/* ------------------------------------------------------------------ *
+ * Per-provider API usage bars (footer's progress pills)               *
+ * ------------------------------------------------------------------ */
+
+/** Provider identifiers for `/api/provider-usage`. Mirrors `ProviderName` minus Logo.dev (client-direct). */
+export type ProviderUsageKey = "yahoo" | "fmp" | "alphavantage";
+
+/**
+ * Single provider's usage row. The `limitHint: "documented" | "heuristic"`
+ * differentiates FMP/AlphaVantage (real free-tier caps) from Yahoo
+ * (undocumented but commonly ~200/hr per IP), so the footer pill can
+ * color-code the warning level but never read the heuristic as a hard
+ * cap.
+ */
+export interface ProviderUsageEntry {
+  provider: ProviderUsageKey;
+  /** Display label: "FMP", "AlphaVantage", "Yahoo Finance". */
+  label: string;
+  /** Calls observed in the rolling window. */
+  used: number;
+  /** Hard limit if documented, heuristic ceiling otherwise. */
+  limit: number;
+  /** Percentage of the limit used, clamped to [0, 100]. */
+  usedPct: number;
+  /** `Math.max(0, limit - used)`. */
+  remaining: number;
+  /** Length of the rolling window in ms. */
+  windowMs: number;
+  /** Human-readable label like "24h" / "1h". */
+  windowLabel: string;
+  /** ISO 8601 timestamp when the oldest used-call drops off the window. */
+  resetsAt: string | null;
+  /** Seconds until `resetsAt` (0 if already passed). */
+  secondsToReset: number | null;
+  /** True if a 429 was observed within the window — pill flips red. */
+  isRateLimited: boolean;
+  /** ISO 8601 last 429 observation, null if no recent 429. */
+  lastRateLimitAt: string | null;
+  /** "documented" for FMP/AV; "heuristic" for Yahoo. */
+  limitHint: "documented" | "heuristic";
+}
+
+export interface ProviderUsageResponse {
+  /** ISO 8601 server timestamp at the snapshot moment. */
+  checkedAt: string;
+  entries: ProviderUsageEntry[];
+}
+
+/**
+ * Live status of a single data-provider FEATURE probe. The response carries
+ * one entry per (provider, feature) — FMP appears twice (`quote` +
+ * `batch-quote`) and Yahoo twice (`quote` + `chart`) so the UI can separate
+ * temporary outages from plan limits and chart-specific outages from
+ * quote outages:
+ *  - `ok`                — probe succeeded (HTTP 200 / real data returned)
+ *  - `known_restriction` — reachable, but the endpoint is NOT on the current
+ *                          plan (HTTP 402 Payment Required, e.g. FMP
+ *                          `batch-quote` on the free tier). Expected, not an
+ *                          outage — the app falls back to another provider.
+ *                          HTTP 403 is deliberately NOT folded in: it's
+ *                          ambiguous between plan gating and a broken key,
+ *                          so it reports as `degraded` and keeps surfacing.
+ *  - `degraded`          — reachable but rate-limited (HTTP 429) or an
+ *                          upstream error body (HTTP 200 + `Error Message`).
+ *  - `down`              — unreachable / errored / timed out (temporary outage).
+ *  - `not_configured`    — env key missing, provider never called.
+ */
+export type ProviderStatus =
+  | "ok"
+  | "known_restriction"
+  | "degraded"
+  | "down"
+  | "not_configured";
+
+/** Which feature of a provider a health entry probes. */
+export type ProviderHealthFeature = "quote" | "batch-quote" | "chart";
+
+export interface ProviderHealthEntry {
+  provider: ProviderName;
+  feature: ProviderHealthFeature;
+  status: ProviderStatus;
+  /** Round-trip probe latency in ms; null when not configured. */
+  latencyMs: number | null;
+  /** Short reason when not ok (e.g. "http_402", "timeout"). */
+  detail?: string;
+}
+
+export interface ProviderHealthResponse {
+  /** ISO timestamp the probes ran at server-side. */
+  checkedAt: string;
+  providers: ProviderHealthEntry[];
+  /** True when no entry is `down` / `degraded` / `not_configured` (`known_restriction` is an expected plan limitation, not an outage). */
+  healthy: boolean;
 }
 
 /* ------------------------------------------------------------------ *

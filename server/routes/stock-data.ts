@@ -10,11 +10,14 @@ import type {
   FxRatesResponse,
   IndexQuote,
   InsightsTabResponse,
+  ProviderUsageResponse,
   SmaDistanceResponse,
   StockMetrics,
   StockQuote,
+  ProviderHealthResponse,
   SectorHeatmapMetadata,
   SectorHeatmapResponse,
+  YahooFallbackFinancials,
 } from "../../shared/api";
 
 const MAX_SYMBOLS = 50;
@@ -134,7 +137,12 @@ export const handleStockOverview: RequestHandler = async (req, res) => {
 export const handleStockFinancials: RequestHandler = async (req, res) => {
   const symbol = parseTicker(req.query.symbol);
   if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
-  const data: FinancialStatements = await stockService.getFinancialStatements(symbol);
+  // Granularity is opt-in via `?period=quarter`; unknown strings fall
+  // back to annual rather than 400-ing the caller so existing clients
+  // keep working untouched. (A 400 here would be backwards-incompatible.)
+  const periodRaw = String(req.query.period ?? "").trim().toLowerCase();
+  const period: "annual" | "quarter" = periodRaw === "quarter" ? "quarter" : "annual";
+  const data: FinancialStatements = await stockService.getFinancialStatements(symbol, period);
   res.json(data);
 };
 
@@ -142,6 +150,57 @@ export const handleStockMetrics: RequestHandler = async (req, res) => {
   const symbol = parseTicker(req.query.symbol);
   if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
   const data: StockMetrics = await stockService.getMetrics(symbol);
+  res.json(data);
+};
+
+/**
+ * Yahoo-driven fallback for the Index financial-metrics grid when FMP is
+ * rate-limited (HTTP 429 from `/stable/`). Mirrors the parity handler
+ * `handleStockYahooFallbackFinancials` in `api/_router.js` so the local
+ * dev server + Vercel / Netlify both return the same response shape.
+ * Always returns a `YahooFallbackFinancials` (never throws): missing
+ * upstream values normalise to `null` so the client renders em-dashes
+ * instead of misleading zeros.
+ */
+export const handleStockYahooFallbackFinancials: RequestHandler = async (req, res) => {
+  const symbol = parseTicker(req.query.symbol);
+  if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
+  const data: YahooFallbackFinancials = await stockService.getYahooFallbackFinancials(symbol);
+  res.json(data);
+};
+
+/**
+ * Per-provider API usage for the footer's progress bars. Returns a
+ * rolling-window call count + reset horizon for each tracked provider
+ * (FMP / AV / Yahoo). Cheap to compute (in-process singleton tracker),
+ * so the route serves a 5-second freshness cache to dampen any client
+ * poll storms.
+ *
+ * Diagnostic mode: `?mode=status` returns a tiny `{ store, kvConfigured, ready }`
+ * object so the user can verify post-provisioning that Vercel KV has
+ * taken over from the in-process store. Probe with:
+ *
+ *   curl 'https://vantage.vercel.app/api/provider-usage?mode=status'
+ *   # expect: { "store": "VercelKvStore", "kvConfigured": true, "ready": true }
+ */
+export const handleProviderUsage: RequestHandler = async (req, res) => {
+  if (String(req.query.mode ?? "") === "status") {
+    // Lazy import so the route can ship before `usageStore.ts` is wired.
+    const { current: currentStore } = await import("../services/usageStore").then((m) => m.__test__);
+    const storeName = currentStore().constructor.name;
+    res.json({
+      store: storeName,
+      kvConfigured: storeName === "VercelKvStore",
+      ready: true,
+      checkedAt: new Date().toISOString(),
+    });
+    return;
+  }
+  // `stockService.getProviderUsage` is async because the tracker awaits
+  // KV cold-start hydration when KV env vars are present. Awaits cheaply
+  // (≤50ms typical) on first request after a cold start; subsequent
+  // requests hit the in-process mirror synchronously below the awaits.
+  const data: ProviderUsageResponse = await stockService.getProviderUsage();
   res.json(data);
 };
 
@@ -291,6 +350,16 @@ export const handleSmaDistances: RequestHandler = async (req, res) => {
  * `?currencies=USD,ILS,EUR` (any order; default USD,ILS,EUR). Yahoo offloads
  * the heavy lifting.
  */
+/**
+ * Live provider health (Yahoo, FMP, AlphaVantage) for the UI status
+ * indicator — lets the app surface provider outages instead of silently
+ * degrading. Cached server-side 5 min; see stockService.getProviderHealth.
+ */
+export const handleProviderHealth: RequestHandler = async (_req, res) => {
+  const data: ProviderHealthResponse = await stockService.getProviderHealth();
+  res.json(data);
+};
+
 export const handleFxRates: RequestHandler = async (req, res) => {
   const raw = String(req.query.currencies || "USD,ILS,EUR");
   const currencies: FxCurrency[] = raw
