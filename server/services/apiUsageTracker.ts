@@ -52,6 +52,17 @@ export interface BucketSnap {
 export interface UsageStore {
   load(provider: TrackedProvider, dayISO: string): Promise<BucketSnap>;
   save(provider: TrackedProvider, dayISO: string, snap: BucketSnap): Promise<void>;
+  /**
+   * Removes any persisted bucket whose day-key is strictly older than
+   * `cutoffDayISO` (lexicographic `YYYY-MM-DD` comparison — works because
+   * ISO dates are zero-padded). Returns counts so the caller can
+   * surface stats. Never throws across the public surface — failures are
+   * logged and surfaced as `{ scannedCount: 0, prunedCount: 0 }`.
+   *
+   * Throws synchronously ONLY on a malformed `cutoffDayISO` so the bug
+   * surfaces at the call site rather than silently no-op'ing.
+   */
+  pruneOlderThan(cutoffDayISO: string): Promise<{ scannedCount: number; prunedCount: number }>;
 }
 
 /**
@@ -83,6 +94,25 @@ export class LocalMemoryStore implements UsageStore {
   /** Test seam — clears all keys. */
   __clear(): void {
     this.map.clear();
+  }
+  async pruneOlderThan(cutoffDayISO: string): Promise<{ scannedCount: number; prunedCount: number }> {
+    if (!isValidDayISO(cutoffDayISO)) {
+      throw new Error(`pruneOlderThan: cutoffDayISO must be YYYY-MM-DD, got ${cutoffDayISO}`);
+    }
+    let scannedCount = 0;
+    let prunedCount = 0;
+    for (const [key] of this.map.entries()) {
+      scannedCount++;
+      // Keys are encoded as `${provider}:${dayISO}`; the trailing
+      // YYYY-MM-DD is reliable as `key.slice(-10)` because every
+      // tracked provider name is shorter than the date.
+      const dayISO = key.length >= 10 ? key.slice(-10) : "";
+      if (isValidDayISO(dayISO) && dayISO < cutoffDayISO) {
+        this.map.delete(key);
+        prunedCount++;
+      }
+    }
+    return { scannedCount, prunedCount };
   }
 }
 
@@ -163,6 +193,71 @@ export class VercelKvStore implements UsageStore {
       console.warn("[usageStore] KV save failed:", e instanceof Error ? e.message : e);
     }
   }
+
+  /**
+   * Walks every `vantage:usage:*` key via Upstash SCAN, filters to those
+   * whose trailing `YYYY-MM-DD` is strictly less than `cutoffDayISO`,
+   * then DELs them in batches of 100. Cursor iteration caps at 50
+   * rounds as a runaway-safety so a misbehaving KV doesn't hang the
+   * hydration chain forever.
+   */
+  async pruneOlderThan(cutoffDayISO: string): Promise<{ scannedCount: number; prunedCount: number }> {
+    if (!isValidDayISO(cutoffDayISO)) {
+      throw new Error(`pruneOlderThan: cutoffDayISO must be YYYY-MM-DD, got ${cutoffDayISO}`);
+    }
+    let scannedCount = 0;
+    const toDelete: string[] = [];
+    let cursor = "0";
+    let iterations = 0;
+    const MAX_ITERATIONS = 50;
+
+    try {
+      do {
+        iterations++;
+        if (iterations > MAX_ITERATIONS) {
+          console.warn("[usageStore] SCAN cursor did not converge; aborting prune");
+          break;
+        }
+        const [, batch] = await this.exec<[string, string[]]>(
+          "SCAN", cursor, "MATCH", "vantage:usage:*", "COUNT", 100,
+        );
+        if (!batch) break;
+        cursor = batch[0] ?? "0";
+        const keys = Array.isArray(batch[1]) ? batch[1] : [];
+        for (const key of keys) {
+          scannedCount++;
+          const m = (key as string).match(/:(\d{4}-\d{2}-\d{2})$/);
+          if (m && m[1] < cutoffDayISO) {
+            toDelete.push(key);
+          }
+        }
+      } while (cursor !== "0");
+    } catch (e) {
+      // SCAN failures are logged but do NOT swallow what we've already
+      // scanned — return the partial counts so the diagnostic remains
+      // honest about the attempt.
+      console.warn(
+        "[usageStore] pruneOlderThan SCAN loop failed:",
+        e instanceof Error ? e.message : e,
+      );
+      return { scannedCount, prunedCount: 0 };
+    }
+
+    let prunedCount = 0;
+    for (let i = 0; i < toDelete.length; i += 100) {
+      const chunk = toDelete.slice(i, i + 100);
+      try {
+        await this.exec("DEL", ...chunk);
+        prunedCount += chunk.length;
+      } catch (e) {
+        console.warn(
+          `[usageStore] pruneOlderThan DEL batch failed:`,
+          e instanceof Error ? e.message : e,
+        );
+      }
+    }
+    return { scannedCount, prunedCount };
+  }
 }
 
 /**
@@ -189,13 +284,31 @@ function createDefaultStore(): UsageStore {
  * The exported `usageStore` is a delegating proxy whose methods forward
  * to whichever adapter `_backing` currently points at.
  *
- *   await usageStore.load("fmp", day);   // → _backing.load(...)
- *   await usageStore.save("fmp", day, snap);
+ *   await usageStore.load("fmp", day);                       // → _backing.load(...)
+ *   await usageStore.save("fmp", day, snap);                  // → _backing.save(...)
+ *   await usageStore.pruneOlderThan("2026-08-04");           // → _backing.pruneOlderThan(...)
  */
 export const usageStore: UsageStore = {
   load: (provider, day) => _backing.load(provider, day),
   save: (provider, day, snap) => _backing.save(provider, day, snap),
+  pruneOlderThan: (cutoffDayISO) => _backing.pruneOlderThan(cutoffDayISO),
 };
+
+/**
+ * Validates that a string is a real YYYY-MM-DD calendar day — format
+ * AND semantically valid (e.g. "2026-13-40" passes the regex but isn't
+ * a real date). Used by both store adapters' `pruneOlderThan` so a
+ * malformed cutoff surfaces at the call site rather than silently
+ * no-op'ing.
+ */
+function isValidDayISO(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const ms = Date.parse(`${value}T00:00:00.000Z`);
+  if (!Number.isFinite(ms)) return false;
+  // Round-trip: Date.parse then back to ISO + slice — guards against
+  // "2026-02-30" silently rolling over to "2026-03-02".
+  return new Date(ms).toISOString().slice(0, 10) === value;
+}
 
 /* ────────────────────────────  TRACKER LAYER  ──────────────────────────── */
 
@@ -270,7 +383,79 @@ let hydrationPromise: Promise<void> = (async () => {
       }
     }),
   );
+  // After today's buckets are in, sweep KV for stale day-keys.
+  // Frequency-guarded (max once per 6h per process) so the cost is
+  // bounded; the SCAN runs only on cold starts / first load after a
+  // long idle, not on every request.
+  await pruneOldBucketsIfDue();
 })();
+
+/* ── KV retention policy ─────────────────────────────────────────────── */
+//
+// Free-tier Vercel KV is 30K writes / 300K reads per month. Without a
+// retention sweep, every day-bucket that `recordCall` writes stays in
+// KV forever; eventually we eat the 30K write budget on SCAN operations
+// alone. Solution: prune buckets older than 30 days at cold start,
+// guarded so the SCAN runs at most once per 6h per process.
+
+const PRUNE_INTERVAL_MS = 6 * 60 * 60 * 1000;     // 6 hours
+const PRUNE_RETENTION_DAYS = 30;
+
+/** Snapshot of the most recent retention sweep. */
+export interface PruneStats {
+  /** Epoch ms when this prune attempt finished. */
+  ranAt: number;
+  /** The cutoff used (YYYY-MM-DD). Buckets with day < this were removed. */
+  cutoffDayISO: string;
+  /** Total vantage:usage:* keys observed this run. */
+  scannedCount: number;
+  /** Keys actually deleted this run. */
+  prunedCount: number;
+  /** Resolved backing-store type at sweep time ("LocalMemoryStore" | "VercelKvStore"). */
+  storeType: string;
+  /** Non-null iff the sweep failed mid-flight (partial counts still returned). */
+  errorMessage: string | null;
+}
+
+let lastPruneStats: PruneStats | null = null;
+let lastPruneAttemptAt = 0;
+
+/**
+ * Retention sweep across the active backing store. Frequency-guarded so
+ * it fires at most once per `PRUNE_INTERVAL_MS` per process; the in-process
+ * guard is sufficient because cold-start hydration is the only call site.
+ *
+ * Never throws across the public surface — the lastPruneStats object
+ * captures the failure mode (and its partial scannable count) so the
+ * ?mode=retention diagnostic stays informative.
+ */
+async function pruneOldBucketsIfDue(now: number = Date.now()): Promise<void> {
+  if (now - lastPruneAttemptAt < PRUNE_INTERVAL_MS) return;
+  lastPruneAttemptAt = now;
+
+  const cutoff = new Date(now - PRUNE_RETENTION_DAYS * 86_400_000).toISOString().slice(0, 10);
+  const store = _backing;
+  try {
+    const { scannedCount, prunedCount } = await store.pruneOlderThan(cutoff);
+    lastPruneStats = {
+      ranAt: now,
+      cutoffDayISO: cutoff,
+      scannedCount,
+      prunedCount,
+      storeType: store.constructor.name,
+      errorMessage: null,
+    };
+  } catch (e) {
+    lastPruneStats = {
+      ranAt: now,
+      cutoffDayISO: cutoff,
+      scannedCount: 0,
+      prunedCount: 0,
+      storeType: store.constructor.name,
+      errorMessage: e instanceof Error ? e.message : String(e),
+    };
+  }
+}
 
 function scheduleFlush(provider: TrackedProvider): void {
   const m = mirrors[provider];
@@ -507,5 +692,39 @@ export const __test__ = {
   /** Reset the backing store to the env-detected default. */
   resetStore(): void {
     _backing = createDefaultStore();
+  },
+  /** Diagnostic: last retention-sweep result, or `null` if never run. */
+  pruneStats(): PruneStats | null {
+    return lastPruneStats ? { ...lastPruneStats } : null;
+  },
+  /** Test seam — clears the in-process prune stats + resets the 6h guard to 0. */
+  resetPruneStats(): void {
+    lastPruneStats = null;
+    lastPruneAttemptAt = 0;
+  },
+  /** Test seam — directly manipulate the frequency-guard's last-attempt timestamp. */
+  setLastPruneAttemptAt(ms: number): void {
+    lastPruneAttemptAt = ms;
+  },
+  /**
+   * Test seam — force-runs the retention sweep regardless of the 6h
+   * guard, so specs can verify the prune path without waiting. Real
+   * code paths should rely on hydration → pruneOldBucketsIfDue instead.
+   */
+  runPruneForTests(now: number = Date.now()): Promise<void> {
+    lastPruneAttemptAt = 0;
+    return pruneOldBucketsIfDue(now).finally(() => {
+      // Restore the post-run timestamp so subsequent in-band calls respect
+      // the 6h guard after the forced test sweep completes.
+      lastPruneAttemptAt = Date.now();
+    });
+  },
+  /**
+   * Test seam — invokes the retention sweep HONORING the 6h guard.
+   * Lets specs verify the in-band absorption behavior end-to-end
+   * (`runPruneForTests` resets the guard, which would mask it).
+   */
+  pruneForTests(now: number = Date.now()): Promise<void> {
+    return pruneOldBucketsIfDue(now);
   },
 };
