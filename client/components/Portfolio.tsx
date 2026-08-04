@@ -1,11 +1,13 @@
 import { useState, useMemo } from "react";
 import { useI18n } from "@/lib/i18n";
 import { portfolios } from "@/lib/mockData";
+import BatchQuoteFallbackHint from "@/components/BatchQuoteFallbackHint";
 import {
   useBatchQuotes,
   useFxRates,
   useMultiChart,
   useEarningsCalendar,
+  useYahooDown,
 } from "@/hooks/useStockData";
 import {
   annualizedVolatility,
@@ -231,6 +233,11 @@ export default function Portfolio() {
 
   const liveCount = quotes.filter(Boolean).length;
 
+  // Batch quotes fall back to per-symbol Yahoo on the free tier — when Yahoo
+  // is down the table shows no live prices, so surface [MOCK] from the health
+  // probe even while a stale payload lingers in the query cache.
+  const yahooDown = useYahooDown();
+
   return (
     <div className="space-y-8">
       {/* ---- Top-of-page FX-fallback banner (only when conversion can't be honest) ---- */}
@@ -296,7 +303,7 @@ export default function Portfolio() {
               {t("portfolio.partial")} {liveCount}/{symbols.length}
             </span>
           )}
-          {liveCount === 0 && !quotesLoading && (
+          {(liveCount === 0 || yahooDown) && !quotesLoading && (
             <span className="text-[10px] uppercase tracking-wide px-2 py-1 rounded text-yellow-400 bg-yellow-500/10">
               [MOCK] {t("portfolio.noPrice")}
             </span>
@@ -400,6 +407,7 @@ export default function Portfolio() {
         <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
           <h3 className="text-xl font-bold">{t("portfolio.holdings")}</h3>
           <div className="flex items-center gap-2 text-xs text-slate-400">
+            <BatchQuoteFallbackHint />
             <span>{t("portfolio.sortBy")}:</span>
             <div className="relative">
               <select

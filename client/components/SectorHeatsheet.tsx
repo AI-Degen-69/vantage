@@ -1,5 +1,6 @@
 import type { SectorHeatmapCell, SectorHeatmapResponse } from "@shared/api";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, translateSector } from "@/lib/i18n";
+import { useYahooChartDown } from "@/hooks/useStockData";
 
 interface SectorHeatsheetProps {
   heatmap: SectorHeatmapResponse | null | undefined;
@@ -84,6 +85,10 @@ function dayHeader(date: string, lang: string, isPartial: boolean): string {
  */
 export function SectorHeatsheet({ heatmap, days, isLoading }: SectorHeatsheetProps) {
   const { t, lang } = useI18n();
+  // Heatmap cells are computed server-side from per-ticker chart closes —
+  // when Yahoo chart history is down, badge [MOCK] so stale aggregates
+  // (possibly still cached) can't read as live.
+  const yahooChartDown = useYahooChartDown();
   const hasRows = !!heatmap && heatmap.rows.length > 0;
   const showSkeleton = isLoading && !hasRows;
 
@@ -99,6 +104,14 @@ export function SectorHeatsheet({ heatmap, days, isLoading }: SectorHeatsheetPro
         {hasRows && (
           <span className="text-[10px] text-slate-500 uppercase tracking-wide" dir="ltr">
             {t("insights.heatsheet.foot", { rows: heatmap!.rows.length, days })}
+          </span>
+        )}
+        {yahooChartDown && hasRows && (
+          <span
+            className="text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded text-yellow-400 bg-yellow-500/10 ms-auto"
+            title={t("providerHealth.chartDownHint")}
+          >
+            [MOCK]
           </span>
         )}
         {isLoading && hasRows && (
@@ -164,8 +177,19 @@ export function SectorHeatsheet({ heatmap, days, isLoading }: SectorHeatsheetPro
           {/* Sector rows */}
           {heatmap!.rows.map((row) => {
             const week = fmtPct(row.weekNet);
+            // Sector label resolves through the active language's dictionary
+            // (HE locale gets strings like "טכנולוגי", EN gets "Technology").
+            // Falls back to raw English on unrecognized FMP sectors so a
+            // brand-new sector never goes blank in the heatmap.
+            const sectorLabel = translateSector(t, row.sector);
             return (
-              <HeatsheetRow key={row.sector} row={row} week={week} t={t} />
+              <HeatsheetRow
+                key={row.sector}
+                row={row}
+                week={week}
+                t={t}
+                sectorLabel={sectorLabel}
+              />
             );
           })}
         </div>
@@ -190,29 +214,41 @@ export function SectorHeatsheet({ heatmap, days, isLoading }: SectorHeatsheetPro
  * Internal: a single sector row. Split out so the column layout /
  * responsiveness concerns live in one place and React's `<key>` system
  * can re-render row entries efficiently on prop change.
+ *
+ * `sectorLabel` is the localized display string resolved at the call site
+ * (HE locale gets translated Hebrew, EN gets canonical English). The raw
+ * `row.sector` is kept for the underlying cache key / React `<key>` so
+ * toggling language doesn't remount cells.
  */
 function HeatsheetRow({
   row,
   week,
   t,
+  sectorLabel,
 }: {
   row: SectorHeatmapResponse["rows"][number];
   week: string;
   t: (key: string, vars?: Record<string, string | number>) => string;
+  sectorLabel: string;
 }) {
   return (
     <>
       {/* Sector name + universe count tooltip */}
       <div
         className="text-sm font-medium text-foreground px-1 self-center truncate"
-        title={`${row.sector} · ${t("insights.heatsheet.symbolCount", {
+        title={`${sectorLabel} · ${t("insights.heatsheet.symbolCount", {
           count: row.universeCount,
         })}`}
       >
-        {row.sector}
+        {sectorLabel}
       </div>
       {row.cells.map((cell) => (
-        <HeatsheetCell key={`${row.sector}-${cell.date}`} cell={cell} sector={row.sector} t={t} />
+        <HeatsheetCell
+          key={`${row.sector}-${cell.date}`}
+          cell={cell}
+          sectorLabel={sectorLabel}
+          t={t}
+        />
       ))}
       <div
         className={`text-sm font-bold text-end px-1 self-center ${
@@ -236,14 +272,18 @@ function HeatsheetRow({
  * dynamic Tailwind classes — Tailwind can't extract classnames from
  * computed strings (its JIT expects literal safelist matches), so
  * computing the rgba in JS keeps the build deterministic.
+ *
+ * `sectorLabel` arrives already-resolved from the parent map so language
+ * toggling doesn't cause a full cell remount (the visible number doesn't
+ * change, only the surrounding tooltip text does).
  */
 function HeatsheetCell({
   cell,
-  sector,
+  sectorLabel,
   t,
 }: {
   cell: SectorHeatmapCell;
-  sector: string;
+  sectorLabel: string;
   t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
   const pctText = fmtPct(cell.movePct);
@@ -259,9 +299,9 @@ function HeatsheetCell({
     <div
       className={`text-[11px] font-semibold text-end px-1.5 py-1.5 rounded transition-colors cursor-default ${cellTextClass(cell.movePct)}`}
       style={{ backgroundColor: cellColor(cell.movePct) }}
-      title={`${sector} · ${cell.date}\n${tooltip}`}
+      title={`${sectorLabel} · ${cell.date}\n${tooltip}`}
       dir="ltr"
-      aria-label={`${sector} ${cell.date} ${pctText || "no data"}`}
+      aria-label={`${sectorLabel} ${cell.date} ${pctText || "no data"}`}
     >
       {cell.movePct === null || !Number.isFinite(cell.movePct)
         ? t("insights.heatsheet.cellEmpty")

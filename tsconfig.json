@@ -37,6 +37,7 @@
     "server/**/*",
     "shared/**/*",
     "api/**/*",
+    "scripts/**/*",
     "vite.config.ts",
     "vite.config.server.ts"
   ],

@@ -1,8 +1,9 @@
 import { useState, useMemo } from "react";
 import { Search, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useI18n } from "@/lib/i18n";
-import { useInsightsTab, useBatchQuotes, useSectorHeatmap } from "@/hooks/useStockData";
+import { useI18n, translateSector } from "@/lib/i18n";
+import BatchQuoteFallbackHint from "@/components/BatchQuoteFallbackHint";
+import { useInsightsTab, useBatchQuotes, useSectorHeatmap, useYahooDown } from "@/hooks/useStockData";
 import { SectorHeatsheet } from "@/components/SectorHeatsheet";
 import TickerLogo from "@/components/TickerLogo";
 import type { InsightsTabId, StockQuote } from "@shared/api";
@@ -100,10 +101,17 @@ export default function Insights() {
   } = useSectorHeatmap(heatmapSymbols, 5, heatmapSectors);
 
   // Card-level [LIVE] / [MOCK] comes from whether ANY quote landed.
+  // When Yahoo is down the batch-quote fallback can't run on the free tier
+  // (FMP `batch-quote` is 402-gated), so prices are mock/stale even if a
+  // previous payload is cached — demote the badge to MOCK. Tradeoff: if the
+  // FMP key ever upgrades to a paid tier (batch-quote works), quotes would
+  // be live during a Yahoo outage and this would mislabel them MOCK — gate
+  // on `!isAnyLive || yahooDown` if that day comes.
+  const yahooDown = useYahooDown();
   const liveCount = merged.filter((r) => r.price !== undefined).length;
   const totalCount = merged.length;
-  const isLive = liveCount === totalCount && totalCount > 0;
-  const isAnyLive = liveCount > 0;
+  const isLive = liveCount === totalCount && totalCount > 0 && !yahooDown;
+  const isAnyLive = liveCount > 0 && !yahooDown;
 
   return (
     <div className="w-full bg-background dark min-h-screen">
@@ -161,6 +169,7 @@ export default function Insights() {
             </button>
           ))}
           <div className="ms-auto flex items-center gap-2 py-2">
+            <BatchQuoteFallbackHint />
             <span
               className={`text-[10px] font-medium uppercase tracking-wide px-2 py-1 rounded ${
                 isLive
@@ -218,8 +227,11 @@ export default function Insights() {
                       <div>
                         <p className="text-sm font-semibold text-foreground">{row.symbol}</p>
                         {row.sector && (
+                          // Hidden if translateSector() returns "" (treated
+                          // as missing). Resolves locale-aware: "Technology"
+                          // → "Technology" in EN, "טכנולוגיה" in HE.
                           <p className="text-[10px] text-slate-500 uppercase tracking-wide truncate max-w-[120px]">
-                            {row.sector}
+                            {translateSector(t, row.sector)}
                           </p>
                         )}
                       </div>

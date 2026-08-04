@@ -1,15 +1,66 @@
 // Logo.dev integration. The publishable key (`pk_…`) is SAFE to ship client-
 // side per Logo.dev's docs — it's literally what the key prefix means.
 //
-// We hit Logo.dev's CDN directly from the browser instead of proxying
-// through the Vercel `/api/company-logo` route. Reasons:
-//   - One fewer env var to misconfigure at deploy time.
-//   - Vercel's edge cache was masking 404s as black monograms.
-//   - Direct CDN -> browser is faster than CDN -> Vercel cold start -> image byte stream.
+// We hit Logo.dev's CDN directly from the browser. Resolution order:
+//   1. `import.meta.env.VITE_LOGO_DEV_KEY`  — ops-rotatable via Vercel UI
+//      (Project → Settings → Environment Variables) without a code edit.
+//   2. Literal fallback below                — dev / no-env convenience.
+//   If BOTH are missing, this module throws at load time so a misconfigured
+//   build fails fast instead of silently shipping broken-image logos.
 //
 // Reference: https://www.logo.dev/docs/logo-images/introduction
 
-const PUBLISHABLE_KEY = "pk_d2iRMqLAQCWhvkLPXuyShQ";
+/**
+ * Resolve the publishable key from a build-env value + literal fallback.
+ * Exported for testability — module-scope side-effects aren't safe to
+ * exercise in vitest, so the resolution logic lives here as a pure helper.
+ *
+ * Both inputs are `.trim()`-ed; the env wins when present and non-empty;
+ * otherwise the literal wins; throws if both are blank so a misconfigured
+ * build fails fast at module load instead of silently shipping black tiles.
+ */
+export function resolveLogoDevKey(
+  envValue: string | undefined,
+  fallback: string,
+): string {
+  const fromEnv = (envValue ?? "").trim();
+  if (fromEnv) return fromEnv;
+  const fromFallback = (fallback ?? "").trim();
+  if (!fromFallback) {
+    throw new Error(
+      "[Vantage] Logo.dev publishable key is not configured. " +
+        "Set VITE_LOGO_DEV_KEY in your build env (Vercel → Settings → " +
+        "Environment Variables) or restore the literal fallback in " +
+        "client/lib/logoDev.ts. No key → every <TickerLogo> falls through " +
+        "to the initials / HE-glyph tier.",
+    );
+  }
+  return fromFallback;
+}
+
+// Vite replaces `import.meta.env.VITE_*` with the literal value at
+// `vite build` time, so the helper below runs against an inlined constant,
+// not a live env read. Logo resolution is client-only — this file has no
+// `process.env` at runtime, which is why we don't also probe a server-side
+// env like `server/services/fmp.ts` does for `FMP_KEY` / `VITE_FMP_KEY`.
+const PUBLISHABLE_KEY = resolveLogoDevKey(
+  import.meta.env?.VITE_LOGO_DEV_KEY,
+  "pk_RfqJbKegQfC5oqdfw57qQQ",
+);
+
+// DEV-only nudge: a clone-and-run dev who never sets the env will get
+// working logos via the literal and quietly miss the env-var path that
+// ops uses for rotation. Surface this once at module load so it's visible
+// without overriding the (correct) production behavior of relying on the
+// literal fallback.
+if (import.meta.env?.DEV && !import.meta.env?.VITE_LOGO_DEV_KEY) {
+  console.warn(
+    "[Vantage] VITE_LOGO_DEV_KEY is not set in your build env. " +
+      "Falling back to the literal pk_ in client/lib/logoDev.ts — " +
+      "works locally, but for ops rotation set the env on Vercel " +
+      "(Project → Settings → Environment Variables).",
+  );
+}
 
 const ATTRIBUTION_URL = "https://www.logo.dev/";
 
@@ -17,6 +68,7 @@ const ATTRIBUTION_URL = "https://www.logo.dev/";
  *  `retina=true` on the CDN this gives 2× device-pixel coverage natively
  *  without forcing the browser to downsample an over-sized asset. */
 const SIZE_MAP = {
+  xs: 24,
   sm: 32,
   md: 48,
   lg: 64,

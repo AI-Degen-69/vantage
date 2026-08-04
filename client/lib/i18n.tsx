@@ -9,6 +9,8 @@ const en = {
   "loading": "Loading...",
   "error.generic": "Something went wrong",
   "source.yahoo": "Yahoo Finance",
+  "source.fmp": "FMP",
+  "source.alphavantage": "AlphaVantage",
   "source.finnhub": "Finnhub",
 
   // Route-level lazy-chunk fallback
@@ -47,6 +49,27 @@ const en = {
   "index.financialMetricsTitle": "Financial Metrics",
   "index.metricsUnavailable": "Metrics unavailable for {{ticker}}",
   "index.metricsRetry": "Retry",
+  // Appears under "Metrics unavailable …" when the provider-health probe
+  // shows FMP is degraded/down. The free tier's 250-call daily cap means
+  // a 429 here is almost always the budget, not the request. {{hours}} is
+  // an estimate (FMP's window appears to be a rolling 24h) — we report a
+  // bounded range ("1–24") so a long-quiet probe can't read as 0.
+  "index.metricsRateLimited":
+    "Free-tier FMP daily quota reached — metrics refresh will resume in ~{{hours}}h. Retry is honest about a likely no-op until then.",
+  // Variant shown when the probe hasn't ticked yet (e.g. first paint).
+  // We still want to acknowledge FMP may be the cause, but without
+  // inventing a reset window.
+  "index.metricsRateLimitedUnknownReset":
+    "Free-tier FMP daily quota may be reached — retry later. Live quotes and charts are unaffected.",
+  // ── Yahoo fallback path (FMP rate-limited) ───────────────────────────────────
+  // Compact 4-card snapshot swap with a per-card chip so users can tell at a
+  // glance that the values are single-point estimates (not a YoY/CAGR series).
+  // `metricsYahooFallbackChip` is the visible label on every card; the title
+  // attribute (`metricsYahooFallbackTitle`) explains the source on hover so
+  // a power-user can tell why values look different from the FMP grid.
+  "index.metricsYahooFallbackChip": "Yahoo estimate",
+  "index.metricsYahooFallbackTitle":
+    "Live Yahoo estimate — FMP free-tier daily quota exhausted, single-point TTM/estimate values shown in place of the 8-card YoY/CAGR grid.",
   "index.qualityInBrief": "Quality in Brief",
   "index.unavailableApi": "Market data is currently unavailable. Please try again in a moment.",
   "index.viewMore": "View More",
@@ -61,6 +84,17 @@ const en = {
   "chart.descYoY": "Trailing 12 months vs prior year.",
   "chart.descCagr3Y": "Compound annual growth rate, last 3 years.",
   "chart.descCagr5Y": "Compound annual growth rate, last 5 years.",
+  // Quarterly vs Yearly granularity toggle on the metric chart modal.
+  // "Q1 FY 2025" bars replace "FY 2025"; CAGR windows walk back 4/12/20 rows.
+  "chart.yearly": "Yearly",
+  "chart.quarterly": "Quarterly",
+  "chart.granularity": "Granularity",
+  "chart.timeframe": "Timeframe",
+  "chart.annualHint": "Show one bar per fiscal year (default).",
+  "chart.quarterlyHint": "Show one bar per quarter (Q1–Q4); CAGR windows widen to 4 / 12 / 20 quarters.",
+  "chart.descYoYQuarter": "Latest quarter vs the same quarter last year.",
+  "chart.descCagr3YQuarter": "Quarterly CAGR over the last 12 quarters (annualized).",
+  "chart.descCagr5YQuarter": "Quarterly CAGR over the last 20 quarters (annualized).",
 
   // DCFWidget
   "dcf.title": "DCF Valuation",
@@ -200,11 +234,23 @@ const en = {
   "insights.cusip": "CUSIP",
   "insights.employeeCount": "Employee Count",
   "insights.employees": "Employees",
+  "insights.unavailable": "\u2014",
+  "insights.chartLiveSingleYear": "Only the latest year is live; historical years unavailable from the free-tier provider.",
   "insights.exchangeDescription": "Exchange",
   "insights.high": "High",
   "insights.idChips": "Identifiers",
   "insights.industry": "Industry",
   "insights.insiderTrading": "Insider Trading",
+  "insider.type.P": "Purchase",
+  "insider.type.S": "Sale",
+  "insider.type.A": "Stock Award",
+  "insider.type.G": "Stock Gift",
+  "insider.type.M": "Option Exercise",
+  "insider.type.F": "Tax Withholding",
+  "insider.type.D": "Disposal",
+  "insider.type.X": "Option Grant",
+  "insider.type.C": "Conversion",
+  "insider.type.other": "Transaction",
   "insights.ipoDate": "IPO Date",
   "insights.isAdr": "ADR",
   "insights.isEtf": "ETF",
@@ -213,6 +259,10 @@ const en = {
   "insights.lastDividend": "Last Dividend",
   "insights.low": "Low",
   "insights.news": "News",
+  // Footer for the news card on /stock/:ticker — reflects the upstream
+  // Yahoo `newsCount: 12` and the in-card cap of 8. The footer keeps the
+  // "this is a live Yahoo feed" cue prominent when Yahoo is healthy.
+  "news.footer": "Live from Yahoo Finance · showing {count} latest",
   "insights.nextYear": "Next Year",
   "insights.no": "No",
   "insights.period": "Period",
@@ -358,6 +408,22 @@ const en = {
   "insights.heatsheet.symbolCount_one": "1 symbol",
   "insights.heatsheet.symbolCount_other": "{{count}} symbols",
 
+  // Sectors — canonical FMP English names, translated for HE locale.
+  // HE strings mirror Globes / TheMarker conventions for Hebrew financial press.
+  // Looked up via `translateSector(t, sector)` so the raw English falls back
+  // when a new FMP sector arrives before translators can cover it.
+  "sector.technology": "Technology",
+  "sector.healthcare": "Healthcare",
+  "sector.financialServices": "Financial Services",
+  "sector.consumerCyclical": "Consumer Cyclical",
+  "sector.consumerDefensive": "Consumer Defensive",
+  "sector.communicationServices": "Communication Services",
+  "sector.industrials": "Industrials",
+  "sector.energy": "Energy",
+  "sector.realEstate": "Real Estate",
+  "sector.utilities": "Utilities",
+  "sector.basicMaterials": "Basic Materials",
+
   // Splash / login
   "splash.email": "Email address",
   "splash.password": "Password",
@@ -397,6 +463,42 @@ const en = {
   "language.en": "English",
   "language.he": "עברית",
 
+  // Provider health indicator
+  "providerHealth.title": "Data provider status",
+  "providerHealth.outage": "Market data outage",
+  "providerHealth.degraded": "Degraded",
+  "providerHealth.notConfigured": "Not configured",
+  "providerHealth.affected": "Affected: {{providers}}",
+  "providerHealth.knownRestriction": "Free-tier limitations",
+  "providerHealth.docsLink": "Provider docs",
+  "providerHealth.feature.quote": "Quote",
+  "providerHealth.feature.batchQuote": "Batch quotes",
+  "providerHealth.feature.chart": "Chart",
+  "providerHealth.chartDownHint": "Yahoo chart history is down — this data may be stale",
+  "providerHealth.batchFallback": "Yahoo fallback",
+  "providerHealth.batchFallbackTooltip": "Batch quotes are paid-gated on this plan — each price is fetched per-symbol via Yahoo",
+
+  // Footer usage pills (live API-call counts vs free-tier limits)
+  "usage.footerLabel": "API usage",
+  "usage.title": "API limits",
+  "usage.usedOfLimit": "{{used}} / {{limit}}",
+  "usage.usedOfLimitDay": "{{used}} / {{limit}} today",
+  "usage.remainingOfLimit": "{{remaining}} / {{limit}} left",
+  "usage.remainingOfLimitDay": "{{remaining}} / {{limit}} left (today)",
+  "usage.modeToggle.label": "Display mode",
+  "usage.modeToggle.used": "Used",
+  "usage.modeToggle.remaining": "Remaining",
+  "usage.unknownReset": "no reset timer",
+  "usage.resetNow": "resets now",
+  "usage.resetInMinutes": "resets in {{minutes}}m",
+  "usage.resetInHours": "resets in {{hours}}h",
+  "usage.resetOver24h": "resets >24h",
+  "usage.rateLimited": "rate-limited right now",
+  "usage.heuristic": "approx.",
+  "usage.heuristicTooltip": "Yahoo's documented rate limit doesn't exist on the keyless path — this is an approximate budget (≈200/hr).",
+  "usage.singleInstanceNote": "Per-process counter — may differ from the provider's dashboard across restarts.",
+  "usage.crossInstanceNote": "Counter tracks this Vantage process only; long-running deployments may diverge.",
+
   // Third-party attribution links (free-tier requirement)
   "attribution.logoDev": "Logos by Logo.dev",
   "attribution.logoDevAria": "Company logos provided by Logo.dev (opens in new tab)",
@@ -411,6 +513,8 @@ const he: Record<string, string> = {
   "loading": "טוען...",
   "error.generic": "משהו השתבש",
   "source.yahoo": "Yahoo Finance",
+  "source.fmp": "FMP",
+  "source.alphavantage": "AlphaVantage",
   "source.finnhub": "Finnhub",
 
   // Route-level lazy-chunk fallback
@@ -446,6 +550,26 @@ const he: Record<string, string> = {
   "index.financialMetricsTitle": "מדדים פיננסיים",
   "index.metricsUnavailable": "המדדים לא זמינים עבור {{ticker}}",
   "index.metricsRetry": "נסה שוב",
+  // Appears under "Metrics unavailable …" when the provider-health probe
+  // shows FMP is degraded/down. The free tier's 250-call daily cap means
+  // a 429 here is almost always the budget, not the request. {{hours}} is
+  // an estimate (FMP's window appears to be a rolling 24h) — we report a
+  // bounded range ("1–24") so a long-quiet probe can't read as 0. Hebrew
+  // sits inside LTR-safe braces for the number so dir="ltr" alignment
+  // survives the RTL page.
+  "index.metricsRateLimited":
+    "מכסת ה-FMP היומית בתוכנית החינמית הסתיימה — רענון המדדים יחודש בעוד כ-{{hours}} שעות. לחיצה על \"נסה שוב\" כנראה לא תעזור עד אז.",
+  // Variant shown when the probe hasn't ticked yet (e.g. first paint).
+  "index.metricsRateLimitedUnknownReset":
+    "מכסת ה-FMP היומית בתוכנית החינמית אולי הסתיימה — נסה שוב מאוחר יותר. שערים וגרפים חיים אינם מושפעים.",
+  // ── Yahoo fallback path (FMP rate-limited) ───────────────────────────────
+  // Compact 4-card snapshot swap with a per-card chip so users can tell at a
+  // glance that the values are single-point estimates (not a YoY/CAGR series).
+  // The chip stays identical in EN + HE because the value identity is what
+  // matters; the longer tooltip explanation flips naturally into Hebrew.
+  "index.metricsYahooFallbackChip": "הערכת Yahoo",
+  "index.metricsYahooFallbackTitle":
+    "הערכת Yahoo חיה — מכסת ה-FMP היומית בתוכנית החינמית הסתיימה, מוצגים ערכי TTM/הערכה נקודתיים במקום רשת 8 הכרטיסים YoY/CAGR.",
   "index.qualityInBrief": "איכות בקצרה",
   "index.unavailableApi": "נתוני השוק אינם זמינים כרגע. נסה שוב בעוד רגע.",
   "index.viewMore": "הצג עוד",
@@ -459,6 +583,17 @@ const he: Record<string, string> = {
   "chart.descYoY": "12 החודשים האחרונים מול השנה הקודמת.",
   "chart.descCagr3Y": "שיעור צמיחה שנתי מורכב, 3 שנים אחרונות.",
   "chart.descCagr5Y": "שיעור צמיחה שנתי מורכב, 5 שנים אחרונות.",
+  // בורר שנתי/רבעוני על מודל גרף המדדים. עמודות Q1 FY 2025 במקום FY 2025;
+  // חלונות CAGR צועדים אחורה 4/12/20 שורות.
+  "chart.yearly": "שנתי",
+  "chart.quarterly": "רבעוני",
+  "chart.granularity": "רמת פירוט",
+  "chart.timeframe": "חלון זמן",
+  "chart.annualHint": "עמודה אחת לשנת כספים (ברירת מחדל).",
+  "chart.quarterlyHint": "עמודה אחת לרבעון (Q1–Q4); חלונות CAGR מתרחבים ל-4/12/20 רבעונים.",
+  "chart.descYoYQuarter": "הרבעון האחרון לעומת אותו רבעון בשנה הקודמת.",
+  "chart.descCagr3YQuarter": "CAGR רבעוני על פני 12 הרבעונים האחרונים (מתועל לשנה).",
+  "chart.descCagr5YQuarter": "CAGR רבעוני על פני 20 הרבעונים האחרונים (מתועל לשנה).",
 
   "dcf.title": "הערכת שווי DCF",
   "dcf.earningsMode": "מצב רווחים",
@@ -594,11 +729,23 @@ const he: Record<string, string> = {
   "insights.cusip": "CUSIP",
   "insights.employeeCount": "מספר עובדים",
   "insights.employees": "עובדים",
+  "insights.unavailable": "\u2014",
+  "insights.chartLiveSingleYear": "רק השנה האחרונה זמינה; שנים היסטוריות לא זמינות מהספק בתוכנית החינמית.",
   "insights.exchangeDescription": "בורסה",
   "insights.high": "גבוה",
   "insights.idChips": "מזהים",
   "insights.industry": "תעשייה",
   "insights.insiderTrading": "מסחר פנים",
+  "insider.type.P": "רכישה",
+  "insider.type.S": "מכירה",
+  "insider.type.A": "הענקת מניות",
+  "insider.type.G": "מתנת מניות",
+  "insider.type.M": "מימוש אופציות",
+  "insider.type.F": "ניכוי במס",
+  "insider.type.D": "גריעה",
+  "insider.type.X": "הענקת אופציות",
+  "insider.type.C": "המרה",
+  "insider.type.other": "עסקה",
   "insights.ipoDate": "תאריך הנפקה",
   "insights.isAdr": "ADR",
   "insights.isEtf": "ETF",
@@ -607,6 +754,10 @@ const he: Record<string, string> = {
   "insights.lastDividend": "דיבידנד אחרון",
   "insights.low": "נמוך",
   "insights.news": "חדשות",
+  // HE footer mirroring inscriptions.news.footer — counts the visible
+  // rows after the 8-item cap so users see "חי מ-Yahoo · 8 אחרונים" rather
+  // than a misleading "12 אחרונים" when the upstream hit the limit.
+  "news.footer": "חי מ-Yahoo Finance · מציג {count} אחרונים",
   "insights.nextYear": "שנה הבאה",
   "insights.no": "לא",
   "insights.period": "תקופה",
@@ -773,6 +924,22 @@ const he: Record<string, string> = {
   // translators can re-order without code changes.
   "insights.spotlight.rowMeta": "{{priced}} עם מחיר · {{total}} סהכ",
 
+  // Sectors — canonical FMP English names, translated for HE locale.
+  // HE strings mirror Globes / TheMarker conventions for Hebrew financial
+  // press. Looked up via `translateSector(t, sector)` so the raw English
+  // falls back when a new FMP sector arrives before translators cover it.
+  "sector.technology": "טכנולוגיה",
+  "sector.healthcare": "בריאות",
+  "sector.financialServices": "שירותים פיננסיים",
+  "sector.consumerCyclical": "צרכנות מחזורית",
+  "sector.consumerDefensive": "צרכנות הגנתית",
+  "sector.communicationServices": "שירותי תקשורת",
+  "sector.industrials": "תעשיות",
+  "sector.energy": "אנרגיה",
+  "sector.realEstate": "נדל\"ן",
+  "sector.utilities": "שירותים ציבוריים",
+  "sector.basicMaterials": "חומרי גלם",
+
   // Earnings alerts (topBar slide-down — global, not page-scoped)
   "earningsAlerts.open": "פתח",
   "earningsAlerts.snooze": "השתק",
@@ -794,6 +961,44 @@ const he: Record<string, string> = {
 
   "language.en": "English",
   "language.he": "עברית",
+
+  // Provider health indicator
+  "providerHealth.title": "סטטוס ספקי נתונים",
+  "providerHealth.outage": "הפרעה בנתוני שוק",
+  "providerHealth.degraded": "מוגבל",
+  "providerHealth.notConfigured": "לא מוגדר",
+  "providerHealth.affected": "מושפעים: {{providers}}",
+  "providerHealth.knownRestriction": "הגבלות תוכנית חינמית",
+  "providerHealth.docsLink": "תיעוד ספקים",
+  "providerHealth.feature.quote": "שער",
+  "providerHealth.feature.batchQuote": "שערים מרובים",
+  "providerHealth.feature.chart": "גרף",
+  "providerHealth.chartDownHint": "היסטוריית הגרפים של Yahoo מושבתת — הנתונים עלולים להיות לא מעודכנים",
+  "providerHealth.batchFallback": "גיבוי Yahoo",
+  "providerHealth.batchFallbackTooltip": "שערים מרובים אינם זמינים בתוכנית הנוכחית — כל שער נטען בנפרד דרך Yahoo",
+
+  // Footer usage pills (live API-call counts vs free-tier limits). Numbers
+  // stay inside `dir="ltr"` on the page side, so the Hebrew string can sit
+  // inside LTR-safe braces landing here from the typewriter.
+  "usage.footerLabel": "שימוש בממשקי API",
+  "usage.title": "מגבלות API",
+  "usage.usedOfLimit": "{{used}} / {{limit}}",
+  "usage.usedOfLimitDay": "{{used}} / {{limit}} היום",
+  "usage.remainingOfLimit": "{{remaining}} / {{limit}} נותרו",
+  "usage.remainingOfLimitDay": "{{remaining}} / {{limit}} נותרו (היום)",
+  "usage.modeToggle.label": "מצב תצוגה",
+  "usage.modeToggle.used": "שומש",
+  "usage.modeToggle.remaining": "נותר",
+  "usage.unknownReset": "אין טיימר איפוס",
+  "usage.resetNow": "מתאפס כעת",
+  "usage.resetInMinutes": "מתאפס בעוד {{minutes}} דקות",
+  "usage.resetInHours": "מתאפס בעוד {{hours}} שעות",
+  "usage.resetOver24h": "מתאפס בעוד יותר מ-24 שעות",
+  "usage.rateLimited": "מוגבל כרגע",
+  "usage.heuristic": "משוער",
+  "usage.heuristicTooltip": "ל-Yahoo אין תיעוד רשמי למגבלת קצב במסלול החינמי — זה תקציב מוערך (≈200 לשעה).",
+  "usage.singleInstanceNote": "מונה לכל תהליך — עשוי להיות שונה מלוח המחוונים של הספק לאחר הפעלה מחדש.",
+  "usage.crossInstanceNote": "המונה מתעד את תהליך Vantage בלבד; פריסות ארוכות-טווח עלולות לסטות.",
 
   // Third-party attribution links (free-tier requirement)
   "attribution.logoDev": "לוגואים מ־Logo.dev",
@@ -944,6 +1149,65 @@ export function resolvePluralKey(
     if (v !== undefined) return { pickedKey: candidate, value: v };
   }
   return { pickedKey: key, value: dict[key] ?? key };
+}
+
+// ── Sector name translation ──────────────────────────────────────────────────
+//
+// FMP returns sector tags in canonical English (e.g. "Communication Services",
+// "Consumer Cyclical"). Translated labels live in this file under
+// `sector.<camelCase>` keys; `translateSector(t, sector)` resolves them so
+// the heatmap row labels, cell tooltips, slide-over chips, and Insights card
+// secondary line all render localized names without each call site rolling
+// its own lookup table.
+//
+// Resolution:
+//  - recognized sector → t("sector.<key>")     (works for EN and HE)
+//  - unrecognized sector → raw English as-is   (graceful fallback so a new
+//                          FMP sector surfaces visibly until translators
+//                          cover it, rather than crashing or going blank)
+//  - null / undefined / empty / whitespace → "" (so callers can drop
+//                          the `<p>` entirely without second-guessing)
+
+/**
+ * Map from FMP canonical sector name → i18n key. Centralized so a new sector
+ * only needs one entry here (plus its en/he dictionary rows) instead of
+ * being missed in three different call sites.
+ *
+ * Keys MUST stay in lockstep with the `sector.*` entries in the en/he
+ * dictionaries above.
+ */
+const SECTOR_I18N_KEYS: Readonly<Record<string, string>> = {
+  "Technology": "sector.technology",
+  "Healthcare": "sector.healthcare",
+  "Financial Services": "sector.financialServices",
+  "Consumer Cyclical": "sector.consumerCyclical",
+  "Consumer Defensive": "sector.consumerDefensive",
+  "Communication Services": "sector.communicationServices",
+  "Industrials": "sector.industrials",
+  "Energy": "sector.energy",
+  "Real Estate": "sector.realEstate",
+  "Utilities": "sector.utilities",
+  "Basic Materials": "sector.basicMaterials",
+};
+
+/**
+ * Resolve a FMP sector tag to its localized label.
+ *
+ * @param t - The active language's `t()` function from `useI18n()`.
+ * @param sector - The canonical English sector name from upstream APIs.
+ * @returns Localized name for known sectors; raw English for unrecognized
+ *   sectors (graceful fallback); "" for empty / nullish input so callers
+ *   can simply not render the `<p>`.
+ */
+export function translateSector(
+  t: (key: string) => string,
+  sector: string | null | undefined,
+): string {
+  const trimmed = (sector ?? "").trim();
+  if (!trimmed) return "";
+  const i18nKey = SECTOR_I18N_KEYS[trimmed];
+  if (!i18nKey) return trimmed;
+  return t(i18nKey);
 }
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {

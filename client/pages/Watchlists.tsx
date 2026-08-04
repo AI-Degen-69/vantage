@@ -9,7 +9,8 @@ import EagerLogoWarmer from "@/components/EagerLogoWarmer";
 import TickerLogo from "@/components/TickerLogo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useBatchQuotes, useEarningsCalendar, useWatchlistNews } from "@/hooks/useStockData";
+import BatchQuoteFallbackHint from "@/components/BatchQuoteFallbackHint";
+import { useBatchQuotes, useEarningsCalendar, useWatchlistNews, useYahooDown } from "@/hooks/useStockData";
 import { useWatchlists, useInlineRename } from "@/hooks/useWatchlists";
 import { applyDragReorder, type WatchlistSymbolEntry } from "@/lib/watchlistStore";
 import { formatTimeAgo } from "@/lib/formatTimeAgo";
@@ -60,6 +61,11 @@ export default function Watchlists() {
   const { data: batch } = useBatchQuotes(symbols);
   const { data: earnings, isLoading: earningsLoading } = useEarningsCalendar(today, horizon);
   const { items: newsItems, isLoading: newsLoading, isAnyFailing } = useWatchlistNews(symbols, 12);
+
+  // Batch quotes degrade to per-symbol Yahoo and the news feed is Yahoo-only
+  // — when Yahoo is down both show mock/stale content, so badge [MOCK] from
+  // the health probe instead of waiting for the data to fail.
+  const yahooDown = useYahooDown();
 
   // Track where the user is currently dragging within the table so the
   // hovered row gets a "drop here" highlight. Index-based because the
@@ -240,11 +246,14 @@ export default function Watchlists() {
 
         {/* Main symbol table */}
         <div className="bg-card border border-border rounded-xl overflow-hidden relative">
-          {(!batch?.quotes || batch.quotes.length === 0) && symbols.length > 0 && (
-            <div className="absolute top-2 right-2 text-xs text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded">
-              [MOCK]
-            </div>
-          )}
+          <div className="absolute top-2 right-2 flex flex-col items-end gap-1.5">
+            {(!batch?.quotes || batch.quotes.length === 0 || yahooDown) && symbols.length > 0 && (
+              <span className="text-xs text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded">
+                [MOCK]
+              </span>
+            )}
+            <BatchQuoteFallbackHint />
+          </div>
           {symbols.length === 0 ? (
             <div className="text-center py-16">
               <p className="text-slate-400 text-sm mb-4">{t("watchlists.empty")}</p>
@@ -375,7 +384,7 @@ export default function Watchlists() {
             <div className="bg-card border border-border rounded-xl p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold">{t("dipFinder.news")}</h3>
-                {(newsItems.length === 0 && !newsLoading) || isAnyFailing ? (
+                {(newsItems.length === 0 && !newsLoading) || isAnyFailing || yahooDown ? (
                   <span className="text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded text-yellow-400 bg-yellow-500/10">
                     [MOCK]
                   </span>

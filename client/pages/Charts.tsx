@@ -3,7 +3,7 @@ import { useI18n } from "@/lib/i18n";
 import DCFWidget from "@/components/DCFWidget";
 import { SectionCardSkeleton, HeaderPriceSkeleton } from "@/components/Skeleton";
 import TickerLogo from "@/components/TickerLogo";
-import { useStockQuote, useStockProfile } from "@/hooks/useStockData";
+import { useStockQuote, useStockProfile, useYahooChartDown } from "@/hooks/useStockData";
 import { TrendingUp, TrendingDown, BarChart3, Calendar, Building2 } from "lucide-react";
 
 /**
@@ -20,6 +20,10 @@ export default function Charts() {
   const { data: quoteData, isLoading: quoteLoading } = useStockQuote(ticker);
   // Profile gives us a friendly company name for the page header.
   const { data: profileData, isLoading: profileLoading } = useStockProfile(ticker);
+
+  // DCF + ranges are quote-driven, but the page is the charts surface — when
+  // Yahoo chart history is down, badge [MOCK] so stale bars can't read as live.
+  const yahooChartDown = useYahooChartDown();
   const currentPrice = quoteData?.price;
 
   const dayLow = quoteData?.dayLow ?? null;
@@ -82,7 +86,17 @@ export default function Charts() {
             </div>
           </div>
 
-          <h2 className="text-2xl font-bold text-foreground self-start">{t("nav.charts")}</h2>
+          <div className="flex flex-col items-end gap-1">
+            {yahooChartDown && (
+              <span
+                className="text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded text-yellow-400 bg-yellow-500/10"
+                title={t("providerHealth.chartDownHint")}
+              >
+                [MOCK]
+              </span>
+            )}
+            <h2 className="text-2xl font-bold text-foreground self-start">{t("nav.charts")}</h2>
+          </div>
         </div>
 
         {/* Price + range card */}

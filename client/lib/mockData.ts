@@ -58,6 +58,12 @@ export interface NewsItem {
   publisher: string;
   timestamp: string;
   url: string;
+  // Mirrors `shared/api.NewsItem.thumbnail`/`type` so the mock-fallback
+  // branch and the live-mapped branch share the same shape — the
+  // /stock/:ticker news card's `news:thumb-?thumbnail` render reads
+  // through either path without a runtime check.
+  thumbnail?: string | null;
+  type?: string | null;
 }
 
 export interface EarningsEvent {
