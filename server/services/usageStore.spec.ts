@@ -78,8 +78,8 @@ describe("LocalMemoryStore", () => {
     await s.save("fmp", "2026-07-01", { timestamps: [4], lastRateLimitAt: null });
     await s.save("yahoo", "2026-07-20", { timestamps: [5], lastRateLimitAt: null });
     // Cutoff 2026-07-02 keeps the `day < cutoff` semantics straight: the
-    // 2026-07-01 bucket is retained here on purpose so the strict-less
-    // boundary is unambiguous in the assertion.
+    // 2026-07-01 bucket is deleted because it is strictly earlier than
+    // the 2026-07-02 cutoff, making the strict-less boundary unambiguous.
     const result = await s.pruneOlderThan("2026-07-02");
     expect(result).toEqual({ scannedCount: 5, prunedCount: 4 });
     expect(await s.load("fmp", "2026-06-01")).toEqual({ timestamps: [], lastRateLimitAt: null });

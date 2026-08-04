@@ -223,13 +223,14 @@ describe("apiUsageTracker (KV retention / prune sweep)", () => {
     // Hand-roll clock: pretend the previous attempt was 6h59m ago.
     __test__.setLastPruneAttemptAt(FIXED_NOW - 6 * 60 * 60 * 1000 - 59 * 60_000);
 
-    // Call prune honoring the guard with the same FIXED_NOW now arg.
+    // Call prune honoring the guard with a timestamp beyond the 6h cooldown.
     // The guard re-allows because the elapsed window exceeds the 6h
-    // cooldown; the prune runs and reassigns `lastPruneStats` to a new
-    // object even though ranAt lands at the same `now` value.
-    await __test__.pruneForTests(FIXED_NOW);
+    // cooldown; the prune runs and updates `lastPruneStats.ranAt` to the
+    // new timestamp.
+    const SECOND_NOW = FIXED_NOW + 7 * 60 * 60 * 1000;  // 7 hours later
+    await __test__.pruneForTests(SECOND_NOW);
     const second = __test__.pruneStats()!;
-    expect(second).not.toBe(first);  // new object proves the prune ran
+    expect(second.ranAt).toBe(SECOND_NOW);
   });
 
   it("actually deletes stale buckets from LocalMemoryStore", async () => {
