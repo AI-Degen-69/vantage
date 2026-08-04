@@ -199,11 +199,23 @@ export function projectMetricSeries(
       const date = isQuarter
         ? `${periodLabel} ${yearPart}`
         : `FY ${yearPart}`;
-      return { date, value: raw / meta.divisor };
+      // Compute a numeric chronological sort key for quarters. Extract quarter
+      // number from "Q1"-"Q4"; for annual rows the key is just the year *
+      // 10 so Q* keys (year * 10 + 1..4) sort naturally alongside FY keys.
+      const year = Number(yearPart) || 0;
+      const qMatch = /^Q([1-4])$/.exec(periodLabel);
+      const chronoKey = qMatch
+        ? year * 10 + Number(qMatch[1])
+        : year * 10;
+      return { date, value: raw / meta.divisor, chronoKey };
     })
-    .filter((p): p is { date: string; value: number } => p !== null);
-  projected.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-  return projected;
+    .filter((p): p is { date: string; value: number; chronoKey: number } => p !== null);
+  // Sort by the numeric chronological key instead of the display label so
+  // quarters spanning a year boundary (Q4 2024, Q1 2025, Q2 2025) appear
+  // in correct order.
+  projected.sort((a, b) => a.chronoKey - b.chronoKey);
+  // Drop the chronoKey from the returned shape — callers only need date/value.
+  return projected.map(({ date, value }) => ({ date, value }));
 }
 
 /**

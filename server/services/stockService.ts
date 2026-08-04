@@ -610,8 +610,8 @@ function toDateMs(value: unknown): number | null {
  * @returns A normalized insider transaction with numeric shares, value, and price fields
  */
 function normalizeInsider(raw: any): InsiderTransaction {
-  const shares = toNumberLoose(raw.shares);
-  const value = toNumberLoose(raw.value);
+  const shares = toNumberLoose(raw.shares) ?? 0;
+  const value = toNumberLoose(raw.value) ?? 0;
   // Date extraction is the high-risk one — Yahoo v4 returns startDate as a
   // native Date object OR an ISO string OR a {raw, fmt} object OR a plain
   // unix-second number. The legacy code only handled the `.raw` object
@@ -1124,7 +1124,7 @@ export const stockService = {
           epsEstimateNextQtr: extractNum(epsEstNext),
           revenueEstimateNextQtr: extractNum(revEstNext),
         };
-        cache.set(cacheKey, result);
+        cache.set(cacheKey, result, 300);
         return result;
       } catch (e: any) {
         throttledWarn(
@@ -1151,7 +1151,7 @@ export const stockService = {
           epsEstimateNextQtr: null,
           revenueEstimateNextQtr: null,
         };
-        cache.set(cacheKey, empty);
+        cache.set(cacheKey, empty, 300);
         return empty;
       }
     });
@@ -1565,6 +1565,7 @@ export const stockService = {
         url: string,
       ): Promise<ProviderHealthEntry> => {
         const probeStart = Date.now();
+        apiUsageTracker.recordCall('fmp');
         const result = await probeUrlStatus(url);
         const { status, detail } = providerStatusFromProbe(result);
         return {

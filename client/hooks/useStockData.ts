@@ -287,18 +287,20 @@ export function useStockProfile(ticker: string) {
  *   Annual and quarterly calls use different cache keys so both can run in
  *   parallel without colliding. Annual is the historical default; quarterly
  *   powers the new chart-modal granularity toggle (Q1..Q4 bars instead of
- *   full-year bars).
+ *   full-year bars). The `enabled` flag gates the query so quarterly requests
+ *   only fire when the modal is open in quarterly mode.
  * @returns The query result containing the stock's financial statements
  */
 export function useStockFinancials(
   ticker: string,
-  opts?: { period?: "annual" | "quarter" },
+  opts?: { period?: "annual" | "quarter"; enabled?: boolean },
 ) {
   const period = opts?.period ?? "annual";
+  const enabled = opts?.enabled ?? true;
   return useQuery({
     queryKey: ["stockFinancials", ticker, period],
     queryFn: () => fetchJSON<FinancialStatements>(`/api/stock-financials?symbol=${encodeURIComponent(ticker)}&period=${period}`),
-    enabled: !!ticker,
+    enabled: !!ticker && enabled,
   });
 }
 
