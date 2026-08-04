@@ -387,7 +387,7 @@ let hydrationPromise: Promise<void> = (async () => {
   // Frequency-guarded (max once per 6h per process) so the cost is
   // bounded; the SCAN runs only on cold starts / first load after a
   // long idle, not on every request.
-  await pruneOldBucketsIfDue();
+  void pruneOldBucketsIfDue();
 })();
 
 /* ── KV retention policy ─────────────────────────────────────────────── */
