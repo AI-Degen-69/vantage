@@ -24,6 +24,15 @@ dist-ssr
 .codex/
 .dev-port/
 .backup/
+# Agent runtime lockfiles — regenerated per session by codebuff/freebuff,
+# never reproducible from a clean checkout. Keeping them out of git status
+# removes noise from every `git status` after an agent run.
+skills-lock.json
+# Per-instance Vercel preview-link overrides. `.vercel/` is already
+# excluded, but `.vercel/*.local` is explicit so a future operator can
+# `git add -f .vercel/<file>` without accidentally committing their local
+# token overrides.
+.vercel/*.local
 
 # Editor directories and files
 .vscode/*
