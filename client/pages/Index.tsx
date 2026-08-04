@@ -7,7 +7,7 @@ import CompanyProfile from "@/components/CompanyProfile";
 import TickerLogo from "@/components/TickerLogo";
 import { HeaderPriceSkeleton, MetricCardSkeleton } from "@/components/Skeleton";
 import { financialMetrics, FinancialMetric } from "@/lib/mockData";
-import { useStockQuote, useStockProfile, useStockFinancials, useProviderHealth, useStockYahooFallbackFinancials } from "@/hooks/useStockData";
+import { useStockQuote, useStockProfile, useStockFinancials, useProviderHealth, useStockYahooFallbackFinancials, useProviderUsage } from "@/hooks/useStockData";
 import {
   cagrAtYearsBack,
   detectPeriodGranularity,
@@ -179,7 +179,7 @@ export default function Index() {
   // so the empty-state below can surface the actual cause instead of a
   // vague "Retry" button. Shares the same query key as the global banner;
   // React Query dedupes so this is a zero-cost subscription.
-  const { data: providerHealth, dataUpdatedAt: providerHealthCheckedAt } = useProviderHealth();
+  const { data: providerHealth } = useProviderHealth();
   const fmpProbe = providerHealth?.providers?.find(
     (p) => p.provider === "fmp" && p.feature === "quote",
   );
@@ -189,12 +189,13 @@ export default function Index() {
   // window is a rolling 24h. showFmpRateLimit then renders a localized
   // hint under the empty-state with hours-until-reset math.
   const fmpDown = fmpProbe?.status === "down" || fmpProbe?.status === "degraded";
-  // FMP's free tier window is per-day (rolling 24h). The probe gives us a
-  // timestamp; we report "resets in ~N hours" rather than a hard promise,
-  // and clamp to a sane range so a long-quiet probe doesn't read as
-  // "resets in 0 minutes".
-  const fmpHoursUntilReset = providerHealthCheckedAt
-    ? Math.max(1, Math.min(24, 24 - Math.floor((Date.now() - providerHealthCheckedAt) / 3_600_000)))
+  // FMP's free tier window is per-day (rolling 24h). Use the authoritative
+  // reset timestamp from the provider-usage tracker when available; otherwise
+  // display the "unknown reset" fallback instead of calculating a 24-hour estimate.
+  const { data: providerUsage } = useProviderUsage();
+  const fmpUsageEntry = providerUsage?.entries?.find((e) => e.provider === "fmp");
+  const fmpHoursUntilReset = fmpUsageEntry?.resetsAt
+    ? Math.max(0, Math.floor((new Date(fmpUsageEntry.resetsAt).getTime() - Date.now()) / 3_600_000))
     : null;
 
   const metrics = useMemo(() => {

@@ -119,14 +119,24 @@ export class VercelKvStore implements UsageStore {
   }
 
   private async exec<T = unknown>(cmd: string, ...args: (string | number)[]): Promise<[unknown, T | null]> {
-    const r = await fetch(this.baseUrl, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${this.token}` },
-      body: JSON.stringify([cmd, ...args]),
-    });
-    if (!r.ok) throw new Error(`KV ${cmd} failed: ${r.status} ${r.statusText}`);
-    const arr = (await r.json()) as Array<unknown>;
-    return [arr[0] ?? null, (arr[1] as T | null) ?? null];
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    try {
+      const r = await fetch(this.baseUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify([cmd, ...args]),
+        signal: controller.signal,
+      });
+      if (!r.ok) throw new Error(`KV ${cmd} failed: ${r.status} ${r.statusText}`);
+      const arr = (await r.json()) as Array<unknown>;
+      return [arr[0] ?? null, (arr[1] as T | null) ?? null];
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
   async load(p: TrackedProvider, dayISO: string): Promise<BucketSnap> {
@@ -265,19 +275,39 @@ let hydrationPromise: Promise<void> = (async () => {
 function scheduleFlush(provider: TrackedProvider): void {
   const m = mirrors[provider];
   if (!m) return;
-  // Snapshot before async hand-off so a concurrent push() doesn't race.
-  const payload: BucketSnap = { timestamps: m.timestamps.slice(), lastRateLimitAt: m.lastRateLimitAt };
-  // Fire-and-forget — never throw out of recordCall/recordRateLimit.
-  usageStore.save(provider, m.day, payload).catch((e) => {
-    console.warn(`[apiUsageTracker] flush ${provider} failed:`, e instanceof Error ? e.message : e);
-  });
+  // Fire-and-forget — read, merge, write to avoid clobbering other instances' timestamps.
+  (async () => {
+    try {
+      const stored = await usageStore.load(provider, m.day);
+      // Union the local mirror's timestamps with the stored set, then prune stale ones.
+      const cfg = PROVIDER_CONFIG[provider];
+      const now = Date.now();
+      const merged = Array.from(new Set([...stored.timestamps, ...m.timestamps]));
+      const pruned = merged.filter((t) => t >= now - cfg.windowMs);
+      // Keep the most recent rate-limit timestamp.
+      const lastRateLimitAt =
+        stored.lastRateLimitAt !== null && m.lastRateLimitAt !== null
+          ? Math.max(stored.lastRateLimitAt, m.lastRateLimitAt)
+          : stored.lastRateLimitAt ?? m.lastRateLimitAt;
+      await usageStore.save(provider, m.day, { timestamps: pruned, lastRateLimitAt });
+    } catch (e) {
+      console.warn(`[apiUsageTracker] flush ${provider} failed:`, e instanceof Error ? e.message : e);
+    }
+  })();
 }
 
-function updateMirror(provider: TrackedProvider, now: number): Mirror {
+async function updateMirror(provider: TrackedProvider, now: number): Promise<Mirror> {
   const today = todayISO(now);
   let m = mirrors[provider];
   if (!m || m.day !== today) {
-    m = { day: today, timestamps: [], lastRateLimitAt: null };
+    // Day rolled over — lazily rehydrate from the store instead of replacing with empty.
+    try {
+      const snap = await usageStore.load(provider, today);
+      m = { day: today, timestamps: snap.timestamps.slice(), lastRateLimitAt: snap.lastRateLimitAt };
+    } catch (e) {
+      console.warn(`[apiUsageTracker] updateMirror rehydrate ${provider} failed:`, e instanceof Error ? e.message : e);
+      m = { day: today, timestamps: [], lastRateLimitAt: null };
+    }
     mirrors[provider] = m;
   }
   return m;
@@ -285,25 +315,31 @@ function updateMirror(provider: TrackedProvider, now: number): Mirror {
 
 export const apiUsageTracker = {
   /**
-   * Increment the per-day call count. Synchronously updates the
-   * in-process mirror (so reads within this lambda see the increment
-   * immediately), then schedules an async best-effort KV write.
+   * Increment the per-day call count. Fire-and-forget async to handle day
+   * rollovers (which need to rehydrate from the store), then schedules an
+   * async best-effort KV write.
    */
   recordCall(provider: TrackedProvider, now: number = Date.now()): void {
     const cfg = PROVIDER_CONFIG[provider];
-    const m = updateMirror(provider, now);
-    m.timestamps.push(now);
-    pruneTimestamps(m, cfg.windowMs, now);
-    scheduleFlush(provider);
+    updateMirror(provider, now).then((m) => {
+      m.timestamps.push(now);
+      pruneTimestamps(m, cfg.windowMs, now);
+      scheduleFlush(provider);
+    }).catch((e) => {
+      console.warn(`[apiUsageTracker] recordCall ${provider} failed:`, e instanceof Error ? e.message : e);
+    });
   },
   /**
-   * Mark the provider as currently rate-limited. Same sync-update-
+   * Mark the provider as currently rate-limited. Same async-update-
    * mirror + async-flush-to-KV shape.
    */
   recordRateLimit(provider: TrackedProvider, now: number = Date.now()): void {
-    const m = updateMirror(provider, now);
-    m.lastRateLimitAt = now;
-    scheduleFlush(provider);
+    updateMirror(provider, now).then((m) => {
+      m.lastRateLimitAt = now;
+      scheduleFlush(provider);
+    }).catch((e) => {
+      console.warn(`[apiUsageTracker] recordRateLimit ${provider} failed:`, e instanceof Error ? e.message : e);
+    });
   },
 };
 
@@ -317,12 +353,12 @@ function buildEntry(provider: TrackedProvider, now: number) {
   const cfg = PROVIDER_CONFIG[provider];
   const m = mirrors[provider];
   const snap: BucketSnap = m
-    ? { timestamps: m.timestamps, lastRateLimitAt: m.lastRateLimitAt }
+    ? { timestamps: m.timestamps.slice(), lastRateLimitAt: m.lastRateLimitAt }
     : { timestamps: [], lastRateLimitAt: null };
-  // Mirror's day is the source-of-truth; `now` is informational only.
-  const today = todayISO(now);
-  const dayMatches = m && m.day === today ? true : false;
-  if (dayMatches) pruneTimestamps(snap, cfg.windowMs, now);
+  // Always prune timestamps against the rolling window before calculating used,
+  // regardless of whether the day matches — ensures stale prior-day entries
+  // cannot affect the reported count.
+  pruneTimestamps(snap, cfg.windowMs, now);
 
   const used = snap.timestamps.length;
   const remaining = Math.max(0, cfg.limit - used);

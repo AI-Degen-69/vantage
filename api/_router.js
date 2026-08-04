@@ -807,7 +807,9 @@ export async function handleProviderHealth(req, res) {
       const r = await fetch(url, { signal: ctrl.signal });
       const text = await r.text();
       const errorMessage = detectError(text);
-      return { status: classify(r.status, errorMessage), latencyMs: Date.now() - t0, detail: errorMessage || (r.ok ? undefined : `http_${r.status}`) };
+      const httpStatus = r.status;
+      const classifiedStatus = classify(httpStatus, errorMessage);
+      return { httpStatus, status: classifiedStatus, latencyMs: Date.now() - t0, detail: errorMessage || (r.ok ? undefined : `http_${httpStatus}`) };
     } catch {
       return { status: 'down', latencyMs: Date.now() - t0, detail: 'network error' };
     } finally {
@@ -871,14 +873,16 @@ export async function handleProviderHealth(req, res) {
     FMP_KEY
       ? Promise.all([
           probeUrl(`https://financialmodelingprep.com/stable/quote?symbol=AAPL&apikey=${FMP_KEY}`).then((r) => {
-            if (r.status === 429 || r.status === 403) apiUsageTracker.recordRateLimit && apiUsageTracker.recordRateLimit('fmp');
+            if (r.httpStatus === 429 || r.httpStatus === 403) apiUsageTracker.recordRateLimit && apiUsageTracker.recordRateLimit('fmp');
             apiUsageTracker.recordCall && apiUsageTracker.recordCall('fmp');
-            return { provider: 'fmp', feature: 'quote', ...r };
+            const { httpStatus, ...entry } = r;
+            return { provider: 'fmp', feature: 'quote', ...entry };
           }),
           probeUrl(`https://financialmodelingprep.com/stable/batch-quote?symbols=AAPL,MSFT,NVDA&apikey=${FMP_KEY}`).then((r) => {
-            if (r.status === 429 || r.status === 403) apiUsageTracker.recordRateLimit && apiUsageTracker.recordRateLimit('fmp');
+            if (r.httpStatus === 429 || r.httpStatus === 403) apiUsageTracker.recordRateLimit && apiUsageTracker.recordRateLimit('fmp');
             apiUsageTracker.recordCall && apiUsageTracker.recordCall('fmp');
-            return { provider: 'fmp', feature: 'batch-quote', ...r };
+            const { httpStatus, ...entry } = r;
+            return { provider: 'fmp', feature: 'batch-quote', ...entry };
           }),
         ])
       : Promise.resolve([
@@ -888,8 +892,9 @@ export async function handleProviderHealth(req, res) {
     process.env.AV_KEY
       ? probeUrl(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=${process.env.AV_KEY}`).then((r) => {
           if (apiUsageTracker.recordCall) apiUsageTracker.recordCall('alphavantage');
-          if (r.status === 429 || r.status === 403) apiUsageTracker.recordRateLimit && apiUsageTracker.recordRateLimit('alphavantage');
-          return { provider: 'alphavantage', feature: 'quote', ...r };
+          if (r.httpStatus === 429 || r.httpStatus === 403) apiUsageTracker.recordRateLimit && apiUsageTracker.recordRateLimit('alphavantage');
+          const { httpStatus, ...entry } = r;
+          return { provider: 'alphavantage', feature: 'quote', ...entry };
         })
       : Promise.resolve({ provider: 'alphavantage', feature: 'quote', status: 'not_configured', latencyMs: null }),
   ]);
@@ -919,6 +924,31 @@ export async function handleStockYahooFallbackFinancials(req, res) {
   const ck = `yahoo_fallback_financials_${symbol}`;
   const cached = cache.get(ck);
   if (cached) return res.json(cached);
+  // Null-safe numeric extractor — coerce both `{ raw, fmt }` objects and
+  // bare numbers; missing anything → `null`. Mirrors the TS-side helper
+  // in stockService.getYahooFallbackFinancials.
+  const extractNum = (v) => {
+    if (v === undefined || v === null) return null;
+    if (typeof v === "number") return Number.isFinite(v) ? v : null;
+    if (typeof v === "string") {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    }
+    if (typeof v === "object" && v !== null) {
+      const raw = v.raw;
+      const fmt = v.fmt;
+      if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+      if (typeof raw === "string") {
+        const n = Number(raw);
+        if (Number.isFinite(n)) return n;
+      }
+      if (typeof fmt === "string") {
+        const n = Number(fmt);
+        if (Number.isFinite(n)) return n;
+      }
+    }
+    return null;
+  };
   // `margin: 0.18` (a fraction) is what Yahoo ships; downstream UI
   // treats margin fields as percent so multiply by 100 here.
   const extractMarginPct = (v) => {

@@ -60,7 +60,7 @@ export default function ChartModal({ metric, isOpen, onClose, ticker = "AAPL" }:
   const {
     data: quarterlyStatements,
     dataUpdatedAt: quarterlyUpdatedAt,
-  } = useStockFinancials(ticker, { period: "quarter" });
+  } = useStockFinancials(ticker, { period: "quarter", enabled: isOpen && granularity === "quarter" });
 
   // Series used by the chart. Annual = pre-built points from Index.tsx.
   // Quarterly = freshly projected from the Q-fetch. Recomputed only when
@@ -113,11 +113,11 @@ export default function ChartModal({ metric, isOpen, onClose, ticker = "AAPL" }:
     // (which lacks an index signature) into the permissive shapes the
     // helpers need — keeps the rest of the file narrow and the cast
     // auditable in exactly one place.
-    const rows = statements.income as unknown as ReadonlyArray<Record<string, unknown>>;
     const meta = metricStatementKey(metric.name);
     if (!meta) {
       return { yoy: null, cagr3Y: null, cagr5Y: null, methodology: "quarter" } as const;
     }
+    const rows = statements[meta.statement] as unknown as ReadonlyArray<Record<string, unknown>>;
     return {
       yoy: computeYoYFromRows(rows, meta.key),
       cagr3Y: cagrAtYearsBack(rows, meta.key, 3, "quarter"),

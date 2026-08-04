@@ -204,13 +204,14 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
     overviewData.fullTimeEmployees > 0
       ? overviewData.fullTimeEmployees
       : null;
+  // Display only the live current-year snapshot when available (no mock history
+  // mix). If currentFte is null, keep the entire mock series with [MOCK] indicator.
   const employeeCount =
     currentFte !== null
-      ? [
-          ...mockEmployeeCount.filter((row) => row.year !== currentYear),
-          { year: currentYear, count: currentFte },
-        ]
+      ? [{ year: currentYear, count: currentFte }]
       : mockEmployeeCount;
+  // Keep [MOCK] indicator enabled whenever synthetic history remains in the chart
+  // (which is whenever currentFte is null).
   const isEmployeeMock = currentFte === null;
 
   const isProfileMock = !overviewData && !overviewLoading;
