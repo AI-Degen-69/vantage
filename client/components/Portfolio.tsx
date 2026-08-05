@@ -243,7 +243,7 @@ export default function Portfolio() {
       {/* ---- Top-of-page FX-fallback banner (only when conversion can't be honest) ---- */}
       {currency !== "USD" && (fxLoading || fxRate === null) && (
         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 text-sm text-yellow-300 flex items-start gap-2" role="status">
-          <span className="font-semibold uppercase tracking-wide text-[10px] mt-0.5">FX</span>
+          <span className="font-semibold uppercase tracking-wide text-xs mt-0.5">FX</span>
           <div>
             {t("portfolio.fxBannerBody")}
             <span className="text-yellow-400 ml-1">[{t("portfolio.fxStale")}]</span>
@@ -294,17 +294,17 @@ export default function Portfolio() {
 
         <div className="flex items-center gap-2">
           {fxFailed && (
-            <span className="text-[10px] uppercase tracking-wide px-2 py-1 rounded text-yellow-400 bg-yellow-500/10">
+            <span className="text-xs uppercase tracking-wide px-2 py-1 rounded text-yellow-400 bg-yellow-500/10">
               {t("portfolio.fxStale")}
             </span>
           )}
           {liveCount > 0 && liveCount < symbols.length && (
-            <span className="text-[10px] uppercase tracking-wide px-2 py-1 rounded text-amber-300 bg-amber-500/10">
+            <span className="text-xs uppercase tracking-wide px-2 py-1 rounded text-amber-300 bg-amber-500/10">
               {t("portfolio.partial")} {liveCount}/{symbols.length}
             </span>
           )}
           {(liveCount === 0 || yahooDown) && !quotesLoading && (
-            <span className="text-[10px] uppercase tracking-wide px-2 py-1 rounded text-yellow-400 bg-yellow-500/10">
+            <span className="text-xs uppercase tracking-wide px-2 py-1 rounded text-yellow-400 bg-yellow-500/10">
               [MOCK] {t("portfolio.noPrice")}
             </span>
           )}
@@ -353,7 +353,7 @@ export default function Portfolio() {
       <div className="bg-card border border-border rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-foreground">{t("portfolio.analyticsTitle")}</h3>
-          <span className="text-[10px] uppercase tracking-wide px-2 py-1 rounded text-amber-300 bg-amber-500/10">
+          <span className="text-xs uppercase tracking-wide px-2 py-1 rounded text-amber-300 bg-amber-500/10">
             {t("portfolio.derived")}
           </span>
         </div>
@@ -363,21 +363,21 @@ export default function Portfolio() {
             <p className={`text-xl font-bold ${(portfolioMetrics.irr ?? -1) >= 0 ? "text-green-400" : "text-red-400"}`} dir="ltr">
               {portfolioMetrics.irr === null ? "\u2014" : fmtPct(portfolioMetrics.irr)}
             </p>
-            <p className="text-[10px] text-slate-500 mt-1">{t("portfolio.synthCashflows")}</p>
+            <p className="text-xs text-slate-500 mt-1">{t("portfolio.synthCashflows")}</p>
           </div>
           <div>
             <p className="text-xs text-slate-400 mb-1">{t("portfolio.cagr")}</p>
             <p className={`text-xl font-bold ${(portfolioMetrics.cagr ?? -1) >= 0 ? "text-green-400" : "text-red-400"}`} dir="ltr">
               {fmtPct(portfolioMetrics.cagr)}
             </p>
-            <p className="text-[10px] text-slate-500 mt-1">{t("portfolio.oneYearBasis")}</p>
+            <p className="text-xs text-slate-500 mt-1">{t("portfolio.oneYearBasis")}</p>
           </div>
           <div>
             <p className="text-xs text-slate-400 mb-1">{t("portfolio.volatility")}</p>
             <p className="text-xl font-bold text-amber-400" dir="ltr">
               {fmtPct(sortedHoldings.reduce((s, h) => s + (h.volatility ?? 0) * (h.weight / 100), 0))}
             </p>
-            <p className="text-[10px] text-slate-500 mt-1">{t("portfolio.weightedAvg")}</p>
+            <p className="text-xs text-slate-500 mt-1">{t("portfolio.weightedAvg")}</p>
           </div>
           <div>
             <p className="text-xs text-slate-400 mb-1">{t("portfolio.sharpe")}</p>
@@ -387,7 +387,7 @@ export default function Portfolio() {
                 return Number.isFinite(ws) ? ws.toFixed(2) : "\u2014";
               })()}
             </p>
-            <p className="text-[10px] text-slate-500 mt-1">rf 4.5%</p>
+            <p className="text-xs text-slate-500 mt-1">rf 4.5%</p>
           </div>
           <div>
             <p className="text-xs text-slate-400 mb-1">{t("portfolio.sortino")}</p>
@@ -397,7 +397,7 @@ export default function Portfolio() {
                 return Number.isFinite(ws) ? ws.toFixed(2) : "\u2014";
               })()}
             </p>
-            <p className="text-[10px] text-slate-500 mt-1">{t("portfolio.downsideOnly")}</p>
+            <p className="text-xs text-slate-500 mt-1">{t("portfolio.downsideOnly")}</p>
           </div>
         </div>
       </div>

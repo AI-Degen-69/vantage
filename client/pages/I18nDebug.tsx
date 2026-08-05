@@ -108,7 +108,7 @@ export default function I18nDebug() {
                   </div>
                   <div
                     className={
-                      "text-[10px] uppercase tracking-wider font-mono mt-1 " +
+                      "text-xs uppercase tracking-wider font-mono mt-1 " +
                       (c === activeCount ? "text-blue-400" : "text-slate-600")
                     }
                   >
@@ -219,11 +219,11 @@ function PluralRow({ baseKey, lang, activeCount, t }: PluralRowProps) {
               {resolved}
             </div>
             <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-              <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-800/80 border border-slate-700 text-slate-400 font-mono">
+              <span className="text-xs uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-800/80 border border-slate-700 text-slate-400 font-mono">
                 {category}
               </span>
               {fallback && (
-                <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300">
+                <span className="text-xs uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300">
                   missing
                 </span>
               )}

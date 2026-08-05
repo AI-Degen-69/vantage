@@ -18,6 +18,7 @@ const en = {
 
   // Top-level navigation (sidebar + breadcrumb + page headings)
   "nav.insights": "Insights",
+  "nav.screener": "Screener",
   "nav.watchlists": "Watchlists",
   "nav.charts": "Charts",
   "nav.earnings": "Earnings",
@@ -521,6 +522,7 @@ const he: Record<string, string> = {
   "route.loading": "טוען עמוד…",
 
   "nav.insights": "תובנות",
+  "nav.screener": "סורק",
   "nav.watchlists": "רשימות מעקב",
   "nav.charts": "גרפים",
   "nav.earnings": "דוחות",

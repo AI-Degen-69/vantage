@@ -86,7 +86,7 @@ export default function DipFinder() {
         <div className="flex items-center gap-3">
           <h3 className="text-xl font-bold">{t("dipFinder.title")}</h3>
           <span
-            className={`text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded ${
+            className={`text-xs font-medium uppercase tracking-wide px-2 py-0.5 rounded ${
               badgeKind === "live"
                 ? "text-emerald-300 bg-emerald-500/10"
                 : badgeKind === "partial"

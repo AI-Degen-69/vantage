@@ -93,7 +93,7 @@ export default function StockSlideOver({ ticker, isOpen, onClose }: StockSlideOv
                 <p className="text-sm font-semibold text-foreground leading-tight">
                   {stockData?.name || ticker}
                 </p>
-                <p className="text-[10px] text-slate-500">
+                <p className="text-xs text-slate-500">
                   {ticker}
                   {stockData?.exchange ? ` · ${stockData.exchange}` : ""}
                 </p>
@@ -149,7 +149,7 @@ export default function StockSlideOver({ ticker, isOpen, onClose }: StockSlideOv
                     <div className="text-right">
                       {quote.afterHoursPrice != null && (
                         <div className="text-xs text-slate-400">
-                          <span className="text-[10px]">After hrs:</span>
+                          <span className="text-xs">After hrs:</span>
                           <span className={`ml-1 font-medium ${quote.afterHoursChange != null && quote.afterHoursChange >= 0 ? "text-chart-green" : "text-red-400"}`}>
                             ${quote.afterHoursPrice.toFixed(2)}
                           </span>
@@ -193,7 +193,7 @@ export default function StockSlideOver({ ticker, isOpen, onClose }: StockSlideOv
               {/* Key Ratios */}
               {ratios && (
                 <div>
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Key Ratios</p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Key Ratios</p>
                   <div className="grid grid-cols-2 gap-2">
                     {[
                       { label: "P/E (TTM)", value: ratios.peTtm, suffix: "x" },
@@ -206,7 +206,7 @@ export default function StockSlideOver({ ticker, isOpen, onClose }: StockSlideOv
                       { label: "Beta", value: ratios.beta, suffix: "" },
                     ].map((item) => (
                       <div key={item.label} className="bg-slate-800/30 rounded px-3 py-2 border border-slate-700/50">
-                        <p className="text-[10px] text-slate-500">{item.label}</p>
+                        <p className="text-xs text-slate-500">{item.label}</p>
                         <p className="text-xs font-semibold text-foreground tabular-nums">
                           {item.value != null ? `${item.value.toFixed(2)}${item.suffix}` : "—"}
                         </p>
@@ -219,7 +219,7 @@ export default function StockSlideOver({ ticker, isOpen, onClose }: StockSlideOv
               {/* Quick Stats */}
               {quickStats.length > 0 && (
                 <div>
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Quick Stats</p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Quick Stats</p>
                   <div className="space-y-1">
                     {quickStats.map((stat, idx) => (
                       <div key={idx}>
@@ -228,7 +228,7 @@ export default function StockSlideOver({ ticker, isOpen, onClose }: StockSlideOv
                           className="w-full flex items-center justify-between bg-slate-800/30 rounded px-3 py-2 border border-slate-700/50 hover:bg-slate-800/50 transition-colors"
                         >
                           <div className="text-left">
-                            <p className="text-[10px] text-slate-500">{stat.label}</p>
+                            <p className="text-xs text-slate-500">{stat.label}</p>
                             <p className="text-xs font-semibold text-foreground">{stat.value}</p>
                           </div>
                           {stat.details && (
@@ -238,7 +238,7 @@ export default function StockSlideOver({ ticker, isOpen, onClose }: StockSlideOv
                         {expandedStat === idx && stat.details && (
                           <div className="ml-3 mt-0.5 space-y-0.5 bg-slate-800/20 rounded px-3 py-2 border border-slate-700/30">
                             {stat.details.map((d, di) => (
-                              <div key={di} className="flex justify-between text-[10px]">
+                              <div key={di} className="flex justify-between text-xs">
                                 <span className="text-slate-500">{d.label}</span>
                                 <span className="text-foreground font-medium">{d.value}</span>
                               </div>
@@ -254,8 +254,8 @@ export default function StockSlideOver({ ticker, isOpen, onClose }: StockSlideOv
               {/* Company Description (truncated) */}
               {profile?.description && (
                 <div>
-                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">About</p>
-                  <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-4">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">About</p>
+                  <p className="text-xs text-slate-400 leading-relaxed line-clamp-4">
                     {profile.description}
                   </p>
                 </div>

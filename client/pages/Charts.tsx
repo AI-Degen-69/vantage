@@ -89,7 +89,7 @@ export default function Charts() {
           <div className="flex flex-col items-end gap-1">
             {yahooChartDown && (
               <span
-                className="text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded text-yellow-400 bg-yellow-500/10"
+                className="text-xs font-medium uppercase tracking-wide px-2 py-0.5 rounded text-yellow-400 bg-yellow-500/10"
                 title={t("providerHealth.chartDownHint")}
               >
                 [MOCK]
@@ -145,7 +145,7 @@ export default function Charts() {
                       label={`$${dayLow.toFixed(2)} – $${dayHigh.toFixed(2)}`}
                     />
                     {midpointCaption && (
-                      <p className="text-[10px] text-muted-foreground mt-2" dir="ltr">
+                      <p className="text-xs text-muted-foreground mt-2" dir="ltr">
                         {midpointCaption}
                       </p>
                     )}

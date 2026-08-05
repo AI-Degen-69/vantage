@@ -6,6 +6,8 @@ import type { IndexQuote } from "@shared/api";
 import { EarningsAlertStrip } from "@/components/EarningsAlertStrip";
 import { EarningsAlertHistoryButton } from "@/components/EarningsAlertHistoryPanel";
 import TickerLogo from "@/components/TickerLogo";
+import CommandMenu from "@/components/CommandMenu";
+import { Search } from "lucide-react";
 
 /**
  * Provides the styling classes for an index quote pill container.
@@ -57,7 +59,7 @@ function Pill({
             : "—"}
       </span>
       <span
-        className={`text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded ${
+        className={`text-xs font-medium uppercase tracking-wide px-1.5 py-0.5 rounded ${
           live
             ? "text-chart-positive bg-chart-positive/10"
             : "text-muted-foreground bg-muted/40"
@@ -83,13 +85,13 @@ function Freshness({ updatedAt }: { updatedAt: number | null }) {
   }, []);
 
   if (!updatedAt) {
-    return <span className="text-[10px] text-muted-foreground">·</span>;
+    return <span className="text-xs text-muted-foreground">·</span>;
   }
   const agoSec = Math.max(0, Math.round((now - updatedAt) / 1000));
   const label = agoSec < 2 ? "now" : `${agoSec}s`;
   return (
     <span
-      className="text-[10px] text-muted-foreground font-mono tabular-nums"
+      className="text-xs text-muted-foreground font-mono tabular-nums"
       title={`Last fetched at ${new Date(updatedAt).toLocaleTimeString()}`}
     >
       · {label}
@@ -104,6 +106,7 @@ export default function TopBar() {
   const { t, lang } = useI18n();
   const location = useLocation();
   const { data, isLoading, dataUpdatedAt } = useIndexQuotes();
+  const [searchOpen, setSearchOpen] = useState(false);
 
   // Helper to generate the breadcrumb label for the current path. The
   // /stock/:ticker case renders the nav label + logo + ticker as separate
@@ -162,8 +165,20 @@ export default function TopBar() {
         )}
       </div>
 
-      {/* Center section */}
-      <div className="flex-1 flex justify-center" />
+      {/* Center section: Search Bar */}
+      <div className="flex-1 flex justify-center max-w-xl mx-8">
+        <button
+          onClick={() => setSearchOpen(true)}
+          className="flex items-center gap-2 w-full px-4 py-2 text-sm text-muted-foreground bg-muted/40 hover:bg-muted border border-border rounded-lg transition-colors"
+        >
+          <Search className="w-4 h-4" />
+          <span className="flex-1 text-left">Search tickers, companies...</span>
+          <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100">
+            <span className="text-xs">⌘</span>K
+          </kbd>
+        </button>
+      </div>
+      <CommandMenu open={searchOpen} setOpen={setSearchOpen} />
 
       {/* The strip itself renders nothing — it dispatches sonner toasts via
           the engine mounted above. Mounting it inside TopBar ensures it's

@@ -12,6 +12,7 @@ import type {
   IndexQuote,
   InsightsTabId,
   InsightsTabResponse,
+  InsightsTabEntry,
   InsiderTransaction,
   NewsItem,
   ProviderHealthResponse,
@@ -103,6 +104,19 @@ export function useInsightsTab(tab: InsightsTabId) {
   return useQuery({
     queryKey: ["insightsTab", tab],
     queryFn: () => fetchJSON<InsightsTabResponse>(`/api/insights-tab?tab=${encodeURIComponent(tab)}`),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/**
+ * Fetches all curated ticker universes at once for multi-select filtering.
+ *
+ * @returns The query result containing all tab universes
+ */
+export function useAllInsightsTabs() {
+  return useQuery({
+    queryKey: ["insightsTabsAll"],
+    queryFn: () => fetchJSON<Record<InsightsTabId, InsightsTabEntry[]>>(`/api/insights-tabs-all`),
     staleTime: 5 * 60_000,
   });
 }
@@ -751,3 +765,97 @@ export function useValidateSymbols(candidates: string[]) {
 }
 
 export type { IndexQuotesResponse };
+// ------ FinanceDatabase Hooks ------
+
+export interface ScreenerAsset {
+  symbol: string;
+  name: string;
+  currency: string;
+  exchange: string;
+  mic_code: string;
+  country: string;
+  type: string;
+  asset_type: string;
+  sector: string;
+  industry: string;
+  market_cap: number;
+  summary: string;
+}
+
+export interface ScreenerSearchResult {
+  symbol: string;
+  name: string;
+  asset_type: string;
+  exchange: string;
+  country: string;
+  sector: string;
+}
+
+export interface ScreenerFilterResponse {
+  total: number;
+  results: ScreenerAsset[];
+}
+
+export function useScreenerSearch(query: string, limit: number = 10) {
+  return useQuery({
+    queryKey: ["screenerSearch", query, limit],
+    queryFn: () =>
+      fetchJSON<{ results: ScreenerSearchResult[] }>(
+        `/api/screener/search?q=${encodeURIComponent(query)}&limit=${limit}`
+      ),
+    enabled: query.length >= 1,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useScreenerFilter(
+  filters: {
+    sector?: string[];
+    industry?: string[];
+    country?: string[];
+    asset_type?: string[];
+    exclude_dots?: boolean;
+  },
+  limit: number = 50,
+  offset: number = 0
+) {
+  const queryParams = new URLSearchParams({
+    limit: limit.toString(),
+    offset: offset.toString(),
+  });
+  if (filters.sector?.length) queryParams.set("sector", filters.sector.join(","));
+  if (filters.industry?.length) queryParams.set("industry", filters.industry.join(","));
+  if (filters.country?.length) queryParams.set("country", filters.country.join(","));
+  if (filters.asset_type?.length) queryParams.set("asset_type", filters.asset_type.join(","));
+  if (filters.exclude_dots) queryParams.set("exclude_dots", "1");
+
+  return useQuery({
+    queryKey: ["screenerFilter", queryParams.toString()],
+    queryFn: () => fetchJSON<ScreenerFilterResponse>(`/api/screener/filter?${queryParams.toString()}`),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useScreenerAsset(ticker: string) {
+  return useQuery({
+    queryKey: ["screenerAsset", ticker],
+    queryFn: () => fetchJSON<ScreenerAsset>(`/api/screener/asset/${encodeURIComponent(ticker)}`),
+    enabled: !!ticker,
+    staleTime: 60 * 60_000, // Assets rarely change metadata
+  });
+}
+
+export interface ScreenerFacets {
+  asset_types: string[];
+  sectors: string[];
+  countries: string[];
+}
+
+export function useScreenerFacets() {
+  return useQuery({
+    queryKey: ["screenerFacets"],
+    queryFn: () => fetchJSON<ScreenerFacets>("/api/screener/facets"),
+    staleTime: 24 * 60 * 60_000, // Facets don't change within a session
+  });
+}
+

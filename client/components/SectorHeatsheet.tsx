@@ -18,13 +18,14 @@ interface SectorHeatsheetProps {
  * Returns a `background-color` string consumed inline by the cell <div>.
  */
 function cellColor(pct: number | null): string {
-  if (pct === null || !Number.isFinite(pct)) return "hsl(250 20% 16% / 0.5)"; // Graticule
+  if (pct === null || !Number.isFinite(pct)) return "hsl(240 5% 15% / 0.3)"; // softer graticule
   const intensity = Math.min(1, Math.abs(pct) / 3);
-  // alpha range 0.12 → 0.45 keeps typographic contrast over the tint.
-  const alpha = 0.12 + intensity * 0.33;
+  
+  // Modern slightly muted colors (Green & Red)
+  const alpha = 0.2 + intensity * 0.6;
   return pct >= 0
-    ? `hsl(155 55% 50% / ${alpha.toFixed(3)})` // Aurora Green
-    : `hsl(6 70% 58% / ${alpha.toFixed(3)})`; // Ember Red
+    ? `hsl(142 71% 45% / ${alpha.toFixed(3)})` // Modern Green
+    : `hsl(348 83% 47% / ${alpha.toFixed(3)})`; // Modern Red
 }
 
 /** Pick the readable text color given a tinted background: white for saturated fills, muted for null data. */
@@ -109,7 +110,7 @@ export function SectorHeatsheet({
   if (!hasRows && !showSkeleton) return null;
 
   return (
-    <div className="bg-card/40 border-b border-border px-8 py-5">
+    <div className="bg-transparent px-6 py-5 h-full flex flex-col justify-center">
       {/* Header row: title, footer caption, partial-day badge */}
       <div className="flex items-center gap-3 mb-3">
         <h2 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">
@@ -117,7 +118,7 @@ export function SectorHeatsheet({
         </h2>
         {hasRows && (
           <span
-            className="text-[10px] text-muted-foreground uppercase tracking-wide"
+            className="text-xs text-muted-foreground uppercase tracking-wide"
             dir="ltr"
           >
             {t("insights.heatsheet.foot", { rows: heatmap!.rows.length, days })}
@@ -125,14 +126,14 @@ export function SectorHeatsheet({
         )}
         {yahooChartDown && hasRows && (
           <span
-            className="text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded text-yellow-400 bg-yellow-500/10 ms-auto"
+            className="text-xs font-medium uppercase tracking-wide px-2 py-0.5 rounded text-yellow-400 bg-yellow-500/10 ms-auto"
             title={t("providerHealth.chartDownHint")}
           >
             [MOCK]
           </span>
         )}
         {isLoading && hasRows && (
-          <span className="text-[10px] text-primary ms-auto">
+          <span className="text-xs text-primary ms-auto">
             {t("insights.heatsheet.loading", { days })}
           </span>
         )}
@@ -165,19 +166,20 @@ export function SectorHeatsheet({
           }}
         >
           {/* Day header row */}
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-1 self-end">
+          <div className="text-xs uppercase tracking-wider text-muted-foreground px-1 self-end">
             {/* leftmost column header — empty for the sector-label column */}
           </div>
-          {heatmap!.days.map((date, idx) => {
+          {heatmap!.days.map((date, idx, arr) => {
             // Derive isPartial from the first row's cell for this column index,
             // preserving the server's suppression of partial status for weekend landings.
             const isPartial =
               heatmap!.rows.length > 0 &&
               heatmap!.rows[0].cells[idx]?.isPartial === true;
+            const isToday = idx === arr.length - 1;
             return (
               <div
                 key={date}
-                className="text-[10px] uppercase tracking-wider text-muted-foreground px-1 text-end"
+                className={`text-xs uppercase tracking-wider text-muted-foreground font-semibold px-1 text-end ${!isToday ? 'opacity-60' : ''}`}
                 title={
                   isPartial ? t("insights.heatsheet.partialTitle") : undefined
                 }
@@ -185,7 +187,7 @@ export function SectorHeatsheet({
               >
                 <span>{dayHeader(date, lang, isPartial)}</span>
                 {isPartial && (
-                  <span className="block text-[9px] text-primary/80 normal-case tracking-normal">
+                  <span className="block text-xs text-primary/80 normal-case tracking-normal">
                     {t("insights.heatsheet.partialHit")}
                   </span>
                 )}
@@ -193,7 +195,7 @@ export function SectorHeatsheet({
             );
           })}
           <div
-            className="text-[10px] uppercase tracking-wider text-muted-foreground px-1 text-end"
+            className="text-xs uppercase tracking-wider text-muted-foreground font-semibold px-1 text-end"
             dir="ltr"
           >
             {t("insights.heatsheet.weekNetLabel")}
@@ -224,7 +226,7 @@ export function SectorHeatsheet({
           couldn't attribute to any sector — keeps the denominator honest
           (same transparency as the previous single-column Spotlight). */}
       {hasRows && heatmap!.untagged.length > 0 && (
-        <div className="text-[10px] text-muted-foreground mt-2 uppercase tracking-wide">
+        <div className="text-xs text-muted-foreground mt-2 uppercase tracking-wide">
           <span dir="ltr">{heatmap!.untagged.length}</span>{" "}
           {t("insights.heatsheet.untaggedSymbols", {
             count: heatmap!.untagged.length,
@@ -260,23 +262,24 @@ function HeatsheetRow({
     <>
       {/* Sector name + universe count tooltip */}
       <div
-        className="text-sm font-medium text-foreground px-1 self-center truncate"
+        className="text-[14px] font-bold text-foreground px-3 self-center truncate drop-shadow-sm"
         title={`${sectorLabel} · ${t("insights.heatsheet.symbolCount", {
           count: row.universeCount,
         })}`}
       >
         {sectorLabel}
       </div>
-      {row.cells.map((cell) => (
+      {row.cells.map((cell, idx, arr) => (
         <HeatsheetCell
           key={`${row.sector}-${cell.date}`}
           cell={cell}
           sectorLabel={sectorLabel}
           t={t}
+          isToday={idx === arr.length - 1}
         />
       ))}
       <div
-        className={`text-sm font-bold font-mono tabular-nums text-end px-1 self-center ${
+        className={`text-sm font-bold font-mono tabular-nums text-center px-2 py-1.5 self-center rounded-md bg-muted/20 border border-border/50 ${
           row.weekNet === null
             ? "text-muted-foreground"
             : row.weekNet >= 0
@@ -308,10 +311,12 @@ function HeatsheetCell({
   cell,
   sectorLabel,
   t,
+  isToday,
 }: {
   cell: SectorHeatmapCell;
   sectorLabel: string;
   t: (key: string, vars?: Record<string, string | number>) => string;
+  isToday: boolean;
 }) {
   const pctText = fmtPct(cell.movePct);
   const tooltip =
@@ -326,7 +331,7 @@ function HeatsheetCell({
         });
   return (
     <div
-      className={`text-[11px] font-semibold text-end px-1.5 py-1.5 rounded transition-colors cursor-default ${cellTextClass(cell.movePct)}`}
+      className={`text-xs font-mono font-bold flex items-center justify-center text-center px-2 py-2 rounded-md transition-all cursor-default drop-shadow-sm ${cellTextClass(cell.movePct)} ${!isToday ? 'opacity-60 hover:opacity-100' : 'hover:brightness-125'}`}
       style={{ backgroundColor: cellColor(cell.movePct) }}
       title={`${sectorLabel} · ${cell.date}\n${tooltip}`}
       dir="ltr"
@@ -336,7 +341,7 @@ function HeatsheetCell({
         ? t("insights.heatsheet.cellEmpty")
         : pctText}
       {cell.isPartial && cell.movePct !== null && (
-        <span className="block text-[9px] font-normal opacity-70">~</span>
+        <span className="block text-xs font-normal opacity-70">~</span>
       )}
     </div>
   );

@@ -72,7 +72,7 @@ export function EarningsAlertStrip() {
               ) : alert.event.time === "amc" ? (
                 <Moon className="w-4 h-4" />
               ) : (
-                <span className="text-[10px] font-bold px-1.5">•</span>
+                <span className="text-xs font-bold px-1.5">•</span>
               )}
             </div>
             <div className="flex-1 min-w-0">
@@ -81,7 +81,7 @@ export function EarningsAlertStrip() {
                   {alert.event.symbol}
                 </span>
                 <span
-                  className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${
+                  className={`text-xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${
                     alert.event.time === "bmo"
                       ? "bg-amber-500/15 text-amber-300"
                       : alert.event.time === "amc"
@@ -95,7 +95,7 @@ export function EarningsAlertStrip() {
                     ? t("earnings.amc")
                     : t("earnings.midday")}
                 </span>
-                <span className="text-[10px] text-slate-500">
+                <span className="text-xs text-slate-500">
                   {formatTimeUntil(alert.event, t)}
                 </span>
               </div>

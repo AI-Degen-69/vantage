@@ -6,6 +6,7 @@ import {
   useStockNews,
   useStockMetrics,
   useYahooDown,
+  useScreenerAsset,
 } from "@/hooks/useStockData";
 import {
   mockCompanyProfile,
@@ -33,6 +34,7 @@ export default function CompanyProfile({
 
   const { data: overviewData, isLoading: overviewLoading } =
     useStockProfile(ticker);
+  const { data: screenerAsset } = useScreenerAsset(ticker);
   const { data: analystData } = useStockAnalyst(ticker);
   const { data: insiderData } = useStockInsider(ticker);
   const { data: newsData } = useStockNews(ticker);
@@ -45,12 +47,13 @@ export default function CompanyProfile({
 
   const description =
     overviewData?.description ||
+    screenerAsset?.summary ||
     mockCompanyProfile.description.replace(
       "Apple Inc.",
       `${ticker} Corporation`,
     );
-  const sector = overviewData?.sector || mockCompanyProfile.sector;
-  const industry = overviewData?.industry || mockCompanyProfile.industry;
+  const sector = overviewData?.sector || screenerAsset?.sector || mockCompanyProfile.sector;
+  const industry = overviewData?.industry || screenerAsset?.industry || mockCompanyProfile.industry;
   const ceo = overviewData?.ceo || mockCompanyProfile.ceo;
   const beta = overviewData?.beta ?? mockCompanyProfile.beta;
 
@@ -242,7 +245,10 @@ export default function CompanyProfile({
   // (which is whenever currentFte is null).
   const isEmployeeMock = currentFte === null;
 
-  const isProfileMock = !overviewData && !overviewLoading;
+  // Profile is only "mock" when NEITHER the FMP API NOR our local FinanceDatabase
+  // returned real data. If screenerAsset has a summary or sector, that's real
+  // metadata from our 300k-asset SQLite DB — not mock filler.
+  const isProfileMock = !overviewData && !screenerAsset && !overviewLoading;
 
   if (overviewLoading) {
     return (
@@ -316,7 +322,7 @@ export default function CompanyProfile({
               overviewData?.isAdr ||
               overviewData?.isActivelyTrading !== undefined) && (
               <div className="mt-6 pt-4 border-t border-border">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-3">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-3">
                   {t("insights.idChips")}
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -614,7 +620,7 @@ export default function CompanyProfile({
             </div>
             {!isEmployeeMock && (
               <p
-                className="text-[11px] text-muted-foreground mt-2 leading-snug"
+                className="text-xs text-muted-foreground mt-2 leading-snug"
                 title={t("insights.chartLiveSingleYear")}
               >
                 {t("insights.chartLiveSingleYear")}
@@ -681,7 +687,7 @@ export default function CompanyProfile({
               })}
             </div>
             {!isNewsMock && news.length > 0 && (
-              <p className="text-[11px] text-muted-foreground mt-3 pt-3 border-t border-border">
+              <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
                 {t("news.footer", { count: Math.min(news.length, 8) })}
               </p>
             )}
@@ -737,11 +743,11 @@ function Chip({
       : "text-foreground font-medium";
   return (
     <span
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] bg-muted border border-border text-[11px]"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] bg-muted border border-border text-xs"
       dir="ltr"
       title={`${label}: ${value}`}
     >
-      <span className="text-muted-foreground font-medium uppercase tracking-wider text-[9px]">
+      <span className="text-muted-foreground font-medium uppercase tracking-wider text-xs">
         {label}
       </span>
       <span className={valueCls}>{value}</span>
@@ -775,12 +781,12 @@ function FlagBadge({
   };
   return (
     <span
-      className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] font-medium uppercase tracking-wider ${toneCls[tone]}`}
+      className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-medium uppercase tracking-wider ${toneCls[tone]}`}
       title={value ? `${label}: ${value}` : label}
     >
       {label}
       {value && (
-        <span className="text-[10px] opacity-75 normal-case tracking-normal">
+        <span className="text-xs opacity-75 normal-case tracking-normal">
           {value}
         </span>
       )}

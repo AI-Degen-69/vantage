@@ -37,7 +37,7 @@ export function EarningsAlertHistoryButton() {
           <Bell className="w-4 h-4" />
           {todayEntries.length > 0 && (
             <span
-              className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold bg-blue-500 text-white shadow"
+              className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-xs font-bold bg-blue-500 text-white shadow"
               dir="ltr"
             >
               {todayEntries.length > 99 ? "99+" : todayEntries.length}
@@ -53,7 +53,7 @@ export function EarningsAlertHistoryButton() {
         >
           <div className="p-3 border-b border-slate-800 flex items-center justify-between sticky top-0 bg-slate-900/95 backdrop-blur">
             <h3 className="font-bold text-sm">{t("earningsAlerts.historyTitle")}</h3>
-            <span className="text-[10px] text-slate-500">
+            <span className="text-xs text-slate-500">
               {todayEntries.length === 1
                 ? t("earningsAlerts.historyCount_one", { count: todayEntries.length })
                 : t("earningsAlerts.historyCount_other", { count: todayEntries.length })}
@@ -77,10 +77,10 @@ export function EarningsAlertHistoryButton() {
                       <span className="font-bold text-sm text-foreground">
                         {h.symbol}
                       </span>
-                      <span className="text-[10px] text-slate-500">{h.date}</span>
+                      <span className="text-xs text-slate-500">{h.date}</span>
                     </div>
                     <span
-                      className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded w-fit ${
+                      className={`text-xs uppercase tracking-wide px-1.5 py-0.5 rounded w-fit ${
                         h.action === "opened"
                           ? "bg-emerald-500/15 text-emerald-300"
                           : h.action === "snoozed"

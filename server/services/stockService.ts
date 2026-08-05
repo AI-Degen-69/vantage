@@ -778,9 +778,13 @@ async function yahooQuote(symbol: string): Promise<StockQuote | null> {
       sharesOutstanding: toFinite(q.sharesOutstanding),
       eps: toFinite(q.epsTrailingTwelveMonths),
       pe: toFinite(q.trailingPE),
-      earningsAnnouncement: earningsTimestamp === undefined
-        ? null
-        : new Date(earningsTimestamp * 1000).toISOString(),
+      earningsAnnouncement: q.earningsTimestamp
+        ? new Date(
+            typeof q.earningsTimestamp === "number" && q.earningsTimestamp < 1e12
+              ? q.earningsTimestamp * 1000
+              : q.earningsTimestamp
+          ).toISOString()
+        : null,
     };
   } catch (e: any) {
     // Yahoo v4 throws if the symbol is unknown — fall through to MOCK.
@@ -918,28 +922,117 @@ export const stockService = {
     });
   },
 
+  /**
+   * Fetch historical financial statements via Yahoo Finance fundamentalsTimeSeries.
+   * Used as a fallback when FMP is unavailable or rate limited.
+   */
+  async getYahooFinancialStatements(ticker: string, period: 'annual' | 'quarter' = 'annual', limit: number = 5): Promise<FinancialStatements> {
+    try {
+      const type = period === 'quarter' ? 'quarterly' : 'annual';
+      const fallbackDate = new Date();
+      // To get 20 quarters, we need at least 5 years. 6 years gives a safe buffer (24 quarters).
+      fallbackDate.setFullYear(fallbackDate.getFullYear() - 6); 
+      let res: any[] = await yahooFinance.fundamentalsTimeSeries(ticker, {
+        module: 'all',
+        type,
+        period1: fallbackDate.toISOString(),
+      });
+      if (!res || res.length === 0) return { income: [], balance: [], cash: [] };
+      
+      // Yahoo returns chronological order. Slice to get the most recent `limit` items.
+      if (res.length > limit) {
+        res = res.slice(-limit);
+      }
+
+      // Normalize to our expected format
+      const getPeriod = (r: any) => {
+        if (period === 'annual') return 'FY';
+        const m = new Date(r.date).getMonth(); // 0-11
+        return `Q${Math.ceil((m + 1) / 3)}`;
+      };
+
+      const income = res.map((r: any) => ({
+        date: new Date(r.date).toISOString().slice(0, 10),
+        symbol: ticker,
+        reportedCurrency: 'USD',
+        calendarYear: new Date(r.date).getFullYear().toString(),
+        period: getPeriod(r),
+        revenue: r.totalRevenue || 0,
+        costOfRevenue: r.costOfRevenue || r.reconciledCostOfRevenue || 0,
+        grossProfit: r.grossProfit || 0,
+        operatingIncome: r.operatingIncome || 0,
+        operatingExpense: r.operatingExpense || 0,
+        ebitda: r.EBITDA || r.normalizedEBITDA || 0,
+        netIncome: r.netIncome || 0,
+        eps: r.basicEPS || 0,
+        epsDiluted: r.dilutedEPS || 0,
+      }));
+
+      const balance = res.map((r: any) => ({
+        date: new Date(r.date).toISOString().slice(0, 10),
+        symbol: ticker,
+        reportedCurrency: 'USD',
+        calendarYear: new Date(r.date).getFullYear().toString(),
+        period: getPeriod(r),
+        totalAssets: r.totalAssets || 0,
+        totalLiabilities: r.totalLiabilitiesNetMinorityInterest || 0,
+        totalEquity: r.stockholdersEquity || 0,
+        totalDebt: r.totalDebt || 0,
+        cashAndCashEquivalents: r.cashAndCashEquivalents || r.cashCashEquivalentsAndShortTermInvestments || 0,
+        netDebt: r.netDebt || 0,
+      }));
+
+      const cash = res.map((r: any) => ({
+        date: new Date(r.date).toISOString().slice(0, 10),
+        symbol: ticker,
+        reportedCurrency: 'USD',
+        calendarYear: new Date(r.date).getFullYear().toString(),
+        period: getPeriod(r),
+        operatingCashFlow: r.operatingCashFlow || r.cashFlowFromContinuingOperatingActivities || 0,
+        capitalExpenditure: r.capitalExpenditure || 0,
+        freeCashFlow: r.freeCashFlow || 0,
+      }));
+
+      return { income, balance, cash };
+    } catch (e) {
+      throttledWarn(`yahooFinance:fundamentalsTimeSeries:${ticker}`, `[YahooFinance] Failed to fetch fundamentalsTimeSeries for ${ticker}:`, e);
+      return { income: [], balance: [], cash: [] };
+    }
+  },
+
   async getFinancialStatements(
     symbol: string,
     period: "annual" | "quarter" = "annual",
   ): Promise<FinancialStatements> {
     const cacheKey = `financials_${symbol}_${period}`;
     if (cache.has(cacheKey)) return cache.get(cacheKey) as FinancialStatements;
-    if (!hasFmp()) return { income: [], balance: [], cash: [] };
-    // Free-tier keys are limited to 5 statement rows: `limit=10` returns 402
-    // (verified via scripts/fmp-audit.ts). The client renders YoY from the
-    // last two rows and plots whatever comes back, so 5 years is fine.
-    const extra: Record<string, string | number> = { limit: 5 };
-    if (period === "quarter") extra.period = "quarter";
-    const [incomeRaw, balanceRaw, cashRaw] = await Promise.all([
-      fetchJSON<any[]>(tickerUrl('income-statement', symbol, extra), `income/${symbol}/${period}`),
-      fetchJSON<any[]>(tickerUrl('balance-sheet-statement', symbol, extra), `balance/${symbol}/${period}`),
-      fetchJSON<any[]>(tickerUrl('cash-flow-statement', symbol, extra), `cash/${symbol}/${period}`),
-    ]);
-    const result: FinancialStatements = {
-      income: Array.isArray(incomeRaw) ? incomeRaw.map(normalizeIncomeRow) : [],
-      balance: Array.isArray(balanceRaw) ? balanceRaw.map(normalizeBalanceRow) : [],
-      cash: Array.isArray(cashRaw) ? cashRaw.map(normalizeCashRow) : [],
-    };
+    
+    let result: FinancialStatements = { income: [], balance: [], cash: [] };
+    const limit = period === "quarter" ? 20 : 5;
+
+    if (hasFmp()) {
+      const extra: Record<string, string | number> = { limit };
+      if (period === "quarter") extra.period = "quarter";
+      const [incomeRaw, balanceRaw, cashRaw] = await Promise.all([
+        fetchJSON<any[]>(tickerUrl('income-statement', symbol, extra), `income/${symbol}/${period}`),
+        fetchJSON<any[]>(tickerUrl('balance-sheet-statement', symbol, extra), `balance/${symbol}/${period}`),
+        fetchJSON<any[]>(tickerUrl('cash-flow-statement', symbol, extra), `cash/${symbol}/${period}`),
+      ]);
+      
+      if (Array.isArray(incomeRaw) && incomeRaw.length > 0) {
+        result = {
+          income: incomeRaw.map(normalizeIncomeRow),
+          balance: Array.isArray(balanceRaw) ? balanceRaw.map(normalizeBalanceRow) : [],
+          cash: Array.isArray(cashRaw) ? cashRaw.map(normalizeCashRow) : [],
+        };
+      }
+    }
+
+    if (result.income.length === 0) {
+      // Fallback to Yahoo if FMP is unavailable, rate-limited, or fails
+      result = await this.getYahooFinancialStatements(symbol, period, limit);
+    }
+
     cache.set(cacheKey, result);
     return result;
   },
@@ -1359,6 +1452,13 @@ export const stockService = {
       label: labels[validKey],
       entries,
     };
+  },
+
+  /**
+   * Returns all curated universes at once for the client-side multi-filter.
+   */
+  getAllInsightsTabs(): Record<InsightsTabId, InsightsTabEntry[]> {
+    return insightsTabUniverses;
   },
 
   /**

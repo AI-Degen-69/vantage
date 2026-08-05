@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
-import { Search, Settings } from "lucide-react";
+import { Search, Settings, LayoutGrid, TrendingUp, Rocket, Coins, RefreshCcw, Bot, Cloud, Car, Gamepad2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useI18n, translateSector } from "@/lib/i18n";
 import BatchQuoteFallbackHint from "@/components/BatchQuoteFallbackHint";
 import {
-  useInsightsTab,
+  useAllInsightsTabs,
   useBatchQuotes,
   useSectorHeatmap,
   useYahooDown,
@@ -13,16 +13,16 @@ import { SectorHeatsheet } from "@/components/SectorHeatsheet";
 import TickerLogo from "@/components/TickerLogo";
 import type { InsightsTabId, StockQuote } from "@shared/api";
 
-const TABS: { id: InsightsTabId; i18nKey: string }[] = [
-  { id: "sp500", i18nKey: "insights.tabs.sp500" },
-  { id: "trending", i18nKey: "insights.tabs.trending" },
-  { id: "growth", i18nKey: "insights.tabs.growth" },
-  { id: "dividend", i18nKey: "insights.tabs.dividend" },
-  { id: "buyback", i18nKey: "insights.tabs.buyback" },
-  { id: "ai", i18nKey: "insights.tabs.ai" },
-  { id: "cloud", i18nKey: "insights.tabs.cloud" },
-  { id: "ev", i18nKey: "insights.tabs.ev" },
-  { id: "leisure", i18nKey: "insights.tabs.leisure" },
+const TABS: { id: InsightsTabId; i18nKey: string; Icon: React.ElementType }[] = [
+  { id: "sp500", i18nKey: "insights.tabs.sp500", Icon: LayoutGrid },
+  { id: "trending", i18nKey: "insights.tabs.trending", Icon: TrendingUp },
+  { id: "growth", i18nKey: "insights.tabs.growth", Icon: Rocket },
+  { id: "dividend", i18nKey: "insights.tabs.dividend", Icon: Coins },
+  { id: "buyback", i18nKey: "insights.tabs.buyback", Icon: RefreshCcw },
+  { id: "ai", i18nKey: "insights.tabs.ai", Icon: Bot },
+  { id: "cloud", i18nKey: "insights.tabs.cloud", Icon: Cloud },
+  { id: "ev", i18nKey: "insights.tabs.ev", Icon: Car },
+  { id: "leisure", i18nKey: "insights.tabs.leisure", Icon: Gamepad2 },
 ];
 
 /**
@@ -47,20 +47,55 @@ function formatMarketCap(mc: number | undefined): string {
 export default function Insights() {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<InsightsTabId>("sp500");
+  const [activeFilters, setActiveFilters] = useState<InsightsTabId[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
   const {
-    data: tabData,
+    data: allTabsData,
     isLoading: tabLoading,
     isFetching: tabFetching,
-  } = useInsightsTab(activeTab);
+  } = useAllInsightsTabs();
 
-  // Pull live quotes for whatever universe the server returned.
-  const symbols = useMemo(
-    () => tabData?.entries.map((e) => e.symbol) ?? [],
-    [tabData],
-  );
+  // Pre-filter the universe BEFORE fetching quotes so we don't overload the backend
+  const filteredUniverse = useMemo(() => {
+    if (!allTabsData) return [];
+    
+    const symbolTabs = new Map<string, InsightsTabId[]>();
+    const allEntries = new Map<string, any>();
+
+    for (const [tabId, entries] of Object.entries(allTabsData)) {
+      for (const entry of (entries as any[])) {
+        const sym = entry.symbol.toUpperCase();
+        if (!symbolTabs.has(sym)) {
+          symbolTabs.set(sym, []);
+          allEntries.set(sym, entry);
+        }
+        symbolTabs.get(sym)!.push(tabId as InsightsTabId);
+      }
+    }
+
+    const q = searchQuery.toLowerCase();
+    let results = Array.from(allEntries.values()).map(entry => ({
+      ...entry,
+      tabs: symbolTabs.get(entry.symbol.toUpperCase()) || []
+    }));
+
+    results = results.filter((row) => {
+      const matchesSearch = row.symbol.toLowerCase().includes(q) || row.name.toLowerCase().includes(q);
+      if (!matchesSearch) return false;
+      
+      if (activeFilters.length > 0) {
+        const matchScore = activeFilters.filter(f => row.tabs.includes(f)).length;
+        if (matchScore === 0) return false;
+      }
+      return true;
+    });
+
+    return results;
+  }, [allTabsData, searchQuery, activeFilters]);
+
+  // Combine symbols from the active filtered universe
+  const symbols = useMemo(() => filteredUniverse.map(e => e.symbol), [filteredUniverse]);
   const {
     data: quoteData,
     isLoading: quotesLoading,
@@ -73,8 +108,10 @@ export default function Insights() {
     for (const q of quoteData?.quotes ?? []) {
       if (q && q.symbol) bySymbol.set(q.symbol.toUpperCase(), q);
     }
-    return (tabData?.entries ?? []).map((entry) => {
-      const live = bySymbol.get(entry.symbol.toUpperCase()) ?? null;
+
+    let results = filteredUniverse.map((entry) => {
+      const sym = entry.symbol.toUpperCase();
+      const live = bySymbol.get(sym) ?? null;
       return {
         symbol: entry.symbol,
         name: entry.name,
@@ -83,18 +120,28 @@ export default function Insights() {
         change: live?.change,
         changePercent: live?.changesPercentage,
         marketCap: live?.marketCap,
+        tabs: entry.tabs,
       };
     });
-  }, [tabData, quoteData]);
 
-  const filtered = useMemo(() => {
-    const q = searchQuery.toLowerCase();
-    return merged.filter(
-      (row) =>
-        row.symbol.toLowerCase().includes(q) ||
-        row.name.toLowerCase().includes(q),
-    );
-  }, [merged, searchQuery]);
+    // Sort (matchScore desc, marketCap desc)
+    results.sort((a, b) => {
+      if (activeFilters.length > 0) {
+        const scoreA = activeFilters.filter(f => a.tabs.includes(f)).length;
+        const scoreB = activeFilters.filter(f => b.tabs.includes(f)).length;
+        if (scoreA !== scoreB) return scoreB - scoreA;
+      }
+      // fallback to market cap
+      const capA = a.marketCap || 0;
+      const capB = b.marketCap || 0;
+      return capB - capA;
+    });
+
+    return results;
+  }, [filteredUniverse, quoteData, activeFilters]);
+
+  // filtered is now just merged, since filtering was done beforehand
+  const filtered = merged;
 
   // Sector × 5-day heatmap. Lives entirely on the server side
   // (`/api/sector-heatmap`): the route fans out `getChart` per symbol and
@@ -133,13 +180,15 @@ export default function Insights() {
 
   return (
     <div className="w-full bg-background dark min-h-screen">
-      {/* Header */}
-      <div className="bg-card/50 border-b border-border px-8 py-12">
-        <h1 className="text-4xl font-bold text-center text-foreground mb-8">
-          {t("insights.title")}
-        </h1>
-        <div className="max-w-2xl mx-auto">
-          <div className="relative flex items-center bg-background border border-border rounded-lg overflow-hidden">
+      {/* Header and Heatsheet Side-by-Side */}
+      <div className="bg-card/50 border-b border-border px-8 py-8 flex flex-col xl:flex-row items-start xl:items-center gap-8 justify-between">
+        
+        {/* Title and Search */}
+        <div className="flex-1 w-full xl:max-w-sm 2xl:max-w-md">
+          <h1 className="text-4xl font-bold text-foreground mb-8 text-start">
+            {t("insights.title")}
+          </h1>
+          <div className="relative flex items-center bg-background border border-border rounded-lg overflow-hidden shadow-sm">
             <Search className="w-4 h-4 ms-4 text-muted-foreground shrink-0" />
             <input
               type="text"
@@ -152,67 +201,71 @@ export default function Insights() {
               <Settings className="w-4 h-4 shrink-0" />
             </button>
           </div>
+          
+          {/* Filters Bar under search */}
+          <div className="flex flex-wrap gap-2 mt-4">
+            {TABS.map((tab) => {
+              const isActive = activeFilters.includes(tab.id);
+              const Icon = tab.Icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveFilters(prev => prev.includes(tab.id) ? prev.filter(id => id !== tab.id) : [...prev, tab.id])}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${
+                    isActive
+                      ? "bg-primary/10 border-primary/30 text-primary"
+                      : "bg-background border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {t(tab.i18nKey)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Sector Heatsheet */}
+        <div className="w-full xl:w-auto xl:min-w-[750px] bg-background/40 rounded-xl overflow-hidden border border-border/50 shadow-sm">
+          <SectorHeatsheet
+            heatmap={heatmapData ?? null}
+            days={5}
+            isLoading={heatmapLoading && !heatmapData}
+          />
         </div>
       </div>
-
-      {/* Sector Heatsheet — 5-day columnar heatmap of average daily %
-          moves per sector. Server aggregates per-ticker historical
-          closes (cached 15 min) and renders a Bloomberg-style grid:
-          rows = sectors (best weekNet at the top), columns = past
-          5 trading days, cells tinted by |mean move|. Hidden when the
-          server returns zero tagged sectors. */}
-      <SectorHeatsheet
-        heatmap={heatmapData ?? null}
-        days={5}
-        isLoading={heatmapLoading && !heatmapData}
-      />
       {heatmapFetching && !!heatmapData && (
         <div className="text-center text-xs text-muted-foreground -mt-2 mb-2">
           {t("common.search")}…
         </div>
       )}
 
-      {/* Tabs */}
+      {/* Live Badge */}
       <div className="bg-card/30 border-b border-border overflow-x-auto">
-        <div className="flex px-8 space-x-1 items-center">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-3 font-medium text-sm whitespace-nowrap transition-colors border-b-2 ${
-                activeTab === tab.id
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t(tab.i18nKey)}
-            </button>
-          ))}
-          <div className="ms-auto flex items-center gap-2 py-2">
-            <BatchQuoteFallbackHint />
-            <span
-              className={`text-[10px] font-medium uppercase tracking-wide px-2 py-1 rounded ${
-                isLive
-                  ? "text-chart-positive bg-chart-positive/10"
-                  : isAnyLive
-                    ? "text-primary bg-primary/10"
-                    : "text-yellow-400 bg-yellow-500/10"
-              }`}
-              title={
-                isLive
-                  ? "All prices live"
-                  : isAnyLive
-                    ? `${liveCount}/${totalCount} prices live`
-                    : "Showing curated names only — no live prices yet"
-              }
-            >
-              {isLive
-                ? t("insights.tabBadgeLive")
+        <div className="flex px-8 py-3 items-center justify-end gap-2">
+          <BatchQuoteFallbackHint />
+          <span
+            className={`text-xs font-medium uppercase tracking-wide px-2 py-1 rounded ${
+              isLive
+                ? "text-chart-positive bg-chart-positive/10"
                 : isAnyLive
-                  ? `${liveCount}/${totalCount} LIVE`
-                  : t("insights.tabBadgeMock")}
-            </span>
-          </div>
+                  ? "text-primary bg-primary/10"
+                  : "text-yellow-400 bg-yellow-500/10"
+            }`}
+            title={
+              isLive
+                ? "All prices live"
+                : isAnyLive
+                  ? `${liveCount}/${totalCount} prices live`
+                  : "Showing curated names only — no live prices yet"
+            }
+          >
+            {isLive
+              ? t("insights.tabBadgeLive")
+              : isAnyLive
+                ? `${liveCount}/${totalCount} LIVE`
+                : t("insights.tabBadgeMock")}
+          </span>
         </div>
       </div>
 
@@ -266,7 +319,7 @@ export default function Insights() {
                               // Hidden if translateSector() returns "" (treated
                               // as missing). Resolves locale-aware: "Technology"
                               // → "Technology" in EN, "טכנולוגיה" in HE.
-                              <p className="text-[10px] text-muted-foreground uppercase tracking-wide truncate max-w-[120px]">
+                              <p className="text-xs text-muted-foreground uppercase tracking-wide truncate max-w-[120px]">
                                 {translateSector(t, row.sector)}
                               </p>
                             )}
@@ -292,10 +345,23 @@ export default function Insights() {
                       <p className="text-xs text-muted-foreground mb-2 truncate">
                         {row.name}
                       </p>
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <span>{t("insights.marketCap")}:</span>
-                        <span dir="ltr">{formatMarketCap(row.marketCap)}</span>
-                      </p>
+                      <div className="flex items-end justify-between mt-auto">
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <span>{t("insights.marketCap")}:</span>
+                          <span dir="ltr">{formatMarketCap(row.marketCap)}</span>
+                        </p>
+                        <div className="flex -space-x-1 rtl:space-x-reverse">
+                          {(row.tabs as InsightsTabId[]).map((tabId) => {
+                            const TabIcon = TABS.find(t => t.id === tabId)?.Icon;
+                            if (!TabIcon) return null;
+                            return (
+                              <div key={tabId} className="w-5 h-5 rounded-full bg-background border border-border flex items-center justify-center shadow-sm" title={t(`insights.tabs.${tabId}`)}>
+                                <TabIcon className="w-3 h-3 text-muted-foreground" />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
@@ -515,8 +581,12 @@ export default function Insights() {
                       <p className="vt-sym">{row.symbol}</p>
                       <p className="vt-name">{row.name}</p>
                     </div>
-                    <p className="vt-sector">
+                    <p className="vt-sector flex items-center gap-1">
                       {row.sector ? translateSector(t, row.sector) : ""}
+                      {(row.tabs as InsightsTabId[]).map((tabId) => {
+                        const TabIcon = TABS.find(t => t.id === tabId)?.Icon;
+                        return TabIcon ? <TabIcon key={tabId} className="w-3 h-3 text-muted-foreground" title={t(`insights.tabs.${tabId}`)} /> : null;
+                      })}
                     </p>
                     <div className="vt-quote">
                       <p className="vt-price" dir="ltr">
@@ -609,6 +679,16 @@ export default function Insights() {
                     </div>
                     <p className="vt-name">{row.name}</p>
                     <div className="vt-foot">
+                      <div className="flex -space-x-1 rtl:space-x-reverse me-auto">
+                        {(row.tabs as InsightsTabId[]).map((tabId) => {
+                          const TabIcon = TABS.find(t => t.id === tabId)?.Icon;
+                          return TabIcon ? (
+                            <div key={tabId} className="w-4 h-4 rounded-full bg-background border border-border flex items-center justify-center shadow-sm" title={t(`insights.tabs.${tabId}`)}>
+                              <TabIcon className="w-2.5 h-2.5 text-muted-foreground" />
+                            </div>
+                          ) : null;
+                        })}
+                      </div>
                       <span className="vt-price" dir="ltr">
                         {live ? `$${row.price!.toFixed(2)}` : "—"}
                       </span>
