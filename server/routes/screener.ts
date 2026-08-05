@@ -37,7 +37,17 @@ export function handleScreenerSearch(req: Request, res: Response) {
 }
 
 export function handleScreenerFilter(req: Request, res: Response) {
-  const { sector, industry, country, asset_type, exclude_dots, limit = '50', offset = '0' } = req.query;
+  const {
+    sector,
+    industry,
+    country,
+    asset_type,
+    exclude_dots,
+    sort_by,
+    sort_dir = 'asc',
+    limit = '50',
+    offset = '0',
+  } = req.query;
 
   try {
     const db = getScreenerDb();
@@ -72,16 +82,38 @@ export function handleScreenerFilter(req: Request, res: Response) {
     const countQuery = `SELECT count(*) as total FROM assets ${whereClause}`;
     const totalRow = db.prepare(countQuery).get(...countParams) as { total: number };
     
-    // Get paginated results — sort US primary tickers first, then by symbol length
-    const resultsQuery = `
-      SELECT symbol, name, asset_type, exchange, country, sector, industry, market_cap, summary
-      FROM assets
-      ${whereClause}
+    // Determine sort clause
+    const validSortColumns: Record<string, string> = {
+      symbol: 'symbol',
+      name: 'name',
+      asset_type: 'asset_type',
+      sector: 'sector',
+      industry: 'industry',
+      country: 'country',
+      market_cap: 'market_cap',
+    };
+
+    const requestedCol = typeof sort_by === 'string' ? validSortColumns[sort_by.toLowerCase()] : undefined;
+    const direction = (typeof sort_dir === 'string' && sort_dir.toLowerCase() === 'desc') ? 'DESC' : 'ASC';
+
+    let orderClause = `
       ORDER BY
         CASE WHEN country = 'United States' THEN 1 ELSE 2 END,
         CASE WHEN symbol NOT LIKE '%.%' THEN 1 ELSE 2 END,
         LENGTH(symbol) ASC,
         symbol ASC
+    `;
+
+    if (requestedCol) {
+      orderClause = `ORDER BY ${requestedCol} ${direction} NULLS LAST`;
+    }
+
+    // Get paginated results
+    const resultsQuery = `
+      SELECT symbol, name, asset_type, exchange, country, sector, industry, market_cap, summary
+      FROM assets
+      ${whereClause}
+      ${orderClause}
       LIMIT ? OFFSET ?
     `;
     

@@ -53,6 +53,10 @@ export interface StockQuote {
   pe?: number;
   /** Next earnings announcement date (ISO). */
   earningsAnnouncement?: string | null;
+  /** Annualized dividend yield as a percentage when supplied by the quote provider. */
+  dividendYield?: number;
+  /** Dividend payout ratio as a percentage when supplied by the quote provider. */
+  payoutRatio?: number;
 }
 
 /** Marquee index quote for the TopBar pills. */

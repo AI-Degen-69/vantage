@@ -96,6 +96,9 @@ const en = {
   "chart.descYoYQuarter": "Latest quarter vs the same quarter last year.",
   "chart.descCagr3YQuarter": "Quarterly CAGR over the last 12 quarters (annualized).",
   "chart.descCagr5YQuarter": "Quarterly CAGR over the last 20 quarters (annualized).",
+  "chart.period": "Period",
+  "chart.value": "Value",
+  "chart.yoy": "YoY Growth",
 
   // DCFWidget
   "dcf.title": "DCF Valuation",
@@ -596,6 +599,9 @@ const he: Record<string, string> = {
   "chart.descYoYQuarter": "הרבעון האחרון לעומת אותו רבעון בשנה הקודמת.",
   "chart.descCagr3YQuarter": "CAGR רבעוני על פני 12 הרבעונים האחרונים (מתועל לשנה).",
   "chart.descCagr5YQuarter": "CAGR רבעוני על פני 20 הרבעונים האחרונים (מתועל לשנה).",
+  "chart.period": "תקופה",
+  "chart.value": "ערך",
+  "chart.yoy": "צמיחה שנתית",
 
   "dcf.title": "הערכת שווי DCF",
   "dcf.earningsMode": "מצב רווחים",

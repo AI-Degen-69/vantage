@@ -815,6 +815,8 @@ export function useScreenerFilter(
     country?: string[];
     asset_type?: string[];
     exclude_dots?: boolean;
+    sort_by?: string;
+    sort_dir?: "asc" | "desc";
   },
   limit: number = 50,
   offset: number = 0
@@ -828,6 +830,8 @@ export function useScreenerFilter(
   if (filters.country?.length) queryParams.set("country", filters.country.join(","));
   if (filters.asset_type?.length) queryParams.set("asset_type", filters.asset_type.join(","));
   if (filters.exclude_dots) queryParams.set("exclude_dots", "1");
+  if (filters.sort_by) queryParams.set("sort_by", filters.sort_by);
+  if (filters.sort_dir) queryParams.set("sort_dir", filters.sort_dir);
 
   return useQuery({
     queryKey: ["screenerFilter", queryParams.toString()],

@@ -211,10 +211,10 @@ export default function Insights() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveFilters(prev => prev.includes(tab.id) ? prev.filter(id => id !== tab.id) : [...prev, tab.id])}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors border ${
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
                     isActive
-                      ? "bg-primary/10 border-primary/30 text-primary"
-                      : "bg-background border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
+                      ? "bg-primary text-primary-foreground font-semibold shadow-sm scale-105 border-transparent"
+                      : "bg-muted/50 border-border text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5" />

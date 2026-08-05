@@ -405,6 +405,8 @@ function normalizeQuote(raw: any): StockQuote | null {
     eps: toNum(raw.eps),
     pe: toNum(raw.pe),
     earningsAnnouncement: raw.earningsAnnouncement ?? null,
+    dividendYield: toNum(raw.dividendYield),
+    payoutRatio: toNum(raw.payoutRatio),
   };
 }
 
@@ -785,6 +787,8 @@ async function yahooQuote(symbol: string): Promise<StockQuote | null> {
               : q.earningsTimestamp
           ).toISOString()
         : null,
+      dividendYield: toFinite(q.dividendYield),
+      payoutRatio: toFinite(q.payoutRatio),
     };
   } catch (e: any) {
     // Yahoo v4 throws if the symbol is unknown — fall through to MOCK.

@@ -11,7 +11,7 @@ import { getSectorGlyph } from "@/lib/sectorGlyphs";
 import { useI18n } from "@/lib/i18n";
 import { useStockProfile } from "@/hooks/useStockData";
 
-export type LogoSize = "xs" | "sm" | "md" | "lg";
+export type LogoSize = "xs" | "sm" | "md" | "lg" | "xl";
 export type LogoVariant = "default" | "subtle";
 
 interface TickerLogoProps {
@@ -27,6 +27,7 @@ const sizeMap: Record<LogoSize, { box: string; text: string; rounded: string }> 
   sm: { box: "w-8 h-8", text: "text-xs", rounded: "rounded" },
   md: { box: "w-12 h-12", text: "text-sm", rounded: "rounded-md" },
   lg: { box: "w-16 h-16", text: "text-base", rounded: "rounded-lg" },
+  xl: { box: "w-24 h-24", text: "text-2xl", rounded: "rounded-2xl" },
 };
 
 /**

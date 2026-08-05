@@ -20,7 +20,7 @@ import type {
   YahooFallbackFinancials,
 } from "../../shared/api";
 
-const MAX_SYMBOLS = 1000;
+const MAX_SYMBOLS = 50;
 const TICKER_PATTERN = /^[A-Z]{1,5}(?:[.-][A-Z])?$/;
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 

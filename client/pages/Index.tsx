@@ -4,6 +4,7 @@ import { useI18n } from "@/lib/i18n";
 import ChartModal from "@/components/ChartModal";
 import InsightsCard from "@/components/InsightsCard";
 import CompanyProfile from "@/components/CompanyProfile";
+import StockFundamentalsStrip from "@/components/StockFundamentalsStrip";
 import TickerLogo from "@/components/TickerLogo";
 import { HeaderPriceSkeleton, MetricCardSkeleton } from "@/components/Skeleton";
 import { financialMetrics, FinancialMetric } from "@/lib/mockData";
@@ -11,6 +12,8 @@ import {
   useStockQuote,
   useStockProfile,
   useStockFinancials,
+  useStockMetrics,
+  useStockAnalyst,
   useProviderHealth,
   useProviderUsage,
   useScreenerAsset,
@@ -45,6 +48,11 @@ export default function Index() {
     isFetched: financialsFetched,
     refetch: refetchFinancials,
   } = useStockFinancials(ticker);
+  const { data: quarterlyFinancialsData, isLoading: quarterlyFinancialsLoading } =
+    useStockFinancials(ticker, { period: "quarter" });
+  const { data: stockMetricsData, isLoading: stockMetricsLoading } =
+    useStockMetrics(ticker);
+  const { data: analystData } = useStockAnalyst(ticker);
 
   // Provider-health probe (already polled by the global indicator) — when
   // FMP is degraded we KNOW the financials fetch likely landed on a 429,
@@ -247,20 +255,7 @@ export default function Index() {
   }, [financialsData]);
 
 
-  // Today vs previous-close delta (NOT a true post-market price — FMP free
-  // tier doesn't carry after-hours quote). When a paid key/upgrade adds a
-  // dedicated extended-hours field, replace this with that value.
-  // Note: surfacing as "Today vs Prev Close" rather than "After Hours" so the
-  // label matches the math.
-  const todayVsPrevClose = useMemo(() => {
-    if (!quoteData?.price || !quoteData?.previousClose) return null;
-    const delta = quoteData.price - quoteData.previousClose;
-    return {
-      price: quoteData.price,
-      delta,
-      deltaPct: (delta / quoteData.previousClose) * 100,
-    };
-  }, [quoteData]);
+
 
   // Locale-aware earnings-date formatted via `formatEarningsDate` (en:
   // "Apr 22, 2026", he: "22 באפר 2026"). The previous `toISOString().slice(0,10)`
@@ -281,107 +276,140 @@ export default function Index() {
   return (
     <div className="w-full bg-background dark">
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Quiet header — company identity + price are facts, not the show */}
-        <div className="mb-10 flex flex-col items-start text-left">
-          <div className="flex items-center justify-start gap-3 mb-3">
-            <TickerLogo ticker={ticker} size="md" />
-            <div>
-              <h1 className="font-display text-2xl font-bold text-foreground tracking-tight">
-                {overviewData?.companyName ?? screenerAsset?.name ?? ticker}
-              </h1>
-              <p className="text-xs text-muted-foreground font-mono tracking-wide">
-                {ticker} · {overviewData?.exchange ?? screenerAsset?.exchange ?? "—"}
-              </p>
-            </div>
-          </div>
+        {/* ── Hero ── */}
+        <div className="mb-12 relative rounded-2xl overflow-hidden border border-border/60">
+          {/* Subtle radial glow behind the logo */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                "radial-gradient(ellipse 60% 80% at 50% 0%, hsl(var(--primary)/0.12) 0%, transparent 70%)",
+            }}
+          />
 
-          {/* Stock Price — quiet, tabular, no live-tick theater */}
-          <div className="mb-2">
-            {quoteLoading ? (
-              <HeaderPriceSkeleton />
-            ) : quoteData?.price ? (
-              <div className="flex items-baseline justify-start gap-2.5">
-                <span
-                  className="text-3xl font-semibold text-foreground font-mono tabular-nums"
-                  dir="ltr"
-                >
-                  ${quoteData.price.toFixed(2)}
-                </span>
-                <span className="flex items-center gap-1.5" dir="ltr">
-                  <span
-                    className={`text-sm font-medium font-mono tabular-nums ${quoteData.change >= 0 ? "text-chart-positive" : "text-chart-negative"}`}
-                  >
-                    {quoteData.change >= 0 ? "+" : ""}
-                    {quoteData.change.toFixed(2)}
+          <div className="relative px-8 pt-10 pb-8 flex flex-col items-center text-center">
+            {/* Logo — large */}
+            <div className="mb-5 ring-2 ring-border/40 rounded-2xl shadow-xl shadow-black/40">
+              <TickerLogo ticker={ticker} size="xl" />
+            </div>
+
+            {/* Company name + exchange badge */}
+            <h1 className="font-display text-4xl font-bold text-foreground tracking-tight mb-1">
+              {overviewData?.companyName ?? screenerAsset?.name ?? ticker}
+            </h1>
+            <p className="text-sm text-muted-foreground font-mono tracking-widest uppercase mb-5">
+              {ticker}
+              {(overviewData?.exchange ?? screenerAsset?.exchange) && (
+                <> · {overviewData?.exchange ?? screenerAsset?.exchange}</>
+              )}
+            </p>
+
+            {/* Divider */}
+            <div className="w-16 h-px bg-border/60 mb-6" />
+
+            {/* Price block */}
+            <div className="mb-2">
+              {quoteLoading ? (
+                <HeaderPriceSkeleton />
+              ) : quoteData?.price ? (
+                <div className="inline-flex items-center justify-center gap-3" dir="ltr">
+                  <span className="text-5xl font-bold text-foreground font-mono tabular-nums tracking-tight leading-none">
+                    ${quoteData.price.toFixed(2)}
                   </span>
-                  <span
-                    className={`px-1.5 py-0.5 rounded text-xs font-medium font-mono tabular-nums ${quoteData.changesPercentage >= 0 ? "bg-chart-positive/10 text-chart-positive" : "bg-chart-negative/10 text-chart-negative"}`}
-                  >
-                    {quoteData.changesPercentage >= 0 ? "+" : ""}
-                    {quoteData.changesPercentage.toFixed(2)}%
+                  <div className="flex flex-col items-start justify-between self-stretch py-0.5">
+                    <span
+                      className={`text-base font-semibold font-mono tabular-nums leading-none ${quoteData.change >= 0 ? "text-chart-positive" : "text-chart-negative"}`}
+                    >
+                      {quoteData.change >= 0 ? "+" : ""}{quoteData.change.toFixed(2)}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded-md text-sm font-semibold font-mono tabular-nums leading-none ${quoteData.changesPercentage >= 0 ? "bg-chart-positive/15 text-chart-positive" : "bg-chart-negative/15 text-chart-negative"}`}
+                    >
+                      {quoteData.changesPercentage >= 0 ? "+" : ""}{quoteData.changesPercentage.toFixed(2)}%
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-muted-foreground text-lg">{t("index.unavailableApi")}</div>
+              )}
+            </div>
+
+            {/* Earnings sub-line */}
+            <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs text-muted-foreground mt-3">
+              <span>
+                {t("index.earnings")}{" "}
+                {earningsDate ? (
+                  <span className="text-primary font-mono" dir="ltr">{earningsDate}</span>
+                ) : (
+                  <span className="text-muted-foreground/50" dir="ltr">—</span>
+                )}
+              </span>
+            </div>
+
+            {/* Context chips — sector / industry / market cap */}
+            {(overviewData?.sector ?? screenerAsset?.sector ?? overviewData?.industry ?? quoteData?.marketCap) && (
+              <div className="flex flex-wrap justify-center gap-2 mt-6">
+                {(overviewData?.sector ?? screenerAsset?.sector) && (
+                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-muted/60 text-muted-foreground border border-border/50">
+                    {overviewData?.sector ?? screenerAsset?.sector}
                   </span>
-                </span>
-              </div>
-            ) : (
-              <div className="text-center text-muted-foreground text-lg">
-                {t("index.unavailableApi")}
+                )}
+                {(overviewData?.industry ?? screenerAsset?.industry) && (
+                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-muted/60 text-muted-foreground border border-border/50">
+                    {overviewData?.industry ?? screenerAsset?.industry}
+                  </span>
+                )}
+                {quoteData?.marketCap && (
+                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
+                    {quoteData.marketCap >= 1e12
+                      ? `$${(quoteData.marketCap / 1e12).toFixed(2)}T`
+                      : quoteData.marketCap >= 1e9
+                      ? `$${(quoteData.marketCap / 1e9).toFixed(1)}B`
+                      : `$${(quoteData.marketCap / 1e6).toFixed(0)}M`}{" "}
+                    Market Cap
+                  </span>
+                )}
               </div>
             )}
-          </div>
 
-          {/* Today vs Prev Close — fed by live quote */}
-          <div className="flex flex-wrap justify-start gap-x-5 gap-y-1 text-xs text-muted-foreground">
-            <span>
-              {t("index.change")}{" "}
-              {todayVsPrevClose ? (
-                <span
-                  className={`font-mono tabular-nums ${todayVsPrevClose.delta >= 0 ? "text-chart-positive" : "text-chart-negative"}`}
-                  dir="ltr"
-                >
-                  {todayVsPrevClose.delta >= 0 ? "+" : ""}
-                  {todayVsPrevClose.delta.toFixed(2)} (
-                  {todayVsPrevClose.delta >= 0 ? "+" : ""}
-                  {todayVsPrevClose.deltaPct.toFixed(2)}%)
-                </span>
-              ) : (
-                <span className="text-muted-foreground/60" dir="ltr">
-                  —
-                </span>
-              )}
-            </span>
-            <span>
-              {t("index.earnings")}{" "}
-              {earningsDate ? (
-                <span className="text-primary font-mono" dir="ltr">
-                  {earningsDate}
-                </span>
-              ) : (
-                <span className="text-muted-foreground/60" dir="ltr">
-                  —
-                </span>
-              )}
-            </span>
-          </div>
-        </div>
+            <StockFundamentalsStrip
+              quote={quoteData}
+              metrics={stockMetricsData}
+              annualFinancials={financialsData}
+              quarterlyFinancials={quarterlyFinancialsData}
+              analyst={analystData}
+              marketCap={quoteData?.marketCap ?? overviewData?.marketCap ?? screenerAsset?.market_cap}
+              loading={
+                quoteLoading ||
+                stockMetricsLoading ||
+                quarterlyFinancialsLoading
+              }
+            />
 
-        {/* Quality Brief Section */}
-        <div className="bg-card rounded-panel p-8 border border-border mb-12">
-          <h2 className="font-display text-sm font-semibold text-foreground mb-4">
-            {t("index.qualityInBrief")}
-          </h2>
-          <ul className="space-y-3 text-sm text-foreground">
-            <li className="flex gap-2">
-              <span className="text-primary font-bold shrink-0">—</span>
-              <span dangerouslySetInnerHTML={{ __html: t("index.news1") }} />
-            </li>
-            <li className="flex gap-2">
-              <span className="text-primary font-bold shrink-0">—</span>
-              <span dangerouslySetInnerHTML={{ __html: t("index.news2") }} />
-            </li>
-          </ul>
-          <button className="mt-4 text-primary hover:opacity-80 transition-opacity text-sm font-medium">
-            {t("index.viewMore")}
-          </button>
+            {/* Quality brief stays in the hero to avoid a second full-width card. */}
+            <div className="w-full mt-6 pt-5 border-t border-border/50 text-left">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <h2 className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground/80 mb-2">
+                    {t("index.qualityInBrief")}
+                  </h2>
+                  <ul className="grid gap-1.5 text-xs text-foreground/90 sm:grid-cols-2 sm:gap-x-6">
+                    <li className="flex gap-2">
+                      <span className="text-primary font-bold shrink-0">—</span>
+                      <span dangerouslySetInnerHTML={{ __html: t("index.news1") }} />
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="text-primary font-bold shrink-0">—</span>
+                      <span dangerouslySetInnerHTML={{ __html: t("index.news2") }} />
+                    </li>
+                  </ul>
+                </div>
+                <button className="shrink-0 text-primary hover:opacity-80 transition-opacity text-xs font-medium sm:mt-5">
+                  {t("index.viewMore")}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Charts Grid - 4x2 — three render states driven by query fetch status */}
