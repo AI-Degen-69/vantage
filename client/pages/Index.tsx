@@ -7,7 +7,14 @@ import CompanyProfile from "@/components/CompanyProfile";
 import TickerLogo from "@/components/TickerLogo";
 import { HeaderPriceSkeleton, MetricCardSkeleton } from "@/components/Skeleton";
 import { financialMetrics, FinancialMetric } from "@/lib/mockData";
-import { useStockQuote, useStockProfile, useStockFinancials, useProviderHealth, useStockYahooFallbackFinancials, useProviderUsage } from "@/hooks/useStockData";
+import {
+  useStockQuote,
+  useStockProfile,
+  useStockFinancials,
+  useProviderHealth,
+  useStockYahooFallbackFinancials,
+  useProviderUsage,
+} from "@/hooks/useStockData";
 import {
   cagrAtYearsBack,
   detectPeriodGranularity,
@@ -46,7 +53,8 @@ function YahooFallbackGrid({
   const safeText = (
     value: number | null,
     formatter: (n: number) => string,
-  ): string => (value === null || !Number.isFinite(value) ? emDash : formatter(value));
+  ): string =>
+    value === null || !Number.isFinite(value) ? emDash : formatter(value);
   const safeBadge = (value: number | null): string =>
     value === null || !Number.isFinite(value) ? emDash : formatPercent(value);
   const cards: Array<{
@@ -107,23 +115,25 @@ function YahooFallbackGrid({
   return (
     <>
       {cards.map((card, idx) => {
-        const valueClass = card.badgeType === "positive"
-          ? "border-green-500/30"
-          : card.badgeType === "negative"
-            ? "border-red-500/30"
-            : "border-slate-500/30";
-        const badgeClass = card.badgeType === "positive"
-          ? "bg-green-500/20 text-green-400"
-          : card.badgeType === "negative"
-            ? "bg-red-500/20 text-red-400"
-            : "bg-slate-500/20 text-slate-300";
+        const valueClass =
+          card.badgeType === "positive"
+            ? "border-chart-positive/30"
+            : card.badgeType === "negative"
+              ? "border-chart-negative/30"
+              : "border-border";
+        const badgeClass =
+          card.badgeType === "positive"
+            ? "bg-chart-positive/10 text-chart-positive"
+            : card.badgeType === "negative"
+              ? "bg-chart-negative/10 text-chart-negative"
+              : "bg-muted text-muted-foreground";
         return (
           <div
             key={idx}
-            className={`bg-card border ${valueClass} rounded-xl p-4 flex flex-col`}
+            className={`bg-card border ${valueClass} rounded-panel p-4 flex flex-col`}
           >
             <div className="flex items-start justify-between gap-2 mb-3">
-              <span className="text-sm text-muted-foreground font-medium">
+              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
                 {card.title}
               </span>
               <span
@@ -135,11 +145,14 @@ function YahooFallbackGrid({
               </span>
             </div>
             <div className="flex items-end gap-3 mb-1">
-              <span className="text-3xl font-bold text-foreground tracking-tight" dir="ltr">
+              <span
+                className="text-2xl font-semibold text-foreground font-mono tabular-nums tracking-tight"
+                dir="ltr"
+              >
                 {card.value}
               </span>
               <span
-                className={`text-xs font-semibold px-2 py-0.5 rounded border mb-1 ${badgeClass} border-current/20`}
+                className={`text-xs font-semibold font-mono tabular-nums px-2 py-0.5 rounded border mb-1 ${badgeClass} border-current/20`}
                 dir="ltr"
               >
                 {card.badge}
@@ -158,12 +171,15 @@ function YahooFallbackGrid({
 export default function Index() {
   const { t } = useI18n();
   const { ticker: urlTicker } = useParams<{ ticker?: string }>();
-  const [selectedMetric, setSelectedMetric] = useState<FinancialMetric | null>(null);
+  const [selectedMetric, setSelectedMetric] = useState<FinancialMetric | null>(
+    null,
+  );
 
   const ticker = urlTicker?.toUpperCase() || "AAPL";
 
   const { data: quoteData, isLoading: quoteLoading } = useStockQuote(ticker);
-  const { data: overviewData, isLoading: overviewLoading } = useStockProfile(ticker);
+  const { data: overviewData, isLoading: overviewLoading } =
+    useStockProfile(ticker);
   // isFetched becomes true once the first query attempt settles (success
   // OR failure). We need it to distinguish "still loading" from "loaded
   // with no data" — otherwise the metrics grid shows skeletons forever
@@ -188,14 +204,22 @@ export default function Index() {
   // in for "the whole /stable/ surface is rate-limited" because the
   // window is a rolling 24h. showFmpRateLimit then renders a localized
   // hint under the empty-state with hours-until-reset math.
-  const fmpDown = fmpProbe?.status === "down" || fmpProbe?.status === "degraded";
+  const fmpDown =
+    fmpProbe?.status === "down" || fmpProbe?.status === "degraded";
   // FMP's free tier window is per-day (rolling 24h). Use the authoritative
   // reset timestamp from the provider-usage tracker when available; otherwise
   // display the "unknown reset" fallback instead of calculating a 24-hour estimate.
   const { data: providerUsage } = useProviderUsage();
-  const fmpUsageEntry = providerUsage?.entries?.find((e) => e.provider === "fmp");
+  const fmpUsageEntry = providerUsage?.entries?.find(
+    (e) => e.provider === "fmp",
+  );
   const fmpHoursUntilReset = fmpUsageEntry?.resetsAt
-    ? Math.max(0, Math.floor((new Date(fmpUsageEntry.resetsAt).getTime() - Date.now()) / 3_600_000))
+    ? Math.max(
+        0,
+        Math.floor(
+          (new Date(fmpUsageEntry.resetsAt).getTime() - Date.now()) / 3_600_000,
+        ),
+      )
     : null;
 
   const metrics = useMemo(() => {
@@ -211,7 +235,7 @@ export default function Index() {
       const incAsc = [...inc].sort((a, b) => (a.date < b.date ? -1 : 1));
       const balAsc = [...bal].sort((a, b) => (a.date < b.date ? -1 : 1));
 
-      const safeYoy = (arr: typeof inc, key: keyof typeof inc[number]) => {
+      const safeYoy = (arr: typeof inc, key: keyof (typeof inc)[number]) => {
         if (arr.length < 2) return 0;
         const prev = arr[arr.length - 2][key] as number;
         const current = arr[arr.length - 1][key] as number;
@@ -229,7 +253,7 @@ export default function Index() {
       const granularity = detectPeriodGranularity(incAsc);
       const safeCagrAtYears = (
         arr: typeof inc,
-        key: keyof typeof inc[number],
+        key: keyof (typeof inc)[number],
         years: number,
       ): number | null => cagrAtYearsBack(arr, key, years, granularity);
 
@@ -240,7 +264,10 @@ export default function Index() {
           yoy: safeYoy(incAsc, "revenue"),
           cagr3Y: safeCagrAtYears(incAsc, "revenue", 3),
           cagr5Y: safeCagrAtYears(incAsc, "revenue", 5),
-          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.revenue / 1e9 })),
+          data: incAsc.map((d) => ({
+            date: d.calendarYear,
+            value: d.revenue / 1e9,
+          })),
           type: "bar",
           color: "blue",
         },
@@ -250,7 +277,10 @@ export default function Index() {
           yoy: safeYoy(incAsc, "ebitda"),
           cagr3Y: safeCagrAtYears(incAsc, "ebitda", 3),
           cagr5Y: safeCagrAtYears(incAsc, "ebitda", 5),
-          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.ebitda / 1e9 })),
+          data: incAsc.map((d) => ({
+            date: d.calendarYear,
+            value: d.ebitda / 1e9,
+          })),
           type: "bar",
           color: "blue",
         },
@@ -260,7 +290,10 @@ export default function Index() {
           yoy: safeYoy(incAsc, "grossProfit"),
           cagr3Y: safeCagrAtYears(incAsc, "grossProfit", 3),
           cagr5Y: safeCagrAtYears(incAsc, "grossProfit", 5),
-          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.grossProfit / 1e9 })),
+          data: incAsc.map((d) => ({
+            date: d.calendarYear,
+            value: d.grossProfit / 1e9,
+          })),
           type: "bar",
           color: "blue",
         },
@@ -270,7 +303,11 @@ export default function Index() {
           yoy: safeYoy(incAsc, "operatingIncome"),
           cagr3Y: safeCagrAtYears(incAsc, "operatingIncome", 3),
           cagr5Y: safeCagrAtYears(incAsc, "operatingIncome", 5),
-          data: (incAsc.filter((row) => row.operatingIncome !== undefined) as typeof inc).map((d) => ({
+          data: (
+            incAsc.filter(
+              (row) => row.operatingIncome !== undefined,
+            ) as typeof inc
+          ).map((d) => ({
             date: d.calendarYear,
             value: (d.operatingIncome ?? 0) / 1e9,
           })),
@@ -283,7 +320,10 @@ export default function Index() {
           yoy: safeYoy(incAsc, "netIncome"),
           cagr3Y: safeCagrAtYears(incAsc, "netIncome", 3),
           cagr5Y: safeCagrAtYears(incAsc, "netIncome", 5),
-          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.netIncome / 1e9 })),
+          data: incAsc.map((d) => ({
+            date: d.calendarYear,
+            value: d.netIncome / 1e9,
+          })),
           type: "bar",
           color: "blue",
         },
@@ -302,13 +342,27 @@ export default function Index() {
           unit: "B",
           yoy:
             balAsc.length >= 2
-              ? ((balAsc[balAsc.length - 1].cashAndCashEquivalents - balAsc[balAsc.length - 2].cashAndCashEquivalents) /
+              ? ((balAsc[balAsc.length - 1].cashAndCashEquivalents -
+                  balAsc[balAsc.length - 2].cashAndCashEquivalents) /
                   Math.abs(balAsc[balAsc.length - 2].cashAndCashEquivalents)) *
                 100
               : 0,
-          cagr3Y: cagrAtYearsBack(balAsc, "cashAndCashEquivalents", 3, granularity),
-          cagr5Y: cagrAtYearsBack(balAsc, "cashAndCashEquivalents", 5, granularity),
-          data: balAsc.map((d) => ({ date: d.calendarYear, value: d.cashAndCashEquivalents / 1e9 })),
+          cagr3Y: cagrAtYearsBack(
+            balAsc,
+            "cashAndCashEquivalents",
+            3,
+            granularity,
+          ),
+          cagr5Y: cagrAtYearsBack(
+            balAsc,
+            "cashAndCashEquivalents",
+            5,
+            granularity,
+          ),
+          data: balAsc.map((d) => ({
+            date: d.calendarYear,
+            value: d.cashAndCashEquivalents / 1e9,
+          })),
           type: "bar",
           color: "green",
         },
@@ -317,11 +371,17 @@ export default function Index() {
           unit: "B",
           yoy:
             balAsc.length >= 2
-              ? ((balAsc[balAsc.length - 1].totalAssets - balAsc[balAsc.length - 2].totalAssets) / Math.abs(balAsc[balAsc.length - 2].totalAssets)) * 100
+              ? ((balAsc[balAsc.length - 1].totalAssets -
+                  balAsc[balAsc.length - 2].totalAssets) /
+                  Math.abs(balAsc[balAsc.length - 2].totalAssets)) *
+                100
               : 0,
           cagr3Y: cagrAtYearsBack(balAsc, "totalAssets", 3, granularity),
           cagr5Y: cagrAtYearsBack(balAsc, "totalAssets", 5, granularity),
-          data: balAsc.map((d) => ({ date: d.calendarYear, value: (d.totalAssets ?? 0) / 1e9 })),
+          data: balAsc.map((d) => ({
+            date: d.calendarYear,
+            value: (d.totalAssets ?? 0) / 1e9,
+          })),
           type: "bar",
           color: "purple",
         },
@@ -338,18 +398,15 @@ export default function Index() {
   // FMP probe never fires the Yahoo round-trip. Shares the query key
   // `["stockYahooFallbackFinancials", ticker]` with any other observer,
   // so React Query dedupes across renders.
-  const { data: yahooFallbackData } = useStockYahooFallbackFinancials(
-    ticker,
-    { enabled: fmpDown && financialsFetched && metrics.length === 0 },
-  );
+  const { data: yahooFallbackData } = useStockYahooFallbackFinancials(ticker, {
+    enabled: fmpDown && financialsFetched && metrics.length === 0,
+  });
   // `hasAnyFallbackValue` gates the fallback render on the basis that a
   // valid Yahoo response always carries at least one finite number — a
   // payload of all `null` (which the server emits on total upstream
   // failure) should fall through to the existing "Metrics unavailable"
   // empty-state rather than render four dashes posing as a snapshot.
-  const hasAnyFallbackValue = (
-    yf?: typeof yahooFallbackData,
-  ): boolean => {
+  const hasAnyFallbackValue = (yf?: typeof yahooFallbackData): boolean => {
     if (!yf) return false;
     return (
       yf.revenue !== null ||
@@ -409,38 +466,41 @@ export default function Index() {
   return (
     <div className="w-full bg-background dark">
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Centered Header Section */}
-        <div className="mb-12 text-center">
-          <div className="flex items-center justify-center gap-4 mb-4">
+        {/* Quiet header — company identity + price are facts, not the show */}
+        <div className="mb-10 flex flex-col items-start text-left">
+          <div className="flex items-center justify-start gap-3 mb-3">
             <TickerLogo ticker={ticker} size="md" />
             <div>
-              <h1 className="text-3xl font-bold text-foreground">
+              <h1 className="font-display text-2xl font-bold text-foreground tracking-tight">
                 {overviewData?.companyName ?? ticker}
               </h1>
-              <p className="text-sm text-muted-foreground">
-                {ticker} | {overviewData?.exchange ?? "—"}
+              <p className="text-xs text-muted-foreground font-mono tracking-wide">
+                {ticker} · {overviewData?.exchange ?? "—"}
               </p>
             </div>
           </div>
 
-          {/* Stock Price */}
-          <div className="mb-3">
+          {/* Stock Price — quiet, tabular, no live-tick theater */}
+          <div className="mb-2">
             {quoteLoading ? (
               <HeaderPriceSkeleton />
             ) : quoteData?.price ? (
-              <div className="flex items-baseline justify-center gap-3">
-                <span className="text-5xl font-bold text-foreground" dir="ltr">
+              <div className="flex items-baseline justify-start gap-2.5">
+                <span
+                  className="text-3xl font-semibold text-foreground font-mono tabular-nums"
+                  dir="ltr"
+                >
                   ${quoteData.price.toFixed(2)}
                 </span>
-                <span className="flex items-center gap-1" dir="ltr">
+                <span className="flex items-center gap-1.5" dir="ltr">
                   <span
-                    className={`text-lg font-semibold ${quoteData.change >= 0 ? "text-chart-green" : "text-red-400"}`}
+                    className={`text-sm font-medium font-mono tabular-nums ${quoteData.change >= 0 ? "text-chart-positive" : "text-chart-negative"}`}
                   >
                     {quoteData.change >= 0 ? "+" : ""}
                     {quoteData.change.toFixed(2)}
                   </span>
                   <span
-                    className={`px-2 py-1 rounded text-xs font-semibold ${quoteData.changesPercentage >= 0 ? "bg-chart-green/20 text-chart-green" : "bg-red-400/20 text-red-400"}`}
+                    className={`px-1.5 py-0.5 rounded text-xs font-medium font-mono tabular-nums ${quoteData.changesPercentage >= 0 ? "bg-chart-positive/10 text-chart-positive" : "bg-chart-negative/10 text-chart-negative"}`}
                   >
                     {quoteData.changesPercentage >= 0 ? "+" : ""}
                     {quoteData.changesPercentage.toFixed(2)}%
@@ -448,58 +508,69 @@ export default function Index() {
                 </span>
               </div>
             ) : (
-              <div className="text-center text-slate-400 text-xl">{t("index.unavailableApi")}</div>
+              <div className="text-center text-muted-foreground text-lg">
+                {t("index.unavailableApi")}
+              </div>
             )}
           </div>
 
           {/* Today vs Prev Close — fed by live quote */}
-          <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-muted-foreground">
+          <div className="flex flex-wrap justify-start gap-x-5 gap-y-1 text-xs text-muted-foreground">
             <span>
               {t("index.change")}{" "}
               {todayVsPrevClose ? (
                 <span
-                  className={todayVsPrevClose.delta >= 0 ? "text-green-400" : "text-red-400"}
+                  className={`font-mono tabular-nums ${todayVsPrevClose.delta >= 0 ? "text-chart-positive" : "text-chart-negative"}`}
                   dir="ltr"
                 >
                   {todayVsPrevClose.delta >= 0 ? "+" : ""}
-                  {todayVsPrevClose.delta.toFixed(2)} ({todayVsPrevClose.delta >= 0 ? "+" : ""}
+                  {todayVsPrevClose.delta.toFixed(2)} (
+                  {todayVsPrevClose.delta >= 0 ? "+" : ""}
                   {todayVsPrevClose.deltaPct.toFixed(2)}%)
                 </span>
               ) : (
-                <span className="text-slate-500" dir="ltr">—</span>
+                <span className="text-muted-foreground/60" dir="ltr">
+                  —
+                </span>
               )}
             </span>
             <span>
               {t("index.earnings")}{" "}
               {earningsDate ? (
-                <span className="text-blue-400" dir="ltr">{earningsDate}</span>
+                <span className="text-primary font-mono" dir="ltr">
+                  {earningsDate}
+                </span>
               ) : (
-                <span className="text-slate-500" dir="ltr">—</span>
+                <span className="text-muted-foreground/60" dir="ltr">
+                  —
+                </span>
               )}
             </span>
           </div>
         </div>
 
         {/* Quality Brief Section */}
-        <div className="bg-card rounded-lg p-8 border border-border mb-12">
-          <h2 className="text-xl font-semibold text-foreground mb-4">{t("index.qualityInBrief")}</h2>
+        <div className="bg-card rounded-panel p-8 border border-border mb-12">
+          <h2 className="font-display text-sm font-semibold text-foreground mb-4">
+            {t("index.qualityInBrief")}
+          </h2>
           <ul className="space-y-3 text-sm text-foreground">
             <li className="flex gap-2">
-              <span className="text-chart-green font-bold shrink-0">•</span>
+              <span className="text-primary font-bold shrink-0">—</span>
               <span dangerouslySetInnerHTML={{ __html: t("index.news1") }} />
             </li>
             <li className="flex gap-2">
-              <span className="text-chart-green font-bold shrink-0">•</span>
+              <span className="text-primary font-bold shrink-0">—</span>
               <span dangerouslySetInnerHTML={{ __html: t("index.news2") }} />
             </li>
           </ul>
-          <button className="mt-4 text-blue-400 hover:text-blue-300 text-sm font-medium">
+          <button className="mt-4 text-primary hover:opacity-80 transition-opacity text-sm font-medium">
             {t("index.viewMore")}
           </button>
         </div>
 
         {/* Charts Grid - 4x2 — three render states driven by query fetch status */}
-        <h2 className="text-2xl font-semibold text-foreground mb-6">
+        <h2 className="font-display text-sm font-semibold text-foreground mb-6">
           {t("index.financialMetricsTitle")}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
@@ -520,12 +591,14 @@ export default function Index() {
                 chipLabel={t("index.metricsYahooFallbackChip")}
                 chipTitle={t("index.metricsYahooFallbackTitle")}
                 formatBillions={(n: number) => `${(n / 1e9).toFixed(2)}B`}
-                formatPercent={(n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`}
+                formatPercent={(n: number) =>
+                  `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`
+                }
                 formatUSD={(n: number) => `$${n.toFixed(2)}`}
                 emDash="—"
               />
             ) : (
-              <div className="col-span-full bg-card border border-border rounded-xl px-6 py-10 text-center">
+              <div className="col-span-full bg-card border border-border rounded-panel px-6 py-10 text-center">
                 <p className="text-sm text-muted-foreground">
                   {t("index.metricsUnavailable", { ticker })}
                 </p>
@@ -538,7 +611,7 @@ export default function Index() {
                     state (e.g. a symbol FMP doesn't cover) still reads as
                     "no data" without alarm. */}
                 {fmpDown && (
-                  <p className="mt-3 text-xs text-amber-300/90 max-w-md mx-auto leading-relaxed">
+                  <p className="mt-3 text-xs text-chart-amber/90 max-w-md mx-auto leading-relaxed">
                     {fmpHoursUntilReset !== null
                       ? t("index.metricsRateLimited", {
                           hours: fmpHoursUntilReset,
@@ -556,7 +629,7 @@ export default function Index() {
                     // refetch, so this button is honest about a likely no-op.
                     refetchFinancials().catch(() => null);
                   }}
-                  className="mt-4 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                  className="mt-4 text-xs text-primary hover:opacity-80 transition-opacity"
                 >
                   {t("index.metricsRetry")}
                 </button>
@@ -569,7 +642,11 @@ export default function Index() {
               return (
                 <InsightsCard
                   key={idx}
-                  title={t(metric.name) === metric.name ? metric.name.split(".")[1] : t(metric.name)}
+                  title={
+                    t(metric.name) === metric.name
+                      ? metric.name.split(".")[1]
+                      : t(metric.name)
+                  }
                   value={`${latestVal.toFixed(2)}${metric.unit === "$" ? "" : metric.unit}`}
                   badgeText={`${yoyChange >= 0 ? "+" : ""}${yoyChange.toFixed(2)}%`}
                   badgeType={yoyChange >= 0 ? "positive" : "negative"}

@@ -1,5 +1,5 @@
 /** @import must precede all other statements */
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -60,54 +60,57 @@
   }
 
   .dark {
-    /* Bloomberg Terminal Theme */
-    --background: 270 33% 3%;
-    --foreground: 0 0% 94%;
+    /* Observatory Light-Curve Theme — see DESIGN.md */
+    --background: 250 45% 4%; /* Night Sky */
+    --foreground: 210 20% 95%; /* Starlight White */
 
-    --card: 270 25% 13%;
-    --card-foreground: 0 0% 94%;
+    --card: 250 30% 9%; /* Deep Field */
+    --card-foreground: 210 20% 95%;
 
-    --popover: 270 33% 3%;
-    --popover-foreground: 0 0% 94%;
+    --popover: 250 45% 4%;
+    --popover-foreground: 210 20% 95%;
 
-    --primary: 45 98% 52%;
-    --primary-foreground: 0 0% 0%;
+    --primary: 42 65% 70%; /* Starlight Gold — the one accent, ≤15% of any screen */
+    --primary-foreground: 250 45% 4%;
 
-    --secondary: 270 25% 13%;
-    --secondary-foreground: 0 0% 94%;
+    --secondary: 250 30% 9%;
+    --secondary-foreground: 210 20% 95%;
 
-    --muted: 270 25% 13%;
-    --muted-foreground: 0 0% 53%;
+    --muted: 250 30% 9%;
+    --muted-foreground: 220 10% 60%; /* Dust */
 
-    --accent: 270 25% 13%;
-    --accent-foreground: 0 0% 94%;
+    --accent: 250 33% 12%;
+    --accent-foreground: 210 20% 95%;
 
-    --destructive: 0 100% 50%;
+    --destructive: 350 75% 60%; /* form/system errors — distinct from Ember Red (loss semantics) */
     --destructive-foreground: 0 0% 100%;
 
-    --border: 270 25% 20%;
-    --input: 270 25% 13%;
-    --ring: 45 98% 52%;
+    --border: 250 20% 16%; /* Graticule */
+    --input: 250 30% 9%;
+    --ring: 42 65% 70%;
+
+    --radius: 10px;
 
     /* Financial dashboard colors */
-    --chart-green: 160 100% 50%;
-    --chart-orange: 32 100% 50%;
-    --chart-blue: 217 91% 60%;
-    --chart-cyan: 188 94% 50%;
-    --chart-purple: 270 100% 55%;
-    --chart-pink: 0 100% 50%;
-    --chart-accent: 45 98% 52%;
-    --chart-positive: 160 100% 50%;
-    --chart-negative: 0 100% 50%;
+    --chart-green: 155 55% 50%; /* Aurora Green — gains */
+    --chart-orange: 32 85% 58%;
+    --chart-blue: 200 60% 60%; /* Nebula Blue */
+    --chart-cyan: 190 65% 58%;
+    --chart-purple: 265 45% 62%; /* Deep Space Violet */
+    --chart-pink: 340 55% 62%;
+    --chart-amber: 38 92% 60%; /* Warning Amber — rate-limit notice */
+    --chart-accent: 42 65% 70%; /* Starlight Gold */
+    --chart-positive: 155 55% 50%; /* Aurora Green */
+    --chart-negative: 6 70% 58%; /* Ember Red — losses */
 
-    --sidebar-background: 270 33% 3%;
-    --sidebar-foreground: 0 0% 94%;
-    --sidebar-primary: 45 98% 52%;
-    --sidebar-primary-foreground: 0 0% 0%;
-    --sidebar-accent: 270 25% 13%;
-    --sidebar-accent-foreground: 0 0% 94%;
-    --sidebar-border: 270 25% 20%;
-    --sidebar-ring: 45 98% 52%;
+    --sidebar-background: 250 45% 4%;
+    --sidebar-foreground: 210 20% 95%;
+    --sidebar-primary: 42 65% 70%;
+    --sidebar-primary-foreground: 250 45% 4%;
+    --sidebar-accent: 250 30% 9%;
+    --sidebar-accent-foreground: 210 20% 95%;
+    --sidebar-border: 250 20% 16%;
+    --sidebar-ring: 42 65% 70%;
   }
 }
 
@@ -121,7 +124,7 @@
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
   }
 
   :where(p, span, li, h1, h2, h3, h4, h5, h6, a, button, label, td, th) {

@@ -40,9 +40,9 @@ export default function Sidebar() {
   const { t } = useI18n();
 
   return (
-    <aside className="w-64 bg-slate-900 border-e border-slate-800 h-screen flex flex-col">
+    <aside className="w-64 bg-background border-e border-border h-screen flex flex-col">
       {/* Navigation Menu */}
-      <nav className="flex-1 px-3 py-6 space-y-2">
+      <nav className="flex-1 px-3 py-6 space-y-1">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.href;
@@ -51,10 +51,10 @@ export default function Sidebar() {
             <Link
               key={item.href}
               to={item.href}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg text-white text-base font-medium transition-colors ${
+              className={`flex items-center gap-3 px-4 py-3 rounded-[6px] text-base font-medium transition-colors ${
                 isActive
-                  ? "bg-blue-600 hover:bg-blue-700"
-                  : "hover:bg-slate-800"
+                  ? "bg-primary/10 text-primary border-s-2 border-primary"
+                  : "text-muted-foreground hover:bg-card hover:text-foreground border-s-2 border-transparent"
               }`}
             >
               <Icon className="w-5 h-5 shrink-0" />
@@ -63,9 +63,9 @@ export default function Sidebar() {
           );
         })}
       </nav>
-      
+
       {/* Footer / Settings */}
-      <div className="p-4 border-t border-slate-800">
+      <div className="p-4 border-t border-border">
         <LanguageSwitcher />
         {/* Free-tier attribution link required by https://www.logo.dev/ when no
             paid plan is in place. Renders as a tiny muted text link so it
@@ -74,7 +74,7 @@ export default function Sidebar() {
           href={getLogoDevAttributionUrl()}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-3 block text-[10px] text-slate-500 hover:text-slate-300 transition-colors tracking-wide uppercase opacity-70 hover:opacity-100"
+          className="mt-3 block text-[10px] text-muted-foreground hover:text-foreground transition-colors tracking-wide uppercase opacity-70 hover:opacity-100"
           aria-label={t("attribution.logoDevAria")}
         >
           {t("attribution.logoDev")}

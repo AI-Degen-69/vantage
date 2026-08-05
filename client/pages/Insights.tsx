@@ -3,7 +3,12 @@ import { Search, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useI18n, translateSector } from "@/lib/i18n";
 import BatchQuoteFallbackHint from "@/components/BatchQuoteFallbackHint";
-import { useInsightsTab, useBatchQuotes, useSectorHeatmap, useYahooDown } from "@/hooks/useStockData";
+import {
+  useInsightsTab,
+  useBatchQuotes,
+  useSectorHeatmap,
+  useYahooDown,
+} from "@/hooks/useStockData";
 import { SectorHeatsheet } from "@/components/SectorHeatsheet";
 import TickerLogo from "@/components/TickerLogo";
 import type { InsightsTabId, StockQuote } from "@shared/api";
@@ -45,11 +50,22 @@ export default function Insights() {
   const [activeTab, setActiveTab] = useState<InsightsTabId>("sp500");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const { data: tabData, isLoading: tabLoading, isFetching: tabFetching } = useInsightsTab(activeTab);
+  const {
+    data: tabData,
+    isLoading: tabLoading,
+    isFetching: tabFetching,
+  } = useInsightsTab(activeTab);
 
   // Pull live quotes for whatever universe the server returned.
-  const symbols = useMemo(() => tabData?.entries.map((e) => e.symbol) ?? [], [tabData]);
-  const { data: quoteData, isLoading: quotesLoading, isFetching: quotesFetching } = useBatchQuotes(symbols);
+  const symbols = useMemo(
+    () => tabData?.entries.map((e) => e.symbol) ?? [],
+    [tabData],
+  );
+  const {
+    data: quoteData,
+    isLoading: quotesLoading,
+    isFetching: quotesFetching,
+  } = useBatchQuotes(symbols);
 
   // merge: universe row + matched live quote (by symbol) → UI card model.
   const merged = useMemo(() => {
@@ -74,7 +90,9 @@ export default function Insights() {
   const filtered = useMemo(() => {
     const q = searchQuery.toLowerCase();
     return merged.filter(
-      (row) => row.symbol.toLowerCase().includes(q) || row.name.toLowerCase().includes(q)
+      (row) =>
+        row.symbol.toLowerCase().includes(q) ||
+        row.name.toLowerCase().includes(q),
     );
   }, [merged, searchQuery]);
 
@@ -116,19 +134,21 @@ export default function Insights() {
   return (
     <div className="w-full bg-background dark min-h-screen">
       {/* Header */}
-      <div className="bg-slate-800/50 border-b border-slate-700 px-8 py-12">
-        <h1 className="text-4xl font-bold text-center text-foreground mb-8">{t("insights.title")}</h1>
+      <div className="bg-card/50 border-b border-border px-8 py-12">
+        <h1 className="text-4xl font-bold text-center text-foreground mb-8">
+          {t("insights.title")}
+        </h1>
         <div className="max-w-2xl mx-auto">
-          <div className="relative flex items-center bg-slate-700/50 border border-slate-600 rounded-lg overflow-hidden">
-            <Search className="w-4 h-4 ms-4 text-slate-400 shrink-0" />
+          <div className="relative flex items-center bg-background border border-border rounded-lg overflow-hidden">
+            <Search className="w-4 h-4 ms-4 text-muted-foreground shrink-0" />
             <input
               type="text"
               placeholder={t("insights.search")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 bg-transparent outline-none border-0 px-4 py-3 text-foreground placeholder-slate-400"
+              className="flex-1 bg-transparent outline-none border-0 px-4 py-3 text-foreground placeholder-muted-foreground/70"
             />
-            <button className="flex items-center justify-center px-3 py-3 text-slate-400 hover:text-blue-400 transition-colors border-s border-slate-600">
+            <button className="flex items-center justify-center px-3 py-3 text-muted-foreground hover:text-primary transition-colors border-s border-border">
               <Settings className="w-4 h-4 shrink-0" />
             </button>
           </div>
@@ -147,13 +167,13 @@ export default function Insights() {
         isLoading={heatmapLoading && !heatmapData}
       />
       {heatmapFetching && !!heatmapData && (
-        <div className="text-center text-xs text-slate-500 -mt-2 mb-2">
+        <div className="text-center text-xs text-muted-foreground -mt-2 mb-2">
           {t("common.search")}…
         </div>
       )}
 
       {/* Tabs */}
-      <div className="bg-slate-800/30 border-b border-slate-700 overflow-x-auto">
+      <div className="bg-card/30 border-b border-border overflow-x-auto">
         <div className="flex px-8 space-x-1 items-center">
           {TABS.map((tab) => (
             <button
@@ -161,8 +181,8 @@ export default function Insights() {
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-3 font-medium text-sm whitespace-nowrap transition-colors border-b-2 ${
                 activeTab === tab.id
-                  ? "border-blue-500 text-blue-400"
-                  : "border-transparent text-slate-400 hover:text-foreground"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
               {t(tab.i18nKey)}
@@ -173,101 +193,451 @@ export default function Insights() {
             <span
               className={`text-[10px] font-medium uppercase tracking-wide px-2 py-1 rounded ${
                 isLive
-                  ? "text-emerald-300 bg-emerald-500/10"
+                  ? "text-chart-positive bg-chart-positive/10"
                   : isAnyLive
-                  ? "text-amber-300 bg-amber-500/10"
-                  : "text-yellow-400 bg-yellow-500/10"
+                    ? "text-primary bg-primary/10"
+                    : "text-yellow-400 bg-yellow-500/10"
               }`}
               title={
                 isLive
                   ? "All prices live"
                   : isAnyLive
-                  ? `${liveCount}/${totalCount} prices live`
-                  : "Showing curated names only — no live prices yet"
+                    ? `${liveCount}/${totalCount} prices live`
+                    : "Showing curated names only — no live prices yet"
               }
             >
               {isLive
                 ? t("insights.tabBadgeLive")
                 : isAnyLive
-                ? `${liveCount}/${totalCount} LIVE`
-                : t("insights.tabBadgeMock")}
+                  ? `${liveCount}/${totalCount} LIVE`
+                  : t("insights.tabBadgeMock")}
             </span>
           </div>
         </div>
       </div>
 
       {/* Grid */}
-      <div className="px-8 py-8">
-        {(tabLoading || quotesLoading) && merged.length === 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div
-                key={i}
-                className="bg-card rounded-lg p-4 border border-slate-700 h-[150px]"
-                aria-label="loading"
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {filtered.map((row) => {
-              const live = row.price !== undefined && Number.isFinite(row.price);
-              const pct = row.changePercent;
-              const cls = pct === undefined ? "text-slate-500" : pct >= 0 ? "text-green-400" : "text-red-400";
-              const sign = pct === undefined || pct < 0 ? "" : "+";
-              return (
-                <div
-                  key={row.symbol}
-                  onClick={() => navigate(`/stock/${row.symbol}`)}
-                  className="bg-card rounded-lg p-4 border border-slate-700 hover:border-slate-600 hover:bg-slate-700/30 transition-all cursor-pointer group"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <TickerLogo ticker={row.symbol} size="sm" />
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{row.symbol}</p>
-                        {row.sector && (
-                          // Hidden if translateSector() returns "" (treated
-                          // as missing). Resolves locale-aware: "Technology"
-                          // → "Technology" in EN, "טכנולוגיה" in HE.
-                          <p className="text-[10px] text-slate-500 uppercase tracking-wide truncate max-w-[120px]">
-                            {translateSector(t, row.sector)}
+      <div
+        data-impeccable-variants="15a93bf5"
+        data-impeccable-variant-count="2"
+        style={{ display: "contents" }}
+      >
+        {/* impeccable-variants-start 15a93bf5 */}
+        {/* Original */}
+        <div data-impeccable-variant="original">
+          <div className="px-8 py-8">
+            {(tabLoading || quotesLoading) && merged.length === 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="bg-card rounded-panel p-4 border border-border h-[150px]"
+                    aria-label="loading"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {filtered.map((row) => {
+                  const live =
+                    row.price !== undefined && Number.isFinite(row.price);
+                  const pct = row.changePercent;
+                  const cls =
+                    pct === undefined
+                      ? "text-muted-foreground"
+                      : pct >= 0
+                        ? "text-chart-positive"
+                        : "text-chart-negative";
+                  const sign = pct === undefined || pct < 0 ? "" : "+";
+                  return (
+                    <div
+                      key={row.symbol}
+                      onClick={() => navigate(`/stock/${row.symbol}`)}
+                      className="bg-card rounded-panel p-4 border border-border hover:border-primary/40 hover:bg-card/80 transition-all cursor-pointer group"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <TickerLogo ticker={row.symbol} size="sm" />
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">
+                              {row.symbol}
+                            </p>
+                            {row.sector && (
+                              // Hidden if translateSector() returns "" (treated
+                              // as missing). Resolves locale-aware: "Technology"
+                              // → "Technology" in EN, "טכנולוגיה" in HE.
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wide truncate max-w-[120px]">
+                                {translateSector(t, row.sector)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right rtl:text-left">
+                          <p
+                            className="text-sm font-bold text-foreground font-mono tabular-nums"
+                            dir="ltr"
+                          >
+                            {live ? `$${row.price!.toFixed(2)}` : "—"}
                           </p>
-                        )}
+                          <p
+                            className={`text-xs font-semibold font-mono tabular-nums ${cls}`}
+                            dir="ltr"
+                          >
+                            {pct === undefined
+                              ? "—"
+                              : `${sign}${pct.toFixed(2)}%`}
+                          </p>
+                        </div>
                       </div>
+                      <p className="text-xs text-muted-foreground mb-2 truncate">
+                        {row.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <span>{t("insights.marketCap")}:</span>
+                        <span dir="ltr">{formatMarketCap(row.marketCap)}</span>
+                      </p>
                     </div>
-                    <div className="text-right rtl:text-left">
-                      <p className="text-sm font-bold text-foreground" dir="ltr">
+                  );
+                })}
+              </div>
+            )}
+
+            {filtered.length === 0 && !tabLoading && (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">
+                  {t("insights.noMatch", { query: searchQuery })}
+                </p>
+              </div>
+            )}
+
+            {(tabFetching || quotesFetching) && merged.length > 0 && (
+              <div className="text-center text-xs text-muted-foreground mt-4">
+                {t("common.search")}…
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      {/* Variants: insert below this line */}
+      <style data-impeccable-css="15a93bf5">{`
+          @scope ([data-impeccable-variant="1"]) {
+            :scope .vt-ledger {
+              border-block-start: 1px solid hsl(var(--border));
+            }
+            :scope .vt-row {
+              display: grid;
+              grid-template-columns: 2.25rem 2rem minmax(0, 1fr) minmax(0, 8rem) auto auto;
+              align-items: center;
+              gap: 16px;
+              padding-block: 15px;
+              border-block-end: 1px solid hsl(var(--border));
+              cursor: pointer;
+              transition: background-color 220ms cubic-bezier(0.16, 1, 0.3, 1);
+              padding-inline: 8px;
+              margin-inline: -8px;
+            }
+            :scope[data-p-density="airy"] .vt-row { padding-block: 22px; }
+            :scope[data-p-density="tight"] .vt-row { padding-block: 9px; }
+            :scope .vt-row:hover { background: hsl(var(--card)); }
+            :scope .vt-rank {
+              font-family: "JetBrains Mono", ui-monospace, monospace;
+              font-variant-numeric: tabular-nums;
+              font-size: 0.75rem;
+              color: hsl(var(--muted-foreground));
+              text-align: end;
+              opacity: 0.7;
+            }
+            :scope:not([data-p-rank]) .vt-rank { display: none; }
+            :scope:not([data-p-rank]) .vt-row { grid-template-columns: 0 2rem minmax(0, 1fr) minmax(0, 8rem) auto auto; gap: 12px; }
+            :scope .vt-id { min-width: 0; }
+            :scope .vt-sym {
+              font-size: 0.9375rem;
+              font-weight: 600;
+              color: hsl(var(--foreground));
+              letter-spacing: 0.01em;
+            }
+            :scope .vt-name {
+              font-size: 0.75rem;
+              color: hsl(var(--muted-foreground));
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+            :scope .vt-sector {
+              font-size: 0.6875rem;
+              text-transform: uppercase;
+              letter-spacing: 0.04em;
+              color: hsl(var(--muted-foreground));
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+            :scope .vt-cap {
+              font-family: "JetBrains Mono", ui-monospace, monospace;
+              font-variant-numeric: tabular-nums;
+              font-size: 0.8125rem;
+              color: hsl(var(--muted-foreground));
+              text-align: end;
+              min-width: 5.5rem;
+            }
+            :scope .vt-price {
+              font-family: "JetBrains Mono", ui-monospace, monospace;
+              font-variant-numeric: tabular-nums;
+              font-size: 0.9375rem;
+              font-weight: 600;
+              color: hsl(var(--foreground));
+              text-align: end;
+            }
+            :scope .vt-chg {
+              font-family: "JetBrains Mono", ui-monospace, monospace;
+              font-variant-numeric: tabular-nums;
+              font-size: 0.75rem;
+              font-weight: 600;
+              text-align: end;
+            }
+            :scope .vt-quote { display: flex; flex-direction: column; gap: 2px; min-width: 6.5rem; }
+            @media (max-width: 760px) {
+              :scope .vt-row { grid-template-columns: 2rem minmax(0, 1fr) auto; }
+              :scope .vt-rank, :scope .vt-cap, :scope .vt-sector { display: none; }
+            }
+          }
+
+          @scope ([data-impeccable-variant="2"]) {
+            :scope .vt-grid {
+              display: grid;
+              grid-template-columns: repeat(var(--vt-cols, 4), minmax(0, 1fr));
+              gap: 1px;
+              background: hsl(var(--border));
+              border: 1px solid hsl(var(--border));
+            }
+            :scope[data-p-columns="3"] .vt-grid { --vt-cols: 3; }
+            :scope[data-p-columns="5"] .vt-grid { --vt-cols: 5; }
+            @media (max-width: 1100px) { :scope .vt-grid { --vt-cols: 2 !important; } }
+            @media (max-width: 640px) { :scope .vt-grid { --vt-cols: 1 !important; } }
+            :scope .vt-cell {
+              background: hsl(var(--background));
+              padding: 20px 18px 16px;
+              cursor: pointer;
+              display: flex;
+              flex-direction: column;
+              gap: 10px;
+              transition: background-color 220ms cubic-bezier(0.16, 1, 0.3, 1);
+            }
+            :scope .vt-cell:hover { background: hsl(var(--card)); }
+            :scope .vt-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+            :scope .vt-sym {
+              font-size: 0.75rem;
+              font-weight: 600;
+              letter-spacing: 0.06em;
+              text-transform: uppercase;
+              color: hsl(var(--muted-foreground));
+            }
+            :scope .vt-hero {
+              font-family: "JetBrains Mono", ui-monospace, monospace;
+              font-variant-numeric: tabular-nums;
+              font-weight: 600;
+              font-size: clamp(1.5rem, 2.4vw, 2rem);
+              line-height: 1.05;
+              letter-spacing: -0.02em;
+            }
+            :scope .vt-meter { height: 2px; background: hsl(var(--border)); overflow: hidden; }
+            :scope:not([data-p-meter]) .vt-meter { display: none; }
+            :scope .vt-meter i { display: block; height: 100%; }
+            :scope .vt-price {
+              font-family: "JetBrains Mono", ui-monospace, monospace;
+              font-variant-numeric: tabular-nums;
+              font-size: 0.875rem;
+              font-weight: 600;
+              color: hsl(var(--foreground));
+            }
+            :scope .vt-name {
+              font-size: 0.75rem;
+              color: hsl(var(--muted-foreground));
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            }
+            :scope .vt-cap {
+              font-family: "JetBrains Mono", ui-monospace, monospace;
+              font-variant-numeric: tabular-nums;
+              font-size: 0.75rem;
+              color: hsl(var(--muted-foreground));
+            }
+            :scope .vt-foot { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-block-start: auto; }
+          }
+        `}</style>
+
+      {/* Variant 1 — ruled ledger: the card container is removed entirely; rows read as an instrument register ordered top to bottom */}
+      <div
+        data-impeccable-variant="1"
+        data-p-rank=""
+        data-p-density="normal"
+        data-impeccable-params='[{"id":"density","kind":"steps","default":"normal","label":"Row density","options":[{"value":"tight","label":"Tight"},{"value":"normal","label":"Normal"},{"value":"airy","label":"Airy"}]},{"id":"rank","kind":"toggle","default":true,"label":"Rank numerals"}]'
+      >
+        <div className="px-8 py-8">
+          {(tabLoading || quotesLoading) && merged.length === 0 ? (
+            <div className="vt-ledger">
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} className="vt-row" aria-label="loading">
+                  <span className="vt-rank">{i + 1}</span>
+                  <div className="w-8 h-8 bg-card" />
+                  <div className="h-3 w-40 bg-card" />
+                  <div className="h-3 w-24 bg-card" />
+                  <div className="h-3 w-20 bg-card justify-self-end" />
+                  <div className="h-3 w-16 bg-card justify-self-end" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="vt-ledger">
+              {filtered.map((row, i) => {
+                const live =
+                  row.price !== undefined && Number.isFinite(row.price);
+                const pct = row.changePercent;
+                const cls =
+                  pct === undefined
+                    ? "text-muted-foreground"
+                    : pct >= 0
+                      ? "text-chart-positive"
+                      : "text-chart-negative";
+                const sign = pct === undefined || pct < 0 ? "" : "+";
+                return (
+                  <div
+                    key={row.symbol}
+                    onClick={() => navigate(`/stock/${row.symbol}`)}
+                    className="vt-row"
+                  >
+                    <span className="vt-rank" dir="ltr">
+                      {i + 1}
+                    </span>
+                    <TickerLogo ticker={row.symbol} size="sm" />
+                    <div className="vt-id">
+                      <p className="vt-sym">{row.symbol}</p>
+                      <p className="vt-name">{row.name}</p>
+                    </div>
+                    <p className="vt-sector">
+                      {row.sector ? translateSector(t, row.sector) : ""}
+                    </p>
+                    <div className="vt-quote">
+                      <p className="vt-price" dir="ltr">
                         {live ? `$${row.price!.toFixed(2)}` : "—"}
                       </p>
-                      <p className={`text-xs font-semibold ${cls}`} dir="ltr">
+                      <p className={`vt-chg ${cls}`} dir="ltr">
                         {pct === undefined ? "—" : `${sign}${pct.toFixed(2)}%`}
                       </p>
                     </div>
+                    <p className="vt-cap" dir="ltr">
+                      {formatMarketCap(row.marketCap)}
+                    </p>
                   </div>
-                  <p className="text-xs text-slate-400 mb-2 truncate">{row.name}</p>
-                  <p className="text-xs text-slate-500 flex items-center gap-1">
-                    <span>{t("insights.marketCap")}:</span>
-                    <span dir="ltr">{formatMarketCap(row.marketCap)}</span>
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          )}
 
-        {filtered.length === 0 && !tabLoading && (
-          <div className="text-center py-12">
-            <p className="text-slate-400">{t("insights.noMatch", { query: searchQuery })}</p>
-          </div>
-        )}
+          {filtered.length === 0 && !tabLoading && (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">
+                {t("insights.noMatch", { query: searchQuery })}
+              </p>
+            </div>
+          )}
 
-        {(tabFetching || quotesFetching) && merged.length > 0 && (
-          <div className="text-center text-xs text-slate-500 mt-4">
-            {t("common.search")}…
-          </div>
-        )}
+          {(tabFetching || quotesFetching) && merged.length > 0 && (
+            <div className="text-center text-xs text-muted-foreground mt-4">
+              {t("common.search")}…
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Variant 2 — signal grid: hierarchy inverted so the move, not the ticker, is the headline; card chrome collapses into one shared graticule */}
+      <div
+        data-impeccable-variant="2"
+        style={{ display: "none" }}
+        data-p-columns="4"
+        data-p-meter=""
+        data-impeccable-params='[{"id":"columns","kind":"steps","default":"4","label":"Columns","options":[{"value":"3","label":"3"},{"value":"4","label":"4"},{"value":"5","label":"5"}]},{"id":"meter","kind":"toggle","default":true,"label":"Magnitude bar"}]'
+      >
+        <div className="px-8 py-8">
+          {(tabLoading || quotesLoading) && merged.length === 0 ? (
+            <div className="vt-grid">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="vt-cell h-[150px]"
+                  aria-label="loading"
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="vt-grid">
+              {filtered.map((row) => {
+                const live =
+                  row.price !== undefined && Number.isFinite(row.price);
+                const pct = row.changePercent;
+                const cls =
+                  pct === undefined
+                    ? "text-muted-foreground"
+                    : pct >= 0
+                      ? "text-chart-positive"
+                      : "text-chart-negative";
+                const barColor =
+                  pct === undefined || pct >= 0
+                    ? "hsl(var(--chart-positive))"
+                    : "hsl(var(--chart-negative))";
+                const sign = pct === undefined || pct < 0 ? "" : "+";
+                const magnitude =
+                  pct === undefined ? 0 : Math.min(100, Math.abs(pct) * 14);
+                return (
+                  <div
+                    key={row.symbol}
+                    onClick={() => navigate(`/stock/${row.symbol}`)}
+                    className="vt-cell"
+                  >
+                    <div className="vt-top">
+                      <TickerLogo ticker={row.symbol} size="sm" />
+                      <span className="vt-sym">{row.symbol}</span>
+                    </div>
+                    <p className={`vt-hero ${cls}`} dir="ltr">
+                      {pct === undefined ? "—" : `${sign}${pct.toFixed(2)}%`}
+                    </p>
+                    <div className="vt-meter">
+                      <i
+                        style={{ width: `${magnitude}%`, background: barColor }}
+                      />
+                    </div>
+                    <p className="vt-name">{row.name}</p>
+                    <div className="vt-foot">
+                      <span className="vt-price" dir="ltr">
+                        {live ? `$${row.price!.toFixed(2)}` : "—"}
+                      </span>
+                      <span className="vt-cap" dir="ltr">
+                        {formatMarketCap(row.marketCap)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {filtered.length === 0 && !tabLoading && (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">
+                {t("insights.noMatch", { query: searchQuery })}
+              </p>
+            </div>
+          )}
+
+          {(tabFetching || quotesFetching) && merged.length > 0 && (
+            <div className="text-center text-xs text-muted-foreground mt-4">
+              {t("common.search")}…
+            </div>
+          )}
+        </div>
+      </div>
+      {/* impeccable-variants-end 15a93bf5 */}
     </div>
   );
 }

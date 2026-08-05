@@ -13,7 +13,7 @@ import TickerLogo from "@/components/TickerLogo";
  * @returns The Tailwind CSS classes used to style the pill container.
  */
 function pillClassName() {
-  return "flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/50";
+  return "flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card/80 border border-border";
 }
 
 /**
@@ -38,24 +38,29 @@ function Pill({
   const live = !!quote;
   const sign = (quote?.changesPercentage ?? 0) >= 0 ? "+" : "";
   const cls = live
-    ? (quote!.changesPercentage >= 0 ? "text-green-400" : "text-red-400")
-    : "text-slate-500";
+    ? quote!.changesPercentage >= 0
+      ? "text-chart-positive"
+      : "text-chart-negative"
+    : "text-muted-foreground";
   const ariaSuffix = language === "he" ? ` (${label})` : "";
   return (
     <div className={pillClassName()} aria-label={`${label} ${ariaSuffix}`}>
-      <span className="text-xs text-slate-300 font-medium">{label}</span>
-      <span className={`text-xs font-semibold ${cls}`} dir="ltr">
+      <span className="text-xs text-muted-foreground font-medium">{label}</span>
+      <span
+        className={`text-xs font-semibold font-mono tabular-nums ${cls}`}
+        dir="ltr"
+      >
         {loading
           ? "…"
           : quote
-          ? `${sign}${quote.changesPercentage.toFixed(2)}%`
-          : "—"}
+            ? `${sign}${quote.changesPercentage.toFixed(2)}%`
+            : "—"}
       </span>
       <span
         className={`text-[10px] font-medium uppercase tracking-wide px-1.5 py-0.5 rounded ${
           live
-            ? "text-emerald-300 bg-emerald-500/10"
-            : "text-yellow-400 bg-yellow-500/10"
+            ? "text-chart-positive bg-chart-positive/10"
+            : "text-muted-foreground bg-muted/40"
         }`}
         title={live ? "Live quote" : "No live data"}
       >
@@ -78,16 +83,13 @@ function Freshness({ updatedAt }: { updatedAt: number | null }) {
   }, []);
 
   if (!updatedAt) {
-    return <span className="text-[10px] text-slate-500">·</span>;
+    return <span className="text-[10px] text-muted-foreground">·</span>;
   }
   const agoSec = Math.max(0, Math.round((now - updatedAt) / 1000));
-  const label =
-    agoSec < 2
-      ? "now"
-      : `${agoSec}s`;
+  const label = agoSec < 2 ? "now" : `${agoSec}s`;
   return (
     <span
-      className="text-[10px] text-slate-500"
+      className="text-[10px] text-muted-foreground font-mono tabular-nums"
       title={`Last fetched at ${new Date(updatedAt).toLocaleTimeString()}`}
     >
       · {label}
@@ -108,7 +110,8 @@ export default function TopBar() {
   // elements below, so this exposes just the label.
   const getBreadcrumbLabel = () => {
     const path = location.pathname;
-    if (path === "/insights" || path.startsWith("/stock/")) return t("nav.insights");
+    if (path === "/insights" || path.startsWith("/stock/"))
+      return t("nav.insights");
     if (path === "/watchlists") return t("nav.watchlists");
     if (path === "/charts") return t("nav.charts");
     if (path === "/earnings") return t("nav.earnings");
@@ -129,22 +132,31 @@ export default function TopBar() {
   const language = lang;
 
   return (
-    <header className="h-16 border-b border-slate-800 bg-slate-900/50 backdrop-blur flex items-center justify-between px-6 sticky top-0 z-40 w-full shrink-0">
+    <header className="h-16 border-b border-border bg-background/80 backdrop-blur flex items-center justify-between px-6 sticky top-0 z-40 w-full shrink-0">
       {/* Left section: Wordmark + Breadcrumb */}
       <div className="flex items-center gap-4">
-        <Link to="/" className="text-xl font-bold tracking-widest text-white">
+        <Link
+          to="/"
+          className="text-xl font-bold tracking-widest text-foreground"
+        >
           VANTAGE
         </Link>
-        <div className="h-4 w-[1px] bg-slate-700 mx-2" />
+        <div className="h-4 w-[1px] bg-border mx-2" />
         {stockTicker ? (
-          <span className="flex items-center gap-2 text-sm font-medium text-slate-300">
+          <span className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
             <span>{getBreadcrumbLabel()}</span>
-            <span className="text-slate-600">·</span>
-            <TickerLogo ticker={stockTicker} size="xs" ariaLabel={`${stockTicker} logo`} />
-            <span dir="ltr">{stockTicker}</span>
+            <span className="text-border">·</span>
+            <TickerLogo
+              ticker={stockTicker}
+              size="xs"
+              ariaLabel={`${stockTicker} logo`}
+            />
+            <span className="font-mono" dir="ltr">
+              {stockTicker}
+            </span>
           </span>
         ) : (
-          <span className="text-sm font-medium text-slate-300">
+          <span className="text-sm font-medium text-muted-foreground">
             {getBreadcrumbLabel()}
           </span>
         )}

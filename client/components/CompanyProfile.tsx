@@ -24,10 +24,15 @@ import { SectionCardSkeleton } from "@/components/Skeleton";
  * @param ticker - The stock ticker to display; defaults to `AAPL`.
  * @returns The company profile page, loading skeleton, or mock-backed profile content.
  */
-export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string }) {
+export default function CompanyProfile({
+  ticker = "AAPL",
+}: {
+  ticker?: string;
+}) {
   const { t } = useI18n();
 
-  const { data: overviewData, isLoading: overviewLoading } = useStockProfile(ticker);
+  const { data: overviewData, isLoading: overviewLoading } =
+    useStockProfile(ticker);
   const { data: analystData } = useStockAnalyst(ticker);
   const { data: insiderData } = useStockInsider(ticker);
   const { data: newsData } = useStockNews(ticker);
@@ -40,7 +45,10 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
 
   const description =
     overviewData?.description ||
-    mockCompanyProfile.description.replace("Apple Inc.", `${ticker} Corporation`);
+    mockCompanyProfile.description.replace(
+      "Apple Inc.",
+      `${ticker} Corporation`,
+    );
   const sector = overviewData?.sector || mockCompanyProfile.sector;
   const industry = overviewData?.industry || mockCompanyProfile.industry;
   const ceo = overviewData?.ceo || mockCompanyProfile.ceo;
@@ -57,14 +65,21 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
   const piotroskiScore = metricsData?.scores?.piotroskiScore ?? null;
   const peRatio = overviewData?.peRatio ?? null;
   const piotroskiDisplayValue =
-    piotroskiScore !== null ? `${piotroskiScore} / 9` : peRatio !== null ? peRatio.toFixed(2) : "—";
+    piotroskiScore !== null
+      ? `${piotroskiScore} / 9`
+      : peRatio !== null
+        ? peRatio.toFixed(2)
+        : "—";
   const piotroskiLabelKey =
     piotroskiScore !== null ? "insights.piotroskiScore" : "metrics.pe";
 
   const translatePeriod = (period: string) => {
-    if (period === "0q" || period === "Current Qtr") return t("insights.currentQtr");
-    if (period === "0y" || period === "Current Year") return t("insights.currentYear");
-    if (period === "+1y" || period === "Next Year") return t("insights.nextYear");
+    if (period === "0q" || period === "Current Qtr")
+      return t("insights.currentQtr");
+    if (period === "0y" || period === "Current Year")
+      return t("insights.currentYear");
+    if (period === "+1y" || period === "Next Year")
+      return t("insights.nextYear");
     return period;
   };
 
@@ -77,7 +92,7 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
           // formatTradeDateLocale handles unix-seconds + unparseable gracefully;
           // null result → "Recent" so the row still has a sensible label.
           timestamp: n.providerPublishTime
-            ? formatTradeDateLocale(n.providerPublishTime) ?? "Recent"
+            ? (formatTradeDateLocale(n.providerPublishTime) ?? "Recent")
             : "Recent",
           // Pass `thumbnail` through so the render can build a news-card
           // layout. Most Yahoo v4 news items carry `thumbnail.resolutions[]`
@@ -106,7 +121,10 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
   const insiders =
     insiderData && insiderData.length > 0
       ? [...insiderData]
-          .sort((a, b) => parseTradeDateMs(b.startDate) - parseTradeDateMs(a.startDate))
+          .sort(
+            (a, b) =>
+              parseTradeDateMs(b.startDate) - parseTradeDateMs(a.startDate),
+          )
           .map((i) => {
             const code = (i.transactionCode ?? "").toUpperCase();
             const typeLabel = i18nInsiderType(t, code, i.transactionText);
@@ -126,7 +144,7 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
             };
           })
       : [...mockInsiderTrades].sort(
-          (a, b) => parseTradeDateMs(b.date) - parseTradeDateMs(a.date)
+          (a, b) => parseTradeDateMs(b.date) - parseTradeDateMs(a.date),
         );
   const isInsiderMock = !insiderData || insiderData.length === 0 || yahooDown;
 
@@ -142,7 +160,11 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
     epsEstimates = [];
     revEstimates = [];
     analystData.forEach((trend) => {
-      if (trend.period === "0q" || trend.period === "0y" || trend.period === "+1y") {
+      if (
+        trend.period === "0q" ||
+        trend.period === "0y" ||
+        trend.period === "+1y"
+      ) {
         if (trend.earningsEstimate) {
           // Preserve `null` from upstream — `?? 0` previously rendered every
           // missing value as "0.00" which read like a real estimate of zero.
@@ -160,15 +182,21 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
           revEstimates.push({
             metric: "Revenue",
             period: trend.period as never,
-            avg: trend.revenueEstimate.avg === null || trend.revenueEstimate.avg === undefined
-              ? null
-              : trend.revenueEstimate.avg / 1e9,
-            low: trend.revenueEstimate.low === null || trend.revenueEstimate.low === undefined
-              ? null
-              : trend.revenueEstimate.low / 1e9,
-            high: trend.revenueEstimate.high === null || trend.revenueEstimate.high === undefined
-              ? null
-              : trend.revenueEstimate.high / 1e9,
+            avg:
+              trend.revenueEstimate.avg === null ||
+              trend.revenueEstimate.avg === undefined
+                ? null
+                : trend.revenueEstimate.avg / 1e9,
+            low:
+              trend.revenueEstimate.low === null ||
+              trend.revenueEstimate.low === undefined
+                ? null
+                : trend.revenueEstimate.low / 1e9,
+            high:
+              trend.revenueEstimate.high === null ||
+              trend.revenueEstimate.high === undefined
+                ? null
+                : trend.revenueEstimate.high / 1e9,
           });
         }
       }
@@ -249,8 +277,10 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Left Column: Details & Description */}
         <div className="col-span-1 md:col-span-2 space-y-6">
-          <div className="bg-card border border-border rounded-xl p-6">
-            <p className="text-muted-foreground text-sm leading-relaxed mb-6">{description}</p>
+          <div className="bg-card border border-border rounded-panel p-6">
+            <p className="text-muted-foreground text-sm leading-relaxed mb-6">
+              {description}
+            </p>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-2">
               <KV label={t("insights.ceo")} value={ceo} />
@@ -258,13 +288,20 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
               <KV label={t("insights.industry")} value={industry} />
               <KV
                 label={t("insights.employees")}
-                value={typeof employees === "number" ? employees.toLocaleString() : String(employees)}
+                value={
+                  typeof employees === "number"
+                    ? employees.toLocaleString()
+                    : String(employees)
+                }
               />
-              <KV label={t("insights.beta")} value={beta !== null ? beta.toFixed(2) : "—"} />
+              <KV
+                label={t("insights.beta")}
+                value={beta !== null ? beta.toFixed(2) : "—"}
+              />
               <KV
                 label={t(piotroskiLabelKey)}
                 value={piotroskiDisplayValue}
-                accentClass="text-green-400"
+                accentClass="text-chart-positive"
               />
             </div>
 
@@ -279,7 +316,7 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
               overviewData?.isAdr ||
               overviewData?.isActivelyTrading !== undefined) && (
               <div className="mt-6 pt-4 border-t border-border">
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-medium mb-3">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mb-3">
                   {t("insights.idChips")}
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -287,13 +324,22 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
                     <Chip label={t("insights.cik")} value={overviewData.cik} />
                   )}
                   {overviewData?.isin && (
-                    <Chip label={t("insights.isin")} value={overviewData.isin} />
+                    <Chip
+                      label={t("insights.isin")}
+                      value={overviewData.isin}
+                    />
                   )}
                   {overviewData?.cusip && (
-                    <Chip label={t("insights.cusip")} value={overviewData.cusip} />
+                    <Chip
+                      label={t("insights.cusip")}
+                      value={overviewData.cusip}
+                    />
                   )}
                   {overviewData?.ipoDate && (
-                    <Chip label={t("insights.ipoDate")} value={overviewData.ipoDate} />
+                    <Chip
+                      label={t("insights.ipoDate")}
+                      value={overviewData.ipoDate}
+                    />
                   )}
                   {overviewData?.exchangeFullName && (
                     <Chip
@@ -320,8 +366,14 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
                   {overviewData?.isActivelyTrading !== undefined && (
                     <FlagBadge
                       label={t("insights.activeStatus")}
-                      tone={overviewData.isActivelyTrading ? "success" : "danger"}
-                      value={overviewData.isActivelyTrading ? t("insights.yes") : t("insights.no")}
+                      tone={
+                        overviewData.isActivelyTrading ? "success" : "danger"
+                      }
+                      value={
+                        overviewData.isActivelyTrading
+                          ? t("insights.yes")
+                          : t("insights.no")
+                      }
                     />
                   )}
                   {overviewData?.defaultImage !== undefined && (
@@ -337,7 +389,7 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
           </div>
 
           {/* Insider Trading Table */}
-          <div className="bg-card border border-border rounded-xl p-6">
+          <div className="bg-card border border-border rounded-panel p-6">
             <h3 className="text-lg font-semibold mb-4">
               {t("insights.insiderTrading")}
               {isInsiderMock && (
@@ -354,36 +406,48 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
                     <th className="pb-3 font-medium">{t("common.date")}</th>
                     <th className="pb-3 font-medium">{t("common.type")}</th>
                     <th className="pb-3 font-medium">{t("common.price")}</th>
-                    <th className="pb-3 font-medium">{t("common.transacted")}</th>
-                    <th className="pb-3 font-medium text-right">{t("common.value")}</th>
+                    <th className="pb-3 font-medium">
+                      {t("common.transacted")}
+                    </th>
+                    <th className="pb-3 font-medium text-right">
+                      {t("common.value")}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
                   {insiders.slice(0, 5).map((trade, i) => (
-                    <tr key={i} className="hover:bg-slate-800/50 transition-colors">
+                    <tr key={i} className="hover:bg-muted/60 transition-colors">
                       <td className="py-3 font-medium">{trade.name}</td>
-                      <td className="py-3 text-muted-foreground">{trade.date}</td>
+                      <td className="py-3 text-muted-foreground">
+                        {trade.date}
+                      </td>
                       <td className="py-3 truncate max-w-[150px]">
                         <span data-code={trade.code} title={trade.code}>
                           {trade.typeLabel ?? "—"}
                         </span>
                       </td>
                       <td className="py-3" dir="ltr">
-                        {trade.price !== null && trade.price !== undefined
-                          ? `$${trade.price.toFixed(2)}`
-                          : <span className="text-slate-500">—</span>}
+                        {trade.price !== null && trade.price !== undefined ? (
+                          `$${trade.price.toFixed(2)}`
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </td>
                       <td
-                        className={`py-3 ${trade.transacted > 0 ? "text-green-400" : "text-red-400"}`}
+                        className={`py-3 ${trade.transacted > 0 ? "text-chart-positive" : "text-chart-negative"}`}
                         dir="ltr"
                       >
                         {trade.transacted > 0 ? "+" : ""}
                         {(trade.transacted || 0).toLocaleString()}
                       </td>
                       <td className="py-3 text-right" dir="ltr">
-                        {trade.value !== null && trade.value !== undefined && trade.value !== 0
-                          ? `$${trade.value.toLocaleString()}`
-                          : <span className="text-slate-500">—</span>}
+                        {trade.value !== null &&
+                        trade.value !== undefined &&
+                        trade.value !== 0 ? (
+                          `$${trade.value.toLocaleString()}`
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -396,7 +460,7 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
         {/* Right Column: Charts & News */}
         <div className="space-y-6">
           {/* Analyst Estimates */}
-          <div className="bg-card border border-border rounded-xl p-6">
+          <div className="bg-card border border-border rounded-panel p-6">
             <h3 className="text-lg font-semibold mb-4">
               {t("insights.analystEstimates")}
               {isAnalystMock && (
@@ -412,36 +476,66 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
                 <div className="text-right">{t("insights.low")}</div>
                 <div className="text-right">{t("insights.high")}</div>
               </div>
-              <div className="text-sm font-medium mb-2 text-blue-400">EPS</div>
+              <div className="text-sm font-medium mb-2 text-primary">EPS</div>
               {epsEstimates.map((est, i) => (
-                <div key={`eps-${i}`} className="grid grid-cols-4 gap-2 text-sm items-center py-1">
-                  <div className="text-muted-foreground">{translatePeriod(est.period)}</div>
-                  <div className="text-right font-bold text-blue-400" dir="ltr">
-                    <span className="bg-blue-500/10 px-2 py-0.5 rounded">
+                <div
+                  key={`eps-${i}`}
+                  className="grid grid-cols-4 gap-2 text-sm items-center py-1"
+                >
+                  <div className="text-muted-foreground">
+                    {translatePeriod(est.period)}
+                  </div>
+                  <div
+                    className="text-right font-bold text-primary font-mono tabular-nums"
+                    dir="ltr"
+                  >
+                    <span className="bg-primary/10 px-2 py-0.5 rounded">
                       {formatEstimate(est.avg)}
                     </span>
                   </div>
-                  <div className="text-right text-slate-400" dir="ltr">
+                  <div
+                    className="text-right text-muted-foreground font-mono tabular-nums"
+                    dir="ltr"
+                  >
                     {formatEstimate(est.low)}
                   </div>
-                  <div className="text-right text-slate-400" dir="ltr">
+                  <div
+                    className="text-right text-muted-foreground font-mono tabular-nums"
+                    dir="ltr"
+                  >
                     {formatEstimate(est.high)}
                   </div>
                 </div>
               ))}
-              <div className="text-sm font-medium mt-4 mb-2 text-green-400">Revenue (B)</div>
+              <div className="text-sm font-medium mt-4 mb-2 text-chart-positive">
+                Revenue (B)
+              </div>
               {revEstimates.map((est, i) => (
-                <div key={`rev-${i}`} className="grid grid-cols-4 gap-2 text-sm items-center py-1">
-                  <div className="text-muted-foreground">{translatePeriod(est.period)}</div>
-                  <div className="text-right font-bold text-blue-400" dir="ltr">
-                    <span className="bg-blue-500/10 px-2 py-0.5 rounded">
+                <div
+                  key={`rev-${i}`}
+                  className="grid grid-cols-4 gap-2 text-sm items-center py-1"
+                >
+                  <div className="text-muted-foreground">
+                    {translatePeriod(est.period)}
+                  </div>
+                  <div
+                    className="text-right font-bold text-primary font-mono tabular-nums"
+                    dir="ltr"
+                  >
+                    <span className="bg-primary/10 px-2 py-0.5 rounded">
                       {formatEstimateRev(est.avg)}
                     </span>
                   </div>
-                  <div className="text-right text-slate-400" dir="ltr">
+                  <div
+                    className="text-right text-muted-foreground font-mono tabular-nums"
+                    dir="ltr"
+                  >
                     {formatEstimateRev(est.low)}
                   </div>
-                  <div className="text-right text-slate-400" dir="ltr">
+                  <div
+                    className="text-right text-muted-foreground font-mono tabular-nums"
+                    dir="ltr"
+                  >
                     {formatEstimateRev(est.high)}
                   </div>
                 </div>
@@ -453,7 +547,7 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
               historical years stay mock-backed (free tier has no historical
               employee-count endpoint). We surface the gap with a footnote
               rather than a [MOCK] chip when only the snapshot is live. */}
-          <div className="bg-card border border-border rounded-xl p-6">
+          <div className="bg-card border border-border rounded-panel p-6">
             <h3 className="text-lg font-semibold mb-4">
               {t("insights.employeeCount")}
               {isEmployeeMock && (
@@ -467,13 +561,21 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
                 <BarChart data={employeeCount}>
                   <defs>
                     <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.2} />
+                      <stop
+                        offset="5%"
+                        stopColor="hsl(200 60% 60%)"
+                        stopOpacity={0.8}
+                      />
+                      <stop
+                        offset="95%"
+                        stopColor="hsl(200 60% 60%)"
+                        stopOpacity={0.2}
+                      />
                     </linearGradient>
                   </defs>
                   <XAxis
                     dataKey="year"
-                    tick={{ fill: "#94a3b8", fontSize: 12 }}
+                    tick={{ fill: "hsl(220 10% 60%)", fontSize: 12 }}
                     tickLine={false}
                     axisLine={false}
                   />
@@ -482,11 +584,17 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
                     content={({ active, payload, label }: any) => {
                       if (active && payload && payload.length) {
                         return (
-                          <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-xl">
-                            <p className="text-muted-foreground text-xs mb-1">{label}</p>
-                            <p className="text-sm font-bold text-blue-400">
-                              <span dir="ltr">{payload[0].value.toLocaleString()}</span>{" "}
-                              <span className="mx-1">{t("insights.employees")}</span>
+                          <div className="bg-card border border-border rounded-panel p-3 shadow-lg">
+                            <p className="text-muted-foreground text-xs mb-1">
+                              {label}
+                            </p>
+                            <p className="text-sm font-bold text-primary">
+                              <span dir="ltr">
+                                {payload[0].value.toLocaleString()}
+                              </span>{" "}
+                              <span className="mx-1">
+                                {t("insights.employees")}
+                              </span>
                             </p>
                           </div>
                         );
@@ -514,7 +622,7 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
             )}
           </div>
           {/* News Aggregator */}
-          <div className="bg-card border border-border rounded-xl p-6">
+          <div className="bg-card border border-border rounded-panel p-6">
             <h3 className="text-lg font-semibold mb-4">
               {t("insights.news")}
               {isNewsMock && (
@@ -528,7 +636,10 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
                 // Gradient placeholder when Yahoo didn't ship a thumbnail.
                 // Falls back to a single-letter chip with the publisher so the
                 // row still reads as "news" rather than a giant empty box.
-                const initial = (n.publisher || "?").trim().charAt(0).toUpperCase();
+                const initial = (n.publisher || "?")
+                  .trim()
+                  .charAt(0)
+                  .toUpperCase();
                 return (
                   <a
                     key={i}
@@ -543,22 +654,24 @@ export default function CompanyProfile({ ticker = "AAPL" }: { ticker?: string })
                         alt=""
                         loading="lazy"
                         decoding="async"
-                        className="w-16 h-16 rounded-md object-cover bg-slate-800 flex-shrink-0"
+                        className="w-16 h-16 rounded-md object-cover bg-muted flex-shrink-0"
                       />
                     ) : (
                       <div
-                        className="w-16 h-16 rounded-md bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center text-base font-bold text-slate-300 flex-shrink-0"
+                        className="w-16 h-16 rounded-md bg-gradient-to-br from-muted to-card flex items-center justify-center text-base font-bold text-muted-foreground flex-shrink-0"
                         aria-hidden="true"
                       >
                         {initial}
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium group-hover:text-blue-400 transition-colors line-clamp-2 mb-1">
+                      <p className="text-sm font-medium group-hover:text-primary transition-colors line-clamp-2 mb-1">
                         {n.headline}
                       </p>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="font-semibold truncate max-w-[140px]">{n.publisher}</span>
+                        <span className="font-semibold truncate max-w-[140px]">
+                          {n.publisher}
+                        </span>
                         <span>&bull;</span>
                         <span>{n.timestamp}</span>
                       </div>
@@ -598,7 +711,10 @@ function KV({
   return (
     <div className="flex flex-col items-start">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`text-sm font-medium inline-block ${accentClass ?? ""}`} dir="ltr">
+      <p
+        className={`text-sm font-medium inline-block ${accentClass ?? ""}`}
+        dir="ltr"
+      >
         {value}
       </p>
     </div>
@@ -616,14 +732,16 @@ function Chip({
   tone?: "success" | "normal";
 }) {
   const valueCls =
-    tone === "success" ? "text-emerald-300 font-semibold" : "text-slate-200 font-medium";
+    tone === "success"
+      ? "text-chart-positive font-semibold"
+      : "text-foreground font-medium";
   return (
     <span
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800/60 border border-slate-700/50 text-[11px]"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] bg-muted border border-border text-[11px]"
       dir="ltr"
       title={`${label}: ${value}`}
     >
-      <span className="text-slate-500 font-medium uppercase tracking-wider text-[9px]">
+      <span className="text-muted-foreground font-medium uppercase tracking-wider text-[9px]">
         {label}
       </span>
       <span className={valueCls}>{value}</span>
@@ -651,8 +769,9 @@ function FlagBadge({
     purple: "bg-purple-500/10 text-purple-300 border-purple-500/30",
     cyan: "bg-cyan-500/10 text-cyan-300 border-cyan-500/30",
     amber: "bg-amber-500/10 text-amber-300 border-amber-500/30",
-    success: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
-    danger: "bg-red-500/10 text-red-300 border-red-500/30",
+    success:
+      "bg-chart-positive/10 text-chart-positive border-chart-positive/30",
+    danger: "bg-chart-negative/10 text-chart-negative border-chart-negative/30",
   };
   return (
     <span
@@ -660,7 +779,11 @@ function FlagBadge({
       title={value ? `${label}: ${value}` : label}
     >
       {label}
-      {value && <span className="text-[10px] opacity-75 normal-case tracking-normal">{value}</span>}
+      {value && (
+        <span className="text-[10px] opacity-75 normal-case tracking-normal">
+          {value}
+        </span>
+      )}
     </span>
   );
 }
@@ -670,7 +793,7 @@ function FlagBadge({
  */
 function SkeletonHeader() {
   return (
-    <div className="h-7 w-48 bg-slate-800/60 rounded-md relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.4s_infinite] before:bg-gradient-to-r before:from-transparent before:via-slate-700/40 before:to-transparent" />
+    <div className="h-7 w-48 bg-muted rounded-[6px] relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.4s_infinite] before:bg-gradient-to-r before:from-transparent before:via-border/40 before:to-transparent" />
   );
 }
 
@@ -703,15 +826,25 @@ function i18nInsiderType(
 ): string {
   if (!code) return fallback || t("insider.type.other");
   switch (code) {
-    case "P": return t("insider.type.P");
-    case "S": return t("insider.type.S");
-    case "A": return t("insider.type.A");
-    case "G": return t("insider.type.G");
-    case "M": return t("insider.type.M");
-    case "F": return t("insider.type.F");
-    case "D": return t("insider.type.D");
-    case "X": return t("insider.type.X");
-    case "C": return t("insider.type.C");
-    default:  return fallback || code;
+    case "P":
+      return t("insider.type.P");
+    case "S":
+      return t("insider.type.S");
+    case "A":
+      return t("insider.type.A");
+    case "G":
+      return t("insider.type.G");
+    case "M":
+      return t("insider.type.M");
+    case "F":
+      return t("insider.type.F");
+    case "D":
+      return t("insider.type.D");
+    case "X":
+      return t("insider.type.X");
+    case "C":
+      return t("insider.type.C");
+    default:
+      return fallback || code;
   }
 }
