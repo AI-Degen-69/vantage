@@ -23,6 +23,11 @@ export default {
       full: "9999px",
     },
     extend: {
+      fontFamily: {
+        sans: ["Inter", "-apple-system", "system-ui", "sans-serif"],
+        display: ["Space Grotesk", "Inter", "-apple-system", "sans-serif"],
+        mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "monospace"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -74,6 +79,7 @@ export default {
           cyan: "hsl(var(--chart-cyan))",
           purple: "hsl(var(--chart-purple))",
           pink: "hsl(var(--chart-pink))",
+          amber: "hsl(var(--chart-amber))",
           accent: "hsl(var(--chart-accent))",
           positive: "hsl(var(--chart-positive))",
           negative: "hsl(var(--chart-negative))",
@@ -83,6 +89,16 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        // Structural panels (cards, chart containers, category groups) —
+        // near-square, reads as "instrument," not "app card." See
+        // DESIGN.md Shapes: two-tier corner language.
+        panel: "2px",
+      },
+      boxShadow: {
+        // The only shadow in the system: a soft outer glow attached to a
+        // specific live/selected/active signal (DESIGN.md: The Earned
+        // Glow Rule). Never used as ambient default elevation.
+        glow: "0 0 24px -4px hsl(var(--primary) / 0.35)",
       },
       keyframes: {
         "accordion-down": {
@@ -102,7 +118,7 @@ export default {
           },
         },
         // Used by client/components/Skeleton.tsx (Phase 0 — C3).
-        "shimmer": {
+        shimmer: {
           "0%": { transform: "translateX(-100%)" },
           "100%": { transform: "translateX(100%)" },
         },
@@ -110,7 +126,7 @@ export default {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "shimmer": "shimmer 1.4s infinite linear",
+        shimmer: "shimmer 1.4s infinite linear",
       },
     },
   },

@@ -18,22 +18,26 @@ interface SectorHeatsheetProps {
  * Returns a `background-color` string consumed inline by the cell <div>.
  */
 function cellColor(pct: number | null): string {
-  if (pct === null || !Number.isFinite(pct)) return "rgba(71, 85, 105, 0.25)"; // slate-600/25
+  if (pct === null || !Number.isFinite(pct)) return "hsl(250 20% 16% / 0.5)"; // Graticule
   const intensity = Math.min(1, Math.abs(pct) / 3);
   // alpha range 0.12 → 0.45 keeps typographic contrast over the tint.
   const alpha = 0.12 + intensity * 0.33;
   return pct >= 0
-    ? `rgba(16, 185, 129, ${alpha.toFixed(3)})` // emerald-500
-    : `rgba(239, 68, 68, ${alpha.toFixed(3)})`; // red-500
+    ? `hsl(155 55% 50% / ${alpha.toFixed(3)})` // Aurora Green
+    : `hsl(6 70% 58% / ${alpha.toFixed(3)})`; // Ember Red
 }
 
-/** Pick the readable text color given a tinted background: white for saturated fills, slate-300 for null data. */
+/** Pick the readable text color given a tinted background: white for saturated fills, muted for null data. */
 function cellTextClass(pct: number | null): string {
-  if (pct === null || !Number.isFinite(pct)) return "text-slate-500";
+  if (pct === null || !Number.isFinite(pct)) return "text-muted-foreground";
   // Above ~25% alpha (>|0.8| normalized) the dark text starts to wash out;
   // white pops better against the saturated tint in those cases.
   const saturated = Math.min(1, Math.abs(pct) / 3) > 0.55;
-  return saturated ? "text-white" : pct >= 0 ? "text-emerald-200" : "text-red-200";
+  return saturated
+    ? "text-white"
+    : pct >= 0
+      ? "text-chart-positive"
+      : "text-chart-negative";
 }
 
 /**
@@ -58,8 +62,14 @@ function dayHeader(date: string, lang: string, isPartial: boolean): string {
   try {
     const d = new Date(`${date}T00:00:00.000Z`);
     if (Number.isNaN(d.getTime())) return date;
-    const weekday = d.toLocaleDateString(locale, { weekday: "narrow", timeZone: "UTC" });
-    const day = d.toLocaleDateString(locale, { day: "numeric", timeZone: "UTC" });
+    const weekday = d.toLocaleDateString(locale, {
+      weekday: "narrow",
+      timeZone: "UTC",
+    });
+    const day = d.toLocaleDateString(locale, {
+      day: "numeric",
+      timeZone: "UTC",
+    });
     return `${weekday} ${day}`;
   } catch {
     return date;
@@ -83,7 +93,11 @@ function dayHeader(date: string, lang: string, isPartial: boolean): string {
  * Hover each cell for the "n/m priced · avg X.XX%" tooltip in the active
  * language (uses the `insights.heatsheet.cellMeta_*` ICU plural key).
  */
-export function SectorHeatsheet({ heatmap, days, isLoading }: SectorHeatsheetProps) {
+export function SectorHeatsheet({
+  heatmap,
+  days,
+  isLoading,
+}: SectorHeatsheetProps) {
   const { t, lang } = useI18n();
   // Heatmap cells are computed server-side from per-ticker chart closes —
   // when Yahoo chart history is down, badge [MOCK] so stale aggregates
@@ -95,14 +109,17 @@ export function SectorHeatsheet({ heatmap, days, isLoading }: SectorHeatsheetPro
   if (!hasRows && !showSkeleton) return null;
 
   return (
-    <div className="bg-slate-800/40 border-b border-slate-700 px-8 py-5">
+    <div className="bg-card/40 border-b border-border px-8 py-5">
       {/* Header row: title, footer caption, partial-day badge */}
       <div className="flex items-center gap-3 mb-3">
-        <h2 className="text-xs uppercase tracking-widest text-slate-400 font-semibold">
+        <h2 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">
           {t("insights.heatsheet.title")}
         </h2>
         {hasRows && (
-          <span className="text-[10px] text-slate-500 uppercase tracking-wide" dir="ltr">
+          <span
+            className="text-[10px] text-muted-foreground uppercase tracking-wide"
+            dir="ltr"
+          >
             {t("insights.heatsheet.foot", { rows: heatmap!.rows.length, days })}
           </span>
         )}
@@ -115,7 +132,7 @@ export function SectorHeatsheet({ heatmap, days, isLoading }: SectorHeatsheetPro
           </span>
         )}
         {isLoading && hasRows && (
-          <span className="text-[10px] text-amber-300 ms-auto">
+          <span className="text-[10px] text-primary ms-auto">
             {t("insights.heatsheet.loading", { days })}
           </span>
         )}
@@ -129,38 +146,46 @@ export function SectorHeatsheet({ heatmap, days, isLoading }: SectorHeatsheetPro
         // doesn't snap to a taller box.
         <div
           className="grid gap-1.5"
-          style={{ gridTemplateColumns: `minmax(140px, 1.4fr) repeat(${days}, minmax(0, 1fr)) 88px` }}
+          style={{
+            gridTemplateColumns: `minmax(140px, 1.4fr) repeat(${days}, minmax(0, 1fr)) 88px`,
+          }}
         >
           {Array.from({ length: 6 * (days + 2) }).map((_, i) => (
             <div
               key={`row-skel-${i}`}
-              className="h-7 bg-slate-700/40 rounded animate-pulse"
+              className="h-7 bg-muted/60 rounded animate-pulse"
             />
           ))}
         </div>
       ) : (
         <div
           className="grid gap-1.5"
-          style={{ gridTemplateColumns: `1fr repeat(${days}, minmax(0, 1fr)) 88px` }}
+          style={{
+            gridTemplateColumns: `1fr repeat(${days}, minmax(0, 1fr)) 88px`,
+          }}
         >
           {/* Day header row */}
-          <div className="text-[10px] uppercase tracking-wider text-slate-500 px-1 self-end">
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground px-1 self-end">
             {/* leftmost column header — empty for the sector-label column */}
           </div>
           {heatmap!.days.map((date, idx) => {
             // Derive isPartial from the first row's cell for this column index,
             // preserving the server's suppression of partial status for weekend landings.
-            const isPartial = heatmap!.rows.length > 0 && heatmap!.rows[0].cells[idx]?.isPartial === true;
+            const isPartial =
+              heatmap!.rows.length > 0 &&
+              heatmap!.rows[0].cells[idx]?.isPartial === true;
             return (
               <div
                 key={date}
-                className="text-[10px] uppercase tracking-wider text-slate-500 px-1 text-end"
-                title={isPartial ? t("insights.heatsheet.partialTitle") : undefined}
+                className="text-[10px] uppercase tracking-wider text-muted-foreground px-1 text-end"
+                title={
+                  isPartial ? t("insights.heatsheet.partialTitle") : undefined
+                }
                 dir="ltr"
               >
                 <span>{dayHeader(date, lang, isPartial)}</span>
                 {isPartial && (
-                  <span className="block text-[9px] text-amber-400/80 normal-case tracking-normal">
+                  <span className="block text-[9px] text-primary/80 normal-case tracking-normal">
                     {t("insights.heatsheet.partialHit")}
                   </span>
                 )}
@@ -168,7 +193,7 @@ export function SectorHeatsheet({ heatmap, days, isLoading }: SectorHeatsheetPro
             );
           })}
           <div
-            className="text-[10px] uppercase tracking-wider text-slate-500 px-1 text-end"
+            className="text-[10px] uppercase tracking-wider text-muted-foreground px-1 text-end"
             dir="ltr"
           >
             {t("insights.heatsheet.weekNetLabel")}
@@ -199,7 +224,7 @@ export function SectorHeatsheet({ heatmap, days, isLoading }: SectorHeatsheetPro
           couldn't attribute to any sector — keeps the denominator honest
           (same transparency as the previous single-column Spotlight). */}
       {hasRows && heatmap!.untagged.length > 0 && (
-        <div className="text-[10px] text-slate-500 mt-2 uppercase tracking-wide">
+        <div className="text-[10px] text-muted-foreground mt-2 uppercase tracking-wide">
           <span dir="ltr">{heatmap!.untagged.length}</span>{" "}
           {t("insights.heatsheet.untaggedSymbols", {
             count: heatmap!.untagged.length,
@@ -251,15 +276,17 @@ function HeatsheetRow({
         />
       ))}
       <div
-        className={`text-sm font-bold text-end px-1 self-center ${
+        className={`text-sm font-bold font-mono tabular-nums text-end px-1 self-center ${
           row.weekNet === null
-            ? "text-slate-500"
+            ? "text-muted-foreground"
             : row.weekNet >= 0
-              ? "text-emerald-300"
-              : "text-red-300"
+              ? "text-chart-positive"
+              : "text-chart-negative"
         }`}
         dir="ltr"
-        title={row.weekNet === null ? t("insights.heatsheet.weekNetNoData") : week}
+        title={
+          row.weekNet === null ? t("insights.heatsheet.weekNetNoData") : week
+        }
       >
         {row.weekNet === null ? t("insights.heatsheet.cellEmpty") : week}
       </div>
@@ -288,7 +315,9 @@ function HeatsheetCell({
 }) {
   const pctText = fmtPct(cell.movePct);
   const tooltip =
-    cell.movePct === null || cell.movePct === undefined || !Number.isFinite(cell.movePct)
+    cell.movePct === null ||
+    cell.movePct === undefined ||
+    !Number.isFinite(cell.movePct)
       ? t("insights.spotlight.empty")
       : t("insights.heatsheet.cellMeta", {
           priced: cell.withPrice,

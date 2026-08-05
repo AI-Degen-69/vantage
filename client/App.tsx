@@ -32,7 +32,9 @@ const Index = lazy(() => import("./pages/Index"));
 // builds entirely (Vite statically replaces the flag with `false` and the
 // dead branch is dropped) — a top-level lazy() here would emit an unused
 // chunk that prod never references.
-const I18nDebug = import.meta.env.DEV ? lazy(() => import("./pages/I18nDebug")) : null;
+const I18nDebug = import.meta.env.DEV
+  ? lazy(() => import("./pages/I18nDebug"))
+  : null;
 const Insights = lazy(() => import("./pages/Insights"));
 const Charts = lazy(() => import("./pages/Charts"));
 const Watchlists = lazy(() => import("./pages/Watchlists"));
@@ -93,7 +95,9 @@ const AppLayout = () => (
         <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
           <TopBar />
           <ProviderHealthIndicator />
-          <main className="flex-1 overflow-auto"><Outlet /></main>
+          <main className="flex-1 overflow-auto">
+            <Outlet />
+          </main>
           <ProviderUsageFooter />
         </div>
       </div>
@@ -106,16 +110,18 @@ const SplashPage = () => {
   const navigate = useNavigate();
   return (
     <div className="flex flex-col items-center justify-center h-full max-w-md mx-auto text-center px-4">
-      <h1 className="text-4xl font-bold text-foreground mb-6 tracking-widest">VANTAGE</h1>
+      <h1 className="text-4xl font-bold text-foreground mb-6 tracking-widest">
+        VANTAGE
+      </h1>
       <p className="text-muted-foreground mb-8 text-lg">
         {t("splash.subtitle")}
       </p>
-      <div className="w-full space-y-4 bg-card p-6 rounded-xl border border-border">
+      <div className="w-full space-y-4 bg-card p-6 rounded-panel border border-border">
         <div>
           <input
             type="email"
             placeholder={t("splash.email")}
-            className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg text-foreground focus:outline-none focus:border-blue-500 transition-colors"
+            className="w-full px-4 py-3 bg-background border border-border rounded-[6px] text-foreground focus:outline-none focus:border-primary transition-colors"
             defaultValue="demo@vantage.com"
           />
         </div>
@@ -123,13 +129,13 @@ const SplashPage = () => {
           <input
             type="password"
             placeholder={t("splash.password")}
-            className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg text-foreground focus:outline-none focus:border-blue-500 transition-colors"
+            className="w-full px-4 py-3 bg-background border border-border rounded-[6px] text-foreground focus:outline-none focus:border-primary transition-colors"
             defaultValue="password123"
           />
         </div>
         <button
           onClick={() => navigate("/insights")}
-          className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors"
+          className="w-full py-3 bg-primary hover:opacity-90 text-primary-foreground font-semibold rounded-[6px] transition-opacity"
         >
           {t("splash.login")}
         </button>
@@ -164,12 +170,14 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       if (this.props.fallback) return this.props.fallback;
       return (
         <div className="p-8 mx-auto max-w-2xl">
-          <h2 className="text-2xl font-bold text-red-400 mb-3">Something went wrong</h2>
-          <p className="text-sm text-slate-300 mb-4">
+          <h2 className="text-2xl font-bold text-chart-negative mb-3">
+            Something went wrong
+          </h2>
+          <p className="text-sm text-muted-foreground mb-4">
             {this.state.error.message || "Unknown rendering error"}
           </p>
           <button
-            className="px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm"
+            className="px-4 py-2 rounded-[6px] bg-primary hover:opacity-90 text-primary-foreground text-sm transition-opacity"
             onClick={() => {
               // A full reload is the only safe recovery from a render crash —
               // no point partial-patching the React tree. The new mount re-runs
@@ -202,22 +210,68 @@ export default function App() {
             <Routes>
               <Route element={<AppLayout />}>
                 <Route path="/" element={<SplashPage />} />
-                <Route path="/portfolios" element={<ErrorBoundary>{withFallback(<Portfolios />)}</ErrorBoundary>} />
-                <Route path="/stock/:ticker" element={<ErrorBoundary>{withFallback(<Index />)}</ErrorBoundary>} />
-                <Route path="/insights" element={<ErrorBoundary>{withFallback(<Insights />)}</ErrorBoundary>} />
-                <Route path="/watchlists" element={<ErrorBoundary>{withFallback(<Watchlists />)}</ErrorBoundary>} />
-                <Route path="/charts" element={<ErrorBoundary>{withFallback(<Charts />)}</ErrorBoundary>} />
-                <Route path="/earnings" element={<ErrorBoundary>{withFallback(<Earnings />)}</ErrorBoundary>} />
+                <Route
+                  path="/portfolios"
+                  element={
+                    <ErrorBoundary>
+                      {withFallback(<Portfolios />)}
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/stock/:ticker"
+                  element={
+                    <ErrorBoundary>{withFallback(<Index />)}</ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/insights"
+                  element={
+                    <ErrorBoundary>{withFallback(<Insights />)}</ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/watchlists"
+                  element={
+                    <ErrorBoundary>
+                      {withFallback(<Watchlists />)}
+                    </ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/charts"
+                  element={
+                    <ErrorBoundary>{withFallback(<Charts />)}</ErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/earnings"
+                  element={
+                    <ErrorBoundary>{withFallback(<Earnings />)}</ErrorBoundary>
+                  }
+                />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 {/* Dev-only `/i18n` translator QA route — gated so the bundle
                     is excluded from production builds via Vite tree-shake on
                     the dead branch. Tree-shake succeeds because `import.meta.env.DEV`
                     is statically replaced with `false` at build time. */}
                 {import.meta.env.DEV && I18nDebug && (
-                  <Route path="/i18n" element={<ErrorBoundary>{withFallback(<I18nDebug />)}</ErrorBoundary>} />
+                  <Route
+                    path="/i18n"
+                    element={
+                      <ErrorBoundary>
+                        {withFallback(<I18nDebug />)}
+                      </ErrorBoundary>
+                    }
+                  />
                 )}
               </Route>
-              <Route path="*" element={<ErrorBoundary>{withFallback(<NotFound />)}</ErrorBoundary>} />
+              <Route
+                path="*"
+                element={
+                  <ErrorBoundary>{withFallback(<NotFound />)}</ErrorBoundary>
+                }
+              />
             </Routes>
           </ErrorBoundary>
         </BrowserRouter>
