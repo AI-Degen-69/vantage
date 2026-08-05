@@ -12,7 +12,6 @@ import {
   useStockProfile,
   useStockFinancials,
   useProviderHealth,
-  useStockYahooFallbackFinancials,
   useProviderUsage,
 } from "@/hooks/useStockData";
 import {
@@ -20,151 +19,6 @@ import {
   detectPeriodGranularity,
   formatEarningsDate,
 } from "@/lib/finance";
-import type { YahooFallbackFinancials } from "@shared/api";
-
-/**
- * Compact 4-card snapshot grid for the FMP-rate-limited fallback path.
- * Yahoo free tier doesn't ship historical fundamentals, so this can't
- * render the YoY/CAGR 8-card grid the FMP primary does — instead it
- * surfaces single-point TTM / estimate values from `defaultKeyStatistics` /
- * `financialData` / `earningsTrend`. Each card carries a "(Yahoo estimate)"
- * chip + tooltip so stale-free-tier data can't read as a real primary
- * source. This component is local to the page because (a) it isn't used
- * anywhere else, and (b) moving it to a shared file would force the
- * shared component to know about the Index page's render state machine.
- */
-function YahooFallbackGrid({
-  data,
-  chipLabel,
-  chipTitle,
-  formatBillions,
-  formatPercent,
-  formatUSD,
-  emDash,
-}: {
-  data: YahooFallbackFinancials;
-  chipLabel: string;
-  chipTitle: string;
-  formatBillions: (n: number) => string;
-  formatPercent: (n: number) => string;
-  formatUSD: (n: number) => string;
-  emDash: string;
-}) {
-  const safeText = (
-    value: number | null,
-    formatter: (n: number) => string,
-  ): string =>
-    value === null || !Number.isFinite(value) ? emDash : formatter(value);
-  const safeBadge = (value: number | null): string =>
-    value === null || !Number.isFinite(value) ? emDash : formatPercent(value);
-  const cards: Array<{
-    title: string;
-    value: string;
-    badge: string;
-    badgeType: "positive" | "negative" | "neutral";
-  }> = [
-    // Revenue (TTM) with revenueGrowth as the YoY chip.
-    {
-      title: "Revenue (TTM)",
-      value: safeText(data.revenue, formatBillions),
-      badge: safeBadge(data.revenueGrowth),
-      badgeType:
-        data.revenueGrowth === null || !Number.isFinite(data.revenueGrowth)
-          ? "neutral"
-          : data.revenueGrowth >= 0
-            ? "positive"
-            : "negative",
-    },
-    // EBITDA (TTM) with operatingMargin as the chip.
-    {
-      title: "EBITDA (TTM)",
-      value: safeText(data.ebitda, formatBillions),
-      badge: safeBadge(data.operatingMargin),
-      badgeType:
-        data.operatingMargin === null || !Number.isFinite(data.operatingMargin)
-          ? "neutral"
-          : data.operatingMargin >= 0
-            ? "positive"
-            : "negative",
-    },
-    // Gross Profit (TTM) with grossMargin as the chip.
-    {
-      title: "Gross Profit (TTM)",
-      value: safeText(data.grossProfit, formatBillions),
-      badge: safeBadge(data.grossMargin),
-      badgeType:
-        data.grossMargin === null || !Number.isFinite(data.grossMargin)
-          ? "neutral"
-          : data.grossMargin >= 0
-            ? "positive"
-            : "negative",
-    },
-    // EPS est (next quarter consensus) with earningsGrowth as the chip.
-    {
-      title: "EPS Estimate (Next Qtr)",
-      value: safeText(data.epsEstimateNextQtr, formatUSD),
-      badge: safeBadge(data.earningsGrowth),
-      badgeType:
-        data.earningsGrowth === null || !Number.isFinite(data.earningsGrowth)
-          ? "neutral"
-          : data.earningsGrowth >= 0
-            ? "positive"
-            : "negative",
-    },
-  ];
-  return (
-    <>
-      {cards.map((card, idx) => {
-        const valueClass =
-          card.badgeType === "positive"
-            ? "border-chart-positive/30"
-            : card.badgeType === "negative"
-              ? "border-chart-negative/30"
-              : "border-border";
-        const badgeClass =
-          card.badgeType === "positive"
-            ? "bg-chart-positive/10 text-chart-positive"
-            : card.badgeType === "negative"
-              ? "bg-chart-negative/10 text-chart-negative"
-              : "bg-muted text-muted-foreground";
-        return (
-          <div
-            key={idx}
-            className={`bg-card border ${valueClass} rounded-panel p-4 flex flex-col`}
-          >
-            <div className="flex items-start justify-between gap-2 mb-3">
-              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                {card.title}
-              </span>
-              <span
-                className={`text-[10px] uppercase tracking-wide font-medium px-2 py-0.5 rounded shrink-0 ${badgeClass}`}
-                title={chipTitle}
-                dir="ltr"
-              >
-                {chipLabel}
-              </span>
-            </div>
-            <div className="flex items-end gap-3 mb-1">
-              <span
-                className="text-2xl font-semibold text-foreground font-mono tabular-nums tracking-tight"
-                dir="ltr"
-              >
-                {card.value}
-              </span>
-              <span
-                className={`text-xs font-semibold font-mono tabular-nums px-2 py-0.5 rounded border mb-1 ${badgeClass} border-current/20`}
-                dir="ltr"
-              >
-                {card.badge}
-              </span>
-            </div>
-          </div>
-        );
-      })}
-    </>
-  );
-}
-
 /**
  * Displays a localized stock overview with quote information, company details, financial metrics, and interactive charts for the selected ticker.
  */
@@ -223,10 +77,10 @@ export default function Index() {
     : null;
 
   const metrics = useMemo(() => {
-    // When no real financials land for the active ticker, do NOT silently
-    // surface financialMetrics (which is hardcoded AAPL data) for a
-    // non-AAPL ticker. Render empty so the `metrics.length === 0` branch
-    // below shows MetricCardSkeleton instead.
+    // If financials fetch fails or gives 0 rows, use mock data so the UI doesn't look broken
+    if (!financialsFetched) return [];
+    if (!financialsData || financialsData.income.length === 0) return financialMetrics;
+
     let metricsResult: typeof financialMetrics = [];
 
     const inc = financialsData?.income ?? [];
@@ -390,47 +244,6 @@ export default function Index() {
     return metricsResult;
   }, [financialsData]);
 
-  // ── Yahoo fallback path (FMP rate-limited) ────────────────────────────────
-  // When FMP is degraded AND the primary metrics grid is empty, swap to a
-  // Yahoo-driven 4-card snapshot view: Revenue / EBITDA / Gross Profit /
-  // EPS-est, each labeled "(Yahoo estimate)" so stale-free-tier data
-  // can't read as a real primary source. Gated by `enabled` so a healthy
-  // FMP probe never fires the Yahoo round-trip. Shares the query key
-  // `["stockYahooFallbackFinancials", ticker]` with any other observer,
-  // so React Query dedupes across renders.
-  const { data: yahooFallbackData } = useStockYahooFallbackFinancials(ticker, {
-    enabled: fmpDown && financialsFetched && metrics.length === 0,
-  });
-  // `hasAnyFallbackValue` gates the fallback render on the basis that a
-  // valid Yahoo response always carries at least one finite number — a
-  // payload of all `null` (which the server emits on total upstream
-  // failure) should fall through to the existing "Metrics unavailable"
-  // empty-state rather than render four dashes posing as a snapshot.
-  const hasAnyFallbackValue = (yf?: typeof yahooFallbackData): boolean => {
-    if (!yf) return false;
-    return (
-      yf.revenue !== null ||
-      yf.ebitda !== null ||
-      yf.grossProfit !== null ||
-      yf.operatingMargin !== null ||
-      yf.profitMargin !== null ||
-      yf.grossMargin !== null ||
-      yf.revenueGrowth !== null ||
-      yf.earningsGrowth !== null ||
-      yf.totalCash !== null ||
-      yf.totalDebt !== null ||
-      yf.enterpriseValue !== null ||
-      yf.trailingEps !== null ||
-      yf.forwardEps !== null ||
-      yf.epsEstimateNextQtr !== null ||
-      yf.revenueEstimateNextQtr !== null
-    );
-  };
-  const showYahooFallback =
-    fmpDown &&
-    financialsFetched &&
-    metrics.length === 0 &&
-    hasAnyFallbackValue(yahooFallbackData);
 
   // Today vs previous-close delta (NOT a true post-market price — FMP free
   // tier doesn't carry after-hours quote). When a paid key/upgrade adds a
@@ -585,20 +398,7 @@ export default function Index() {
               ))}
             </>
           ) : metrics.length === 0 ? (
-            showYahooFallback && yahooFallbackData ? (
-              <YahooFallbackGrid
-                data={yahooFallbackData}
-                chipLabel={t("index.metricsYahooFallbackChip")}
-                chipTitle={t("index.metricsYahooFallbackTitle")}
-                formatBillions={(n: number) => `${(n / 1e9).toFixed(2)}B`}
-                formatPercent={(n: number) =>
-                  `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`
-                }
-                formatUSD={(n: number) => `$${n.toFixed(2)}`}
-                emDash="—"
-              />
-            ) : (
-              <div className="col-span-full bg-card border border-border rounded-panel px-6 py-10 text-center">
+            <div className="col-span-full bg-card border border-border rounded-panel px-6 py-10 text-center">
                 <p className="text-sm text-muted-foreground">
                   {t("index.metricsUnavailable", { ticker })}
                 </p>
@@ -634,7 +434,6 @@ export default function Index() {
                   {t("index.metricsRetry")}
                 </button>
               </div>
-            )
           ) : (
             metrics.map((metric, idx) => {
               const latestVal = metric.data[metric.data.length - 1]?.value || 0;
@@ -652,6 +451,7 @@ export default function Index() {
                   badgeType={yoyChange >= 0 ? "positive" : "negative"}
                   metricId={metric.name}
                   metricData={metric}
+                  ticker={ticker}
                 />
               );
             })
