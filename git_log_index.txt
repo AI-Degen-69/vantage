@@ -1,0 +1,1396 @@
+﻿commit a626ee27ee0d4483762c5add51f54128cc9b582a
+Author: Default-to-AI <roberttiger9@gmail.com>
+Date:   Wed Aug 5 06:43:51 2026 +0300
+
+    Update 17 files
+
+diff --git a/client/pages/Index.tsx b/client/pages/Index.tsx
+index 943f880..b8f573f 100644
+--- a/client/pages/Index.tsx
++++ b/client/pages/Index.tsx
+@@ -7,7 +7,14 @@ import CompanyProfile from "@/components/CompanyProfile";
+ import TickerLogo from "@/components/TickerLogo";
+ import { HeaderPriceSkeleton, MetricCardSkeleton } from "@/components/Skeleton";
+ import { financialMetrics, FinancialMetric } from "@/lib/mockData";
+-import { useStockQuote, useStockProfile, useStockFinancials, useProviderHealth, useStockYahooFallbackFinancials, useProviderUsage } from "@/hooks/useStockData";
++import {
++  useStockQuote,
++  useStockProfile,
++  useStockFinancials,
++  useProviderHealth,
++  useStockYahooFallbackFinancials,
++  useProviderUsage,
++} from "@/hooks/useStockData";
+ import {
+   cagrAtYearsBack,
+   detectPeriodGranularity,
+@@ -46,7 +53,8 @@ function YahooFallbackGrid({
+   const safeText = (
+     value: number | null,
+     formatter: (n: number) => string,
+-  ): string => (value === null || !Number.isFinite(value) ? emDash : formatter(value));
++  ): string =>
++    value === null || !Number.isFinite(value) ? emDash : formatter(value);
+   const safeBadge = (value: number | null): string =>
+     value === null || !Number.isFinite(value) ? emDash : formatPercent(value);
+   const cards: Array<{
+@@ -107,23 +115,25 @@ function YahooFallbackGrid({
+   return (
+     <>
+       {cards.map((card, idx) => {
+-        const valueClass = card.badgeType === "positive"
+-          ? "border-green-500/30"
+-          : card.badgeType === "negative"
+-            ? "border-red-500/30"
+-            : "border-slate-500/30";
+-        const badgeClass = card.badgeType === "positive"
+-          ? "bg-green-500/20 text-green-400"
+-          : card.badgeType === "negative"
+-            ? "bg-red-500/20 text-red-400"
+-            : "bg-slate-500/20 text-slate-300";
++        const valueClass =
++          card.badgeType === "positive"
++            ? "border-chart-positive/30"
++            : card.badgeType === "negative"
++              ? "border-chart-negative/30"
++              : "border-border";
++        const badgeClass =
++          card.badgeType === "positive"
++            ? "bg-chart-positive/10 text-chart-positive"
++            : card.badgeType === "negative"
++              ? "bg-chart-negative/10 text-chart-negative"
++              : "bg-muted text-muted-foreground";
+         return (
+           <div
+             key={idx}
+-            className={`bg-card border ${valueClass} rounded-xl p-4 flex flex-col`}
++            className={`bg-card border ${valueClass} rounded-panel p-4 flex flex-col`}
+           >
+             <div className="flex items-start justify-between gap-2 mb-3">
+-              <span className="text-sm text-muted-foreground font-medium">
++              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                 {card.title}
+               </span>
+               <span
+@@ -135,11 +145,14 @@ function YahooFallbackGrid({
+               </span>
+             </div>
+             <div className="flex items-end gap-3 mb-1">
+-              <span className="text-3xl font-bold text-foreground tracking-tight" dir="ltr">
++              <span
++                className="text-2xl font-semibold text-foreground font-mono tabular-nums tracking-tight"
++                dir="ltr"
++              >
+                 {card.value}
+               </span>
+               <span
+-                className={`text-xs font-semibold px-2 py-0.5 rounded border mb-1 ${badgeClass} border-current/20`}
++                className={`text-xs font-semibold font-mono tabular-nums px-2 py-0.5 rounded border mb-1 ${badgeClass} border-current/20`}
+                 dir="ltr"
+               >
+                 {card.badge}
+@@ -158,12 +171,15 @@ function YahooFallbackGrid({
+ export default function Index() {
+   const { t } = useI18n();
+   const { ticker: urlTicker } = useParams<{ ticker?: string }>();
+-  const [selectedMetric, setSelectedMetric] = useState<FinancialMetric | null>(null);
++  const [selectedMetric, setSelectedMetric] = useState<FinancialMetric | null>(
++    null,
++  );
+ 
+   const ticker = urlTicker?.toUpperCase() || "AAPL";
+ 
+   const { data: quoteData, isLoading: quoteLoading } = useStockQuote(ticker);
+-  const { data: overviewData, isLoading: overviewLoading } = useStockProfile(ticker);
++  const { data: overviewData, isLoading: overviewLoading } =
++    useStockProfile(ticker);
+   // isFetched becomes true once the first query attempt settles (success
+   // OR failure). We need it to distinguish "still loading" from "loaded
+   // with no data" Γאפ otherwise the metrics grid shows skeletons forever
+@@ -188,14 +204,22 @@ export default function Index() {
+   // in for "the whole /stable/ surface is rate-limited" because the
+   // window is a rolling 24h. showFmpRateLimit then renders a localized
+   // hint under the empty-state with hours-until-reset math.
+-  const fmpDown = fmpProbe?.status === "down" || fmpProbe?.status === "degraded";
++  const fmpDown =
++    fmpProbe?.status === "down" || fmpProbe?.status === "degraded";
+   // FMP's free tier window is per-day (rolling 24h). Use the authoritative
+   // reset timestamp from the provider-usage tracker when available; otherwise
+   // display the "unknown reset" fallback instead of calculating a 24-hour estimate.
+   const { data: providerUsage } = useProviderUsage();
+-  const fmpUsageEntry = providerUsage?.entries?.find((e) => e.provider === "fmp");
++  const fmpUsageEntry = providerUsage?.entries?.find(
++    (e) => e.provider === "fmp",
++  );
+   const fmpHoursUntilReset = fmpUsageEntry?.resetsAt
+-    ? Math.max(0, Math.floor((new Date(fmpUsageEntry.resetsAt).getTime() - Date.now()) / 3_600_000))
++    ? Math.max(
++        0,
++        Math.floor(
++          (new Date(fmpUsageEntry.resetsAt).getTime() - Date.now()) / 3_600_000,
++        ),
++      )
+     : null;
+ 
+   const metrics = useMemo(() => {
+@@ -211,7 +235,7 @@ export default function Index() {
+       const incAsc = [...inc].sort((a, b) => (a.date < b.date ? -1 : 1));
+       const balAsc = [...bal].sort((a, b) => (a.date < b.date ? -1 : 1));
+ 
+-      const safeYoy = (arr: typeof inc, key: keyof typeof inc[number]) => {
++      const safeYoy = (arr: typeof inc, key: keyof (typeof inc)[number]) => {
+         if (arr.length < 2) return 0;
+         const prev = arr[arr.length - 2][key] as number;
+         const current = arr[arr.length - 1][key] as number;
+@@ -229,7 +253,7 @@ export default function Index() {
+       const granularity = detectPeriodGranularity(incAsc);
+       const safeCagrAtYears = (
+         arr: typeof inc,
+-        key: keyof typeof inc[number],
++        key: keyof (typeof inc)[number],
+         years: number,
+       ): number | null => cagrAtYearsBack(arr, key, years, granularity);
+ 
+@@ -240,7 +264,10 @@ export default function Index() {
+           yoy: safeYoy(incAsc, "revenue"),
+           cagr3Y: safeCagrAtYears(incAsc, "revenue", 3),
+           cagr5Y: safeCagrAtYears(incAsc, "revenue", 5),
+-          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.revenue / 1e9 })),
++          data: incAsc.map((d) => ({
++            date: d.calendarYear,
++            value: d.revenue / 1e9,
++          })),
+           type: "bar",
+           color: "blue",
+         },
+@@ -250,7 +277,10 @@ export default function Index() {
+           yoy: safeYoy(incAsc, "ebitda"),
+           cagr3Y: safeCagrAtYears(incAsc, "ebitda", 3),
+           cagr5Y: safeCagrAtYears(incAsc, "ebitda", 5),
+-          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.ebitda / 1e9 })),
++          data: incAsc.map((d) => ({
++            date: d.calendarYear,
++            value: d.ebitda / 1e9,
++          })),
+           type: "bar",
+           color: "blue",
+         },
+@@ -260,7 +290,10 @@ export default function Index() {
+           yoy: safeYoy(incAsc, "grossProfit"),
+           cagr3Y: safeCagrAtYears(incAsc, "grossProfit", 3),
+           cagr5Y: safeCagrAtYears(incAsc, "grossProfit", 5),
+-          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.grossProfit / 1e9 })),
++          data: incAsc.map((d) => ({
++            date: d.calendarYear,
++            value: d.grossProfit / 1e9,
++          })),
+           type: "bar",
+           color: "blue",
+         },
+@@ -270,7 +303,11 @@ export default function Index() {
+           yoy: safeYoy(incAsc, "operatingIncome"),
+           cagr3Y: safeCagrAtYears(incAsc, "operatingIncome", 3),
+           cagr5Y: safeCagrAtYears(incAsc, "operatingIncome", 5),
+-          data: (incAsc.filter((row) => row.operatingIncome !== undefined) as typeof inc).map((d) => ({
++          data: (
++            incAsc.filter(
++              (row) => row.operatingIncome !== undefined,
++            ) as typeof inc
++          ).map((d) => ({
+             date: d.calendarYear,
+             value: (d.operatingIncome ?? 0) / 1e9,
+           })),
+@@ -283,7 +320,10 @@ export default function Index() {
+           yoy: safeYoy(incAsc, "netIncome"),
+           cagr3Y: safeCagrAtYears(incAsc, "netIncome", 3),
+           cagr5Y: safeCagrAtYears(incAsc, "netIncome", 5),
+-          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.netIncome / 1e9 })),
++          data: incAsc.map((d) => ({
++            date: d.calendarYear,
++            value: d.netIncome / 1e9,
++          })),
+           type: "bar",
+           color: "blue",
+         },
+@@ -302,13 +342,27 @@ export default function Index() {
+           unit: "B",
+           yoy:
+             balAsc.length >= 2
+-              ? ((balAsc[balAsc.length - 1].cashAndCashEquivalents - balAsc[balAsc.length - 2].cashAndCashEquivalents) /
++              ? ((balAsc[balAsc.length - 1].cashAndCashEquivalents -
++                  balAsc[balAsc.length - 2].cashAndCashEquivalents) /
+                   Math.abs(balAsc[balAsc.length - 2].cashAndCashEquivalents)) *
+                 100
+               : 0,
+-          cagr3Y: cagrAtYearsBack(balAsc, "cashAndCashEquivalents", 3, granularity),
+-          cagr5Y: cagrAtYearsBack(balAsc, "cashAndCashEquivalents", 5, granularity),
+-          data: balAsc.map((d) => ({ date: d.calendarYear, value: d.cashAndCashEquivalents / 1e9 })),
++          cagr3Y: cagrAtYearsBack(
++            balAsc,
++            "cashAndCashEquivalents",
++            3,
++            granularity,
++          ),
++          cagr5Y: cagrAtYearsBack(
++            balAsc,
++            "cashAndCashEquivalents",
++            5,
++            granularity,
++          ),
++          data: balAsc.map((d) => ({
++            date: d.calendarYear,
++            value: d.cashAndCashEquivalents / 1e9,
++          })),
+           type: "bar",
+           color: "green",
+         },
+@@ -317,11 +371,17 @@ export default function Index() {
+           unit: "B",
+           yoy:
+             balAsc.length >= 2
+-              ? ((balAsc[balAsc.length - 1].totalAssets - balAsc[balAsc.length - 2].totalAssets) / Math.abs(balAsc[balAsc.length - 2].totalAssets)) * 100
++              ? ((balAsc[balAsc.length - 1].totalAssets -
++                  balAsc[balAsc.length - 2].totalAssets) /
++                  Math.abs(balAsc[balAsc.length - 2].totalAssets)) *
++                100
+               : 0,
+           cagr3Y: cagrAtYearsBack(balAsc, "totalAssets", 3, granularity),
+           cagr5Y: cagrAtYearsBack(balAsc, "totalAssets", 5, granularity),
+-          data: balAsc.map((d) => ({ date: d.calendarYear, value: (d.totalAssets ?? 0) / 1e9 })),
++          data: balAsc.map((d) => ({
++            date: d.calendarYear,
++            value: (d.totalAssets ?? 0) / 1e9,
++          })),
+           type: "bar",
+           color: "purple",
+         },
+@@ -338,18 +398,15 @@ export default function Index() {
+   // FMP probe never fires the Yahoo round-trip. Shares the query key
+   // `["stockYahooFallbackFinancials", ticker]` with any other observer,
+   // so React Query dedupes across renders.
+-  const { data: yahooFallbackData } = useStockYahooFallbackFinancials(
+-    ticker,
+-    { enabled: fmpDown && financialsFetched && metrics.length === 0 },
+-  );
++  const { data: yahooFallbackData } = useStockYahooFallbackFinancials(ticker, {
++    enabled: fmpDown && financialsFetched && metrics.length === 0,
++  });
+   // `hasAnyFallbackValue` gates the fallback render on the basis that a
+   // valid Yahoo response always carries at least one finite number Γאפ a
+   // payload of all `null` (which the server emits on total upstream
+   // failure) should fall through to the existing "Metrics unavailable"
+   // empty-state rather than render four dashes posing as a snapshot.
+-  const hasAnyFallbackValue = (
+-    yf?: typeof yahooFallbackData,
+-  ): boolean => {
++  const hasAnyFallbackValue = (yf?: typeof yahooFallbackData): boolean => {
+     if (!yf) return false;
+     return (
+       yf.revenue !== null ||
+@@ -409,38 +466,41 @@ export default function Index() {
+   return (
+     <div className="w-full bg-background dark">
+       <div className="max-w-7xl mx-auto px-4 py-8">
+-        {/* Centered Header Section */}
+-        <div className="mb-12 text-center">
+-          <div className="flex items-center justify-center gap-4 mb-4">
++        {/* Quiet header Γאפ company identity + price are facts, not the show */}
++        <div className="mb-10 flex flex-col items-start text-left">
++          <div className="flex items-center justify-start gap-3 mb-3">
+             <TickerLogo ticker={ticker} size="md" />
+             <div>
+-              <h1 className="text-3xl font-bold text-foreground">
++              <h1 className="font-display text-2xl font-bold text-foreground tracking-tight">
+                 {overviewData?.companyName ?? ticker}
+               </h1>
+-              <p className="text-sm text-muted-foreground">
+-                {ticker} | {overviewData?.exchange ?? "Γאפ"}
++              <p className="text-xs text-muted-foreground font-mono tracking-wide">
++                {ticker} ┬╖ {overviewData?.exchange ?? "Γאפ"}
+               </p>
+             </div>
+           </div>
+ 
+-          {/* Stock Price */}
+-          <div className="mb-3">
++          {/* Stock Price Γאפ quiet, tabular, no live-tick theater */}
++          <div className="mb-2">
+             {quoteLoading ? (
+               <HeaderPriceSkeleton />
+             ) : quoteData?.price ? (
+-              <div className="flex items-baseline justify-center gap-3">
+-                <span className="text-5xl font-bold text-foreground" dir="ltr">
++              <div className="flex items-baseline justify-start gap-2.5">
++                <span
++                  className="text-3xl font-semibold text-foreground font-mono tabular-nums"
++                  dir="ltr"
++                >
+                   ${quoteData.price.toFixed(2)}
+                 </span>
+-                <span className="flex items-center gap-1" dir="ltr">
++                <span className="flex items-center gap-1.5" dir="ltr">
+                   <span
+-                    className={`text-lg font-semibold ${quoteData.change >= 0 ? "text-chart-green" : "text-red-400"}`}
++                    className={`text-sm font-medium font-mono tabular-nums ${quoteData.change >= 0 ? "text-chart-positive" : "text-chart-negative"}`}
+                   >
+                     {quoteData.change >= 0 ? "+" : ""}
+                     {quoteData.change.toFixed(2)}
+                   </span>
+                   <span
+-                    className={`px-2 py-1 rounded text-xs font-semibold ${quoteData.changesPercentage >= 0 ? "bg-chart-green/20 text-chart-green" : "bg-red-400/20 text-red-400"}`}
++                    className={`px-1.5 py-0.5 rounded text-xs font-medium font-mono tabular-nums ${quoteData.changesPercentage >= 0 ? "bg-chart-positive/10 text-chart-positive" : "bg-chart-negative/10 text-chart-negative"}`}
+                   >
+                     {quoteData.changesPercentage >= 0 ? "+" : ""}
+                     {quoteData.changesPercentage.toFixed(2)}%
+@@ -448,58 +508,69 @@ export default function Index() {
+                 </span>
+               </div>
+             ) : (
+-              <div className="text-center text-slate-400 text-xl">{t("index.unavailableApi")}</div>
++              <div className="text-center text-muted-foreground text-lg">
++                {t("index.unavailableApi")}
++              </div>
+             )}
+           </div>
+ 
+           {/* Today vs Prev Close Γאפ fed by live quote */}
+-          <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-muted-foreground">
++          <div className="flex flex-wrap justify-start gap-x-5 gap-y-1 text-xs text-muted-foreground">
+             <span>
+               {t("index.change")}{" "}
+               {todayVsPrevClose ? (
+                 <span
+-                  className={todayVsPrevClose.delta >= 0 ? "text-green-400" : "text-red-400"}
++                  className={`font-mono tabular-nums ${todayVsPrevClose.delta >= 0 ? "text-chart-positive" : "text-chart-negative"}`}
+                   dir="ltr"
+                 >
+                   {todayVsPrevClose.delta >= 0 ? "+" : ""}
+-                  {todayVsPrevClose.delta.toFixed(2)} ({todayVsPrevClose.delta >= 0 ? "+" : ""}
++                  {todayVsPrevClose.delta.toFixed(2)} (
++                  {todayVsPrevClose.delta >= 0 ? "+" : ""}
+                   {todayVsPrevClose.deltaPct.toFixed(2)}%)
+                 </span>
+               ) : (
+-                <span className="text-slate-500" dir="ltr">Γאפ</span>
++                <span className="text-muted-foreground/60" dir="ltr">
++                  Γאפ
++                </span>
+               )}
+             </span>
+             <span>
+               {t("index.earnings")}{" "}
+               {earningsDate ? (
+-                <span className="text-blue-400" dir="ltr">{earningsDate}</span>
++                <span className="text-primary font-mono" dir="ltr">
++                  {earningsDate}
++                </span>
+               ) : (
+-                <span className="text-slate-500" dir="ltr">Γאפ</span>
++                <span className="text-muted-foreground/60" dir="ltr">
++                  Γאפ
++                </span>
+               )}
+             </span>
+           </div>
+         </div>
+ 
+         {/* Quality Brief Section */}
+-        <div className="bg-card rounded-lg p-8 border border-border mb-12">
+-          <h2 className="text-xl font-semibold text-foreground mb-4">{t("index.qualityInBrief")}</h2>
++        <div className="bg-card rounded-panel p-8 border border-border mb-12">
++          <h2 className="font-display text-sm font-semibold text-foreground mb-4">
++            {t("index.qualityInBrief")}
++          </h2>
+           <ul className="space-y-3 text-sm text-foreground">
+             <li className="flex gap-2">
+-              <span className="text-chart-green font-bold shrink-0">Γאó</span>
++              <span className="text-primary font-bold shrink-0">Γאפ</span>
+               <span dangerouslySetInnerHTML={{ __html: t("index.news1") }} />
+             </li>
+             <li className="flex gap-2">
+-              <span className="text-chart-green font-bold shrink-0">Γאó</span>
++              <span className="text-primary font-bold shrink-0">Γאפ</span>
+               <span dangerouslySetInnerHTML={{ __html: t("index.news2") }} />
+             </li>
+           </ul>
+-          <button className="mt-4 text-blue-400 hover:text-blue-300 text-sm font-medium">
++          <button className="mt-4 text-primary hover:opacity-80 transition-opacity text-sm font-medium">
+             {t("index.viewMore")}
+           </button>
+         </div>
+ 
+         {/* Charts Grid - 4x2 Γאפ three render states driven by query fetch status */}
+-        <h2 className="text-2xl font-semibold text-foreground mb-6">
++        <h2 className="font-display text-sm font-semibold text-foreground mb-6">
+           {t("index.financialMetricsTitle")}
+         </h2>
+         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+@@ -520,12 +591,14 @@ export default function Index() {
+                 chipLabel={t("index.metricsYahooFallbackChip")}
+                 chipTitle={t("index.metricsYahooFallbackTitle")}
+                 formatBillions={(n: number) => `${(n / 1e9).toFixed(2)}B`}
+-                formatPercent={(n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`}
++                formatPercent={(n: number) =>
++                  `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`
++                }
+                 formatUSD={(n: number) => `$${n.toFixed(2)}`}
+                 emDash="Γאפ"
+               />
+             ) : (
+-              <div className="col-span-full bg-card border border-border rounded-xl px-6 py-10 text-center">
++              <div className="col-span-full bg-card border border-border rounded-panel px-6 py-10 text-center">
+                 <p className="text-sm text-muted-foreground">
+                   {t("index.metricsUnavailable", { ticker })}
+                 </p>
+@@ -538,7 +611,7 @@ export default function Index() {
+                     state (e.g. a symbol FMP doesn't cover) still reads as
+                     "no data" without alarm. */}
+                 {fmpDown && (
+-                  <p className="mt-3 text-xs text-amber-300/90 max-w-md mx-auto leading-relaxed">
++                  <p className="mt-3 text-xs text-chart-amber/90 max-w-md mx-auto leading-relaxed">
+                     {fmpHoursUntilReset !== null
+                       ? t("index.metricsRateLimited", {
+                           hours: fmpHoursUntilReset,
+@@ -556,7 +629,7 @@ export default function Index() {
+                     // refetch, so this button is honest about a likely no-op.
+                     refetchFinancials().catch(() => null);
+                   }}
+-                  className="mt-4 text-xs text-blue-400 hover:text-blue-300 transition-colors"
++                  className="mt-4 text-xs text-primary hover:opacity-80 transition-opacity"
+                 >
+                   {t("index.metricsRetry")}
+                 </button>
+@@ -569,7 +642,11 @@ export default function Index() {
+               return (
+                 <InsightsCard
+                   key={idx}
+-                  title={t(metric.name) === metric.name ? metric.name.split(".")[1] : t(metric.name)}
++                  title={
++                    t(metric.name) === metric.name
++                      ? metric.name.split(".")[1]
++                      : t(metric.name)
++                  }
+                   value={`${latestVal.toFixed(2)}${metric.unit === "$" ? "" : metric.unit}`}
+                   badgeText={`${yoyChange >= 0 ? "+" : ""}${yoyChange.toFixed(2)}%`}
+                   badgeType={yoyChange >= 0 ? "positive" : "negative"}
+
+commit aef53253c30c1d89e2d3b71831245c88d61d4c5e
+Author: coderabbitai[bot] <136622811+coderabbitai[bot]@users.noreply.github.com>
+Date:   Tue Aug 4 01:00:44 2026 +0000
+
+    fix: apply CodeRabbit auto-fixes
+    
+    Fixed 8 file(s) based on 17 unresolved review comments.
+    
+    Co-authored-by: CodeRabbit <noreply@coderabbit.ai>
+
+diff --git a/client/pages/Index.tsx b/client/pages/Index.tsx
+index 4581d92..943f880 100644
+--- a/client/pages/Index.tsx
++++ b/client/pages/Index.tsx
+@@ -7,7 +7,7 @@ import CompanyProfile from "@/components/CompanyProfile";
+ import TickerLogo from "@/components/TickerLogo";
+ import { HeaderPriceSkeleton, MetricCardSkeleton } from "@/components/Skeleton";
+ import { financialMetrics, FinancialMetric } from "@/lib/mockData";
+-import { useStockQuote, useStockProfile, useStockFinancials, useProviderHealth, useStockYahooFallbackFinancials } from "@/hooks/useStockData";
++import { useStockQuote, useStockProfile, useStockFinancials, useProviderHealth, useStockYahooFallbackFinancials, useProviderUsage } from "@/hooks/useStockData";
+ import {
+   cagrAtYearsBack,
+   detectPeriodGranularity,
+@@ -179,7 +179,7 @@ export default function Index() {
+   // so the empty-state below can surface the actual cause instead of a
+   // vague "Retry" button. Shares the same query key as the global banner;
+   // React Query dedupes so this is a zero-cost subscription.
+-  const { data: providerHealth, dataUpdatedAt: providerHealthCheckedAt } = useProviderHealth();
++  const { data: providerHealth } = useProviderHealth();
+   const fmpProbe = providerHealth?.providers?.find(
+     (p) => p.provider === "fmp" && p.feature === "quote",
+   );
+@@ -189,12 +189,13 @@ export default function Index() {
+   // window is a rolling 24h. showFmpRateLimit then renders a localized
+   // hint under the empty-state with hours-until-reset math.
+   const fmpDown = fmpProbe?.status === "down" || fmpProbe?.status === "degraded";
+-  // FMP's free tier window is per-day (rolling 24h). The probe gives us a
+-  // timestamp; we report "resets in ~N hours" rather than a hard promise,
+-  // and clamp to a sane range so a long-quiet probe doesn't read as
+-  // "resets in 0 minutes".
+-  const fmpHoursUntilReset = providerHealthCheckedAt
+-    ? Math.max(1, Math.min(24, 24 - Math.floor((Date.now() - providerHealthCheckedAt) / 3_600_000)))
++  // FMP's free tier window is per-day (rolling 24h). Use the authoritative
++  // reset timestamp from the provider-usage tracker when available; otherwise
++  // display the "unknown reset" fallback instead of calculating a 24-hour estimate.
++  const { data: providerUsage } = useProviderUsage();
++  const fmpUsageEntry = providerUsage?.entries?.find((e) => e.provider === "fmp");
++  const fmpHoursUntilReset = fmpUsageEntry?.resetsAt
++    ? Math.max(0, Math.floor((new Date(fmpUsageEntry.resetsAt).getTime() - Date.now()) / 3_600_000))
+     : null;
+ 
+   const metrics = useMemo(() => {
+
+commit 0be5d0e12389427350c1787414b6d7bb4a2e91c1
+Author: Default-to-AI <roberttiger9@gmail.com>
+Date:   Tue Aug 4 03:36:04 2026 +0300
+
+    feat: provider-usage tracker, KV persistence, and footer pills
+    
+    Wires a per-provider API usage tracker (FMP / AlphaVantage / Yahoo) into
+    the /api/provider-usage footer pill so users see their free-tier budget
+    in real time. Adds a LocalMemoryStore for single-instance and a
+    VercelKvStore (raw fetch against the Upstash REST API, zero new deps)
+    for cross-instance persistence.
+    
+    What changed
+    ============
+    
+    Server
+    ------
+    * server/services/apiUsageTracker.ts
+      - Single-file module containing the tracker facade AND the store
+        abstraction so Vercel's API bundler ships a self-contained bundle.
+      - recordCall/recordRateLimit: sync mirror update + fire-and-forget
+        KV write. Eager hydration on module init reads today's buckets
+        for all three providers in parallel.
+      - getProviderUsage() is now async (awaitHydration default true);
+        client/lib/ProviderUsageFooter polls every 15s.
+    * server/services/usageStore.ts
+      - Re-export shim only. Class definitions live in apiUsageTracker.ts
+        so Vercel doesn't drop a sibling route during bundling.
+    * server/services/fmp.ts
+      - Moved apiUsageTracker.recordCall("fmp") to the top of fetchFMP()
+        so every invocation counts regardless of node-cache hit/miss.
+    * server/routes/stock-data.ts + api/_router.js
+      - GET /api/provider-usage returns the per-day snapshot.
+      - GET /api/provider-usage?mode=status returns {store, kvConfigured,
+        ready, checkedAt} so users can verify VercelKvStore activation
+        post-provisioning.
+    
+    Client
+    ------
+    * client/components/ProviderUsageFooter.tsx (new)
+      - Sticky bottom strip. One pill per provider with used/limit count,
+        a 48px progress bar, and a reset-hizon label.
+      - Mode toggle (used vs remaining) with localStorage persistence and
+         inverted color tiers under remaining mode.
+    * client/components/ProviderHealthIndicator.tsx (new)
+      - Top banner surfacing per-feature outages with affected-provider list
+        and a "docs link" affordance.
+    * client/components/BatchQuoteFallbackHint.tsx (new)
+      - Small chip on Portfolio explaining the FMP-paid-gated Yahoo fallback.
+    * client/components/TickerLogo.tsx + TopBar.tsx
+      - xs size added for compact usage in the breadcrumb next to the
+        ticker on /stock/<symbol> pages.
+    * client/hooks/useStockData.ts
+      - New hooks: useProviderHealth, useYahooDown, useYahooChartDown,
+        useFmpBatchQuoteRestricted, useProviderUsage.
+    * client/lib/i18n.tsx
+      - providerHealth.* and usage.* key families (en + he).
+    
+    Shared / docs / scripts
+    -----------------------
+    * shared/api.ts + shared/providerHealth.ts (new)
+      - ProviderUsageEntry/Response types + per-feature provider health
+        classification (ok/degraded/down/known_restriction/etc).
+    * docs/data-providers.md
+      - New ┬º1a "Per-process counter Γזע cross-instance (Vercel KV)" with
+        setup steps + smoke-test curl + free-tier cost note.
+    * scripts/fmp-audit.ts (new)
+      - Standalone CLI to probe every /stable/ endpoint live and report
+        the free-tier remaining count.
+    
+    Tests
+    -----
+    * server/services/apiUsageTracker.spec.ts (new, expanded)
+      - 17 tests including cache-vs-count regression, KV integration,
+        cross-instance persistence simulation, prune, isRateLimited flip.
+    * server/services/usageStore.spec.ts (new, 11 tests)
+      - LocalMemoryStore round-trips, VercelKvStore fetch shape + retry,
+        malformed-JSON fallback, factory env detection.
+    * server/services/stockService.providerHealth.spec.ts (new)
+      - Per-feature health probes against every provider+feature axis.
+    * shared/providerHealth.spec.ts (new)
+      - Classification matrix parity with api/_router.classify.spec.ts.
+    
+    Stats
+    =====
+    * 343 / 343 tests passing across 21 spec files.
+    * pnpm typecheck: clean (exit 0).
+    * Recommended env vars for production: KV_REST_API_URL + KV_REST_API_TOKEN
+      populated via Vercel Storage Γזע KV dashboard or `vercel integration add
+      upstash/upstash-kv`.
+    
+    Known issue: see PR body.
+
+diff --git a/client/pages/Index.tsx b/client/pages/Index.tsx
+index e00d458..4581d92 100644
+--- a/client/pages/Index.tsx
++++ b/client/pages/Index.tsx
+@@ -7,7 +7,150 @@ import CompanyProfile from "@/components/CompanyProfile";
+ import TickerLogo from "@/components/TickerLogo";
+ import { HeaderPriceSkeleton, MetricCardSkeleton } from "@/components/Skeleton";
+ import { financialMetrics, FinancialMetric } from "@/lib/mockData";
+-import { useStockQuote, useStockProfile, useStockFinancials } from "@/hooks/useStockData";
++import { useStockQuote, useStockProfile, useStockFinancials, useProviderHealth, useStockYahooFallbackFinancials } from "@/hooks/useStockData";
++import {
++  cagrAtYearsBack,
++  detectPeriodGranularity,
++  formatEarningsDate,
++} from "@/lib/finance";
++import type { YahooFallbackFinancials } from "@shared/api";
++
++/**
++ * Compact 4-card snapshot grid for the FMP-rate-limited fallback path.
++ * Yahoo free tier doesn't ship historical fundamentals, so this can't
++ * render the YoY/CAGR 8-card grid the FMP primary does Γאפ instead it
++ * surfaces single-point TTM / estimate values from `defaultKeyStatistics` /
++ * `financialData` / `earningsTrend`. Each card carries a "(Yahoo estimate)"
++ * chip + tooltip so stale-free-tier data can't read as a real primary
++ * source. This component is local to the page because (a) it isn't used
++ * anywhere else, and (b) moving it to a shared file would force the
++ * shared component to know about the Index page's render state machine.
++ */
++function YahooFallbackGrid({
++  data,
++  chipLabel,
++  chipTitle,
++  formatBillions,
++  formatPercent,
++  formatUSD,
++  emDash,
++}: {
++  data: YahooFallbackFinancials;
++  chipLabel: string;
++  chipTitle: string;
++  formatBillions: (n: number) => string;
++  formatPercent: (n: number) => string;
++  formatUSD: (n: number) => string;
++  emDash: string;
++}) {
++  const safeText = (
++    value: number | null,
++    formatter: (n: number) => string,
++  ): string => (value === null || !Number.isFinite(value) ? emDash : formatter(value));
++  const safeBadge = (value: number | null): string =>
++    value === null || !Number.isFinite(value) ? emDash : formatPercent(value);
++  const cards: Array<{
++    title: string;
++    value: string;
++    badge: string;
++    badgeType: "positive" | "negative" | "neutral";
++  }> = [
++    // Revenue (TTM) with revenueGrowth as the YoY chip.
++    {
++      title: "Revenue (TTM)",
++      value: safeText(data.revenue, formatBillions),
++      badge: safeBadge(data.revenueGrowth),
++      badgeType:
++        data.revenueGrowth === null || !Number.isFinite(data.revenueGrowth)
++          ? "neutral"
++          : data.revenueGrowth >= 0
++            ? "positive"
++            : "negative",
++    },
++    // EBITDA (TTM) with operatingMargin as the chip.
++    {
++      title: "EBITDA (TTM)",
++      value: safeText(data.ebitda, formatBillions),
++      badge: safeBadge(data.operatingMargin),
++      badgeType:
++        data.operatingMargin === null || !Number.isFinite(data.operatingMargin)
++          ? "neutral"
++          : data.operatingMargin >= 0
++            ? "positive"
++            : "negative",
++    },
++    // Gross Profit (TTM) with grossMargin as the chip.
++    {
++      title: "Gross Profit (TTM)",
++      value: safeText(data.grossProfit, formatBillions),
++      badge: safeBadge(data.grossMargin),
++      badgeType:
++        data.grossMargin === null || !Number.isFinite(data.grossMargin)
++          ? "neutral"
++          : data.grossMargin >= 0
++            ? "positive"
++            : "negative",
++    },
++    // EPS est (next quarter consensus) with earningsGrowth as the chip.
++    {
++      title: "EPS Estimate (Next Qtr)",
++      value: safeText(data.epsEstimateNextQtr, formatUSD),
++      badge: safeBadge(data.earningsGrowth),
++      badgeType:
++        data.earningsGrowth === null || !Number.isFinite(data.earningsGrowth)
++          ? "neutral"
++          : data.earningsGrowth >= 0
++            ? "positive"
++            : "negative",
++    },
++  ];
++  return (
++    <>
++      {cards.map((card, idx) => {
++        const valueClass = card.badgeType === "positive"
++          ? "border-green-500/30"
++          : card.badgeType === "negative"
++            ? "border-red-500/30"
++            : "border-slate-500/30";
++        const badgeClass = card.badgeType === "positive"
++          ? "bg-green-500/20 text-green-400"
++          : card.badgeType === "negative"
++            ? "bg-red-500/20 text-red-400"
++            : "bg-slate-500/20 text-slate-300";
++        return (
++          <div
++            key={idx}
++            className={`bg-card border ${valueClass} rounded-xl p-4 flex flex-col`}
++          >
++            <div className="flex items-start justify-between gap-2 mb-3">
++              <span className="text-sm text-muted-foreground font-medium">
++                {card.title}
++              </span>
++              <span
++                className={`text-[10px] uppercase tracking-wide font-medium px-2 py-0.5 rounded shrink-0 ${badgeClass}`}
++                title={chipTitle}
++                dir="ltr"
++              >
++                {chipLabel}
++              </span>
++            </div>
++            <div className="flex items-end gap-3 mb-1">
++              <span className="text-3xl font-bold text-foreground tracking-tight" dir="ltr">
++                {card.value}
++              </span>
++              <span
++                className={`text-xs font-semibold px-2 py-0.5 rounded border mb-1 ${badgeClass} border-current/20`}
++                dir="ltr"
++              >
++                {card.badge}
++              </span>
++            </div>
++          </div>
++        );
++      })}
++    </>
++  );
++}
+ 
+ /**
+  * Displays a localized stock overview with quote information, company details, financial metrics, and interactive charts for the selected ticker.
+@@ -31,6 +174,29 @@ export default function Index() {
+     refetch: refetchFinancials,
+   } = useStockFinancials(ticker);
+ 
++  // Provider-health probe (already polled by the global indicator) Γאפ when
++  // FMP is degraded we KNOW the financials fetch likely landed on a 429,
++  // so the empty-state below can surface the actual cause instead of a
++  // vague "Retry" button. Shares the same query key as the global banner;
++  // React Query dedupes so this is a zero-cost subscription.
++  const { data: providerHealth, dataUpdatedAt: providerHealthCheckedAt } = useProviderHealth();
++  const fmpProbe = providerHealth?.providers?.find(
++    (p) => p.provider === "fmp" && p.feature === "quote",
++  );
++  // Any FMP feature on the quote-plane being degraded is enough Γאפ the free
++  // tier's 250/day budget lets a single 429 in any quote-path probe stand
++  // in for "the whole /stable/ surface is rate-limited" because the
++  // window is a rolling 24h. showFmpRateLimit then renders a localized
++  // hint under the empty-state with hours-until-reset math.
++  const fmpDown = fmpProbe?.status === "down" || fmpProbe?.status === "degraded";
++  // FMP's free tier window is per-day (rolling 24h). The probe gives us a
++  // timestamp; we report "resets in ~N hours" rather than a hard promise,
++  // and clamp to a sane range so a long-quiet probe doesn't read as
++  // "resets in 0 minutes".
++  const fmpHoursUntilReset = providerHealthCheckedAt
++    ? Math.max(1, Math.min(24, 24 - Math.floor((Date.now() - providerHealthCheckedAt) / 3_600_000)))
++    : null;
++
+   const metrics = useMemo(() => {
+     // When no real financials land for the active ticker, do NOT silently
+     // surface financialMetrics (which is hardcoded AAPL data) for a
+@@ -52,11 +218,27 @@ export default function Index() {
+         return ((current - prev) / Math.abs(prev)) * 100;
+       };
+ 
++      // CAGR helpers close the gap between the working "1Y YoY" column and
++      // the 3Y / 5Y columns the modal used to render as "-" because the
++      // metric builder never set their fields. `detectPeriodGranularity`
++      // reads the most recent row's `period` label so an annual series
++      // uses a 1-row stride back per year and a quarterly series uses
++      // 4 rows per year. The helper returns `null` when the series is
++      // too short, so the modal renders "-" cleanly without throwing.
++      const granularity = detectPeriodGranularity(incAsc);
++      const safeCagrAtYears = (
++        arr: typeof inc,
++        key: keyof typeof inc[number],
++        years: number,
++      ): number | null => cagrAtYearsBack(arr, key, years, granularity);
++
+       metricsResult = [
+         {
+           name: "insights.revenue",
+           unit: "B",
+           yoy: safeYoy(incAsc, "revenue"),
++          cagr3Y: safeCagrAtYears(incAsc, "revenue", 3),
++          cagr5Y: safeCagrAtYears(incAsc, "revenue", 5),
+           data: incAsc.map((d) => ({ date: d.calendarYear, value: d.revenue / 1e9 })),
+           type: "bar",
+           color: "blue",
+@@ -65,6 +247,8 @@ export default function Index() {
+           name: "insights.ebitda",
+           unit: "B",
+           yoy: safeYoy(incAsc, "ebitda"),
++          cagr3Y: safeCagrAtYears(incAsc, "ebitda", 3),
++          cagr5Y: safeCagrAtYears(incAsc, "ebitda", 5),
+           data: incAsc.map((d) => ({ date: d.calendarYear, value: d.ebitda / 1e9 })),
+           type: "bar",
+           color: "blue",
+@@ -73,6 +257,8 @@ export default function Index() {
+           name: "insights.grossProfit",
+           unit: "B",
+           yoy: safeYoy(incAsc, "grossProfit"),
++          cagr3Y: safeCagrAtYears(incAsc, "grossProfit", 3),
++          cagr5Y: safeCagrAtYears(incAsc, "grossProfit", 5),
+           data: incAsc.map((d) => ({ date: d.calendarYear, value: d.grossProfit / 1e9 })),
+           type: "bar",
+           color: "blue",
+@@ -81,6 +267,8 @@ export default function Index() {
+           name: "insights.operatingIncome",
+           unit: "B",
+           yoy: safeYoy(incAsc, "operatingIncome"),
++          cagr3Y: safeCagrAtYears(incAsc, "operatingIncome", 3),
++          cagr5Y: safeCagrAtYears(incAsc, "operatingIncome", 5),
+           data: (incAsc.filter((row) => row.operatingIncome !== undefined) as typeof inc).map((d) => ({
+             date: d.calendarYear,
+             value: (d.operatingIncome ?? 0) / 1e9,
+@@ -92,6 +280,8 @@ export default function Index() {
+           name: "insights.netIncome",
+           unit: "B",
+           yoy: safeYoy(incAsc, "netIncome"),
++          cagr3Y: safeCagrAtYears(incAsc, "netIncome", 3),
++          cagr5Y: safeCagrAtYears(incAsc, "netIncome", 5),
+           data: incAsc.map((d) => ({ date: d.calendarYear, value: d.netIncome / 1e9 })),
+           type: "bar",
+           color: "blue",
+@@ -100,6 +290,8 @@ export default function Index() {
+           name: "insights.eps",
+           unit: "$",
+           yoy: safeYoy(incAsc, "eps"),
++          cagr3Y: safeCagrAtYears(incAsc, "eps", 3),
++          cagr5Y: safeCagrAtYears(incAsc, "eps", 5),
+           data: incAsc.map((d) => ({ date: d.calendarYear, value: d.eps })),
+           type: "line",
+           color: "blue",
+@@ -113,6 +305,8 @@ export default function Index() {
+                   Math.abs(balAsc[balAsc.length - 2].cashAndCashEquivalents)) *
+                 100
+               : 0,
++          cagr3Y: cagrAtYearsBack(balAsc, "cashAndCashEquivalents", 3, granularity),
++          cagr5Y: cagrAtYearsBack(balAsc, "cashAndCashEquivalents", 5, granularity),
+           data: balAsc.map((d) => ({ date: d.calendarYear, value: d.cashAndCashEquivalents / 1e9 })),
+           type: "bar",
+           color: "green",
+@@ -124,6 +318,8 @@ export default function Index() {
+             balAsc.length >= 2
+               ? ((balAsc[balAsc.length - 1].totalAssets - balAsc[balAsc.length - 2].totalAssets) / Math.abs(balAsc[balAsc.length - 2].totalAssets)) * 100
+               : 0,
++          cagr3Y: cagrAtYearsBack(balAsc, "totalAssets", 3, granularity),
++          cagr5Y: cagrAtYearsBack(balAsc, "totalAssets", 5, granularity),
+           data: balAsc.map((d) => ({ date: d.calendarYear, value: (d.totalAssets ?? 0) / 1e9 })),
+           type: "bar",
+           color: "purple",
+@@ -133,6 +329,51 @@ export default function Index() {
+     return metricsResult;
+   }, [financialsData]);
+ 
++  // ΓפאΓפא Yahoo fallback path (FMP rate-limited) ΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפאΓפא
++  // When FMP is degraded AND the primary metrics grid is empty, swap to a
++  // Yahoo-driven 4-card snapshot view: Revenue / EBITDA / Gross Profit /
++  // EPS-est, each labeled "(Yahoo estimate)" so stale-free-tier data
++  // can't read as a real primary source. Gated by `enabled` so a healthy
++  // FMP probe never fires the Yahoo round-trip. Shares the query key
++  // `["stockYahooFallbackFinancials", ticker]` with any other observer,
++  // so React Query dedupes across renders.
++  const { data: yahooFallbackData } = useStockYahooFallbackFinancials(
++    ticker,
++    { enabled: fmpDown && financialsFetched && metrics.length === 0 },
++  );
++  // `hasAnyFallbackValue` gates the fallback render on the basis that a
++  // valid Yahoo response always carries at least one finite number Γאפ a
++  // payload of all `null` (which the server emits on total upstream
++  // failure) should fall through to the existing "Metrics unavailable"
++  // empty-state rather than render four dashes posing as a snapshot.
++  const hasAnyFallbackValue = (
++    yf?: typeof yahooFallbackData,
++  ): boolean => {
++    if (!yf) return false;
++    return (
++      yf.revenue !== null ||
++      yf.ebitda !== null ||
++      yf.grossProfit !== null ||
++      yf.operatingMargin !== null ||
++      yf.profitMargin !== null ||
++      yf.grossMargin !== null ||
++      yf.revenueGrowth !== null ||
++      yf.earningsGrowth !== null ||
++      yf.totalCash !== null ||
++      yf.totalDebt !== null ||
++      yf.enterpriseValue !== null ||
++      yf.trailingEps !== null ||
++      yf.forwardEps !== null ||
++      yf.epsEstimateNextQtr !== null ||
++      yf.revenueEstimateNextQtr !== null
++    );
++  };
++  const showYahooFallback =
++    fmpDown &&
++    financialsFetched &&
++    metrics.length === 0 &&
++    hasAnyFallbackValue(yahooFallbackData);
++
+   // Today vs previous-close delta (NOT a true post-market price Γאפ FMP free
+   // tier doesn't carry after-hours quote). When a paid key/upgrade adds a
+   // dedicated extended-hours field, replace this with that value.
+@@ -148,12 +389,15 @@ export default function Index() {
+     };
+   }, [quoteData]);
+ 
+-  const earningsDate = useMemo(() => {
+-    if (!quoteData?.earningsAnnouncement) return null;
+-    const d = new Date(quoteData.earningsAnnouncement);
+-    if (Number.isNaN(d.getTime())) return null;
+-    return d.toISOString().slice(0, 10);
+-  }, [quoteData?.earningsAnnouncement]);
++  // Locale-aware earnings-date formatted via `formatEarningsDate` (en:
++  // "Apr 22, 2026", he: "22 ╫ס╫נ╫ñ╫¿ 2026"). The previous `toISOString().slice(0,10)`
++  // produced bare ISO "2026-04-22" which read like a YAML key to non-technical
++  // users. `formatEarningsDate` also survives upstream Unix-second epoch
++  // values because it routes through `parseTradeDate` (handles both halves).
++  const earningsDate = useMemo(
++    () => formatEarningsDate(quoteData?.earningsAnnouncement),
++    [quoteData?.earningsAnnouncement],
++  );
+ 
+   // NOTE: `categoryColor` and `getCategoryStyle` previously lived here to
+   // color news-pill chips per category, but Index.tsx no longer renders
+@@ -269,25 +513,54 @@ export default function Index() {
+               ))}
+             </>
+           ) : metrics.length === 0 ? (
+-            <div className="col-span-full bg-card border border-border rounded-xl px-6 py-10 text-center">
+-              <p className="text-sm text-muted-foreground">
+-                {t("index.metricsUnavailable", { ticker })}
+-              </p>
+-              <button
+-                type="button"
+-                onClick={() => {
+-                  // .catch(() => null) future-proofs against the void-discard
+-                  // shape Γאפ if anyone later awaits this or chains .then(), the
+-                  // pipeline still won't surface an unhandled rejection. The
+-                  // FMP free tier frequently returns the same empty array on
+-                  // refetch, so this button is honest about a likely no-op.
+-                  refetchFinancials().catch(() => null);
+-                }}
+-                className="mt-4 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+-              >
+-                {t("index.metricsRetry")}
+-              </button>
+-            </div>
++            showYahooFallback && yahooFallbackData ? (
++              <YahooFallbackGrid
++                data={yahooFallbackData}
++                chipLabel={t("index.metricsYahooFallbackChip")}
++                chipTitle={t("index.metricsYahooFallbackTitle")}
++                formatBillions={(n: number) => `${(n / 1e9).toFixed(2)}B`}
++                formatPercent={(n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`}
++                formatUSD={(n: number) => `$${n.toFixed(2)}`}
++                emDash="Γאפ"
++              />
++            ) : (
++              <div className="col-span-full bg-card border border-border rounded-xl px-6 py-10 text-center">
++                <p className="text-sm text-muted-foreground">
++                  {t("index.metricsUnavailable", { ticker })}
++                </p>
++                {/* When FMP is degraded AND metrics are empty, the "Retry"
++                    button by itself is a misleading hint Γאפ it's the budget,
++                    not the request. Surface the real cause (free-tier 429)
++                    so users know why Retry is honest about a likely no-op,
++                    and links them to docs that explain the rate limit. Hidden
++                    until both conditions are met so a benign empty-upstream
++                    state (e.g. a symbol FMP doesn't cover) still reads as
++                    "no data" without alarm. */}
++                {fmpDown && (
++                  <p className="mt-3 text-xs text-amber-300/90 max-w-md mx-auto leading-relaxed">
++                    {fmpHoursUntilReset !== null
++                      ? t("index.metricsRateLimited", {
++                          hours: fmpHoursUntilReset,
++                        })
++                      : t("index.metricsRateLimitedUnknownReset")}
++                  </p>
++                )}
++                <button
++                  type="button"
++                  onClick={() => {
++                    // .catch(() => null) future-proofs against the void-discard
++                    // shape Γאפ if anyone later awaits this or chains .then(), the
++                    // pipeline still won't surface an unhandled rejection. The
++                    // FMP free tier frequently returns the same empty array on
++                    // refetch, so this button is honest about a likely no-op.
++                    refetchFinancials().catch(() => null);
++                  }}
++                  className="mt-4 text-xs text-blue-400 hover:text-blue-300 transition-colors"
++                >
++                  {t("index.metricsRetry")}
++                </button>
++              </div>
++            )
+           ) : (
+             metrics.map((metric, idx) => {
+               const latestVal = metric.data[metric.data.length - 1]?.value || 0;
+
+commit 7f93c3d50c1661c2f54365db99719d203c7cd96f
+Author: Default-to-AI <roberttiger9@gmail.com>
+Date:   Sun Aug 2 16:27:11 2026 +0300
+
+    feat: vantage stock analysis app Γאפ clean single-commit history
+    
+    Single-root snapshot of the production tree: bilingual (EN/HE) stock-analysis
+    web app (dark Bloomberg-style terminal UI, real market data via FMP/Alpha
+    Vantage/Yahoo/Logo.dev, earnings calendar, DCF widget, watchlists, portfolios,
+    curated sector heatmap, route-level code splitting).
+    
+    History was intentionally flattened: prior history carried leaked API keys and
+    ~70 MB of tooling databases/build output in .freebuff/ and .vercel/. All
+    branches were deleted and the app tree re-committed from scratch. Server-side
+    API keys are read from environment variables only (.env.example documents the
+    placeholders); nothing secret is committed.
+
+diff --git a/client/pages/Index.tsx b/client/pages/Index.tsx
+new file mode 100644
+index 0000000..e00d458
+--- /dev/null
++++ b/client/pages/Index.tsx
+@@ -0,0 +1,325 @@
++import { useState, useMemo } from "react";
++import { useParams } from "react-router-dom";
++import { useI18n } from "@/lib/i18n";
++import ChartModal from "@/components/ChartModal";
++import InsightsCard from "@/components/InsightsCard";
++import CompanyProfile from "@/components/CompanyProfile";
++import TickerLogo from "@/components/TickerLogo";
++import { HeaderPriceSkeleton, MetricCardSkeleton } from "@/components/Skeleton";
++import { financialMetrics, FinancialMetric } from "@/lib/mockData";
++import { useStockQuote, useStockProfile, useStockFinancials } from "@/hooks/useStockData";
++
++/**
++ * Displays a localized stock overview with quote information, company details, financial metrics, and interactive charts for the selected ticker.
++ */
++export default function Index() {
++  const { t } = useI18n();
++  const { ticker: urlTicker } = useParams<{ ticker?: string }>();
++  const [selectedMetric, setSelectedMetric] = useState<FinancialMetric | null>(null);
++
++  const ticker = urlTicker?.toUpperCase() || "AAPL";
++
++  const { data: quoteData, isLoading: quoteLoading } = useStockQuote(ticker);
++  const { data: overviewData, isLoading: overviewLoading } = useStockProfile(ticker);
++  // isFetched becomes true once the first query attempt settles (success
++  // OR failure). We need it to distinguish "still loading" from "loaded
++  // with no data" Γאפ otherwise the metrics grid shows skeletons forever
++  // when FMP returns null (which happens on the free tier for many tickers).
++  const {
++    data: financialsData,
++    isFetched: financialsFetched,
++    refetch: refetchFinancials,
++  } = useStockFinancials(ticker);
++
++  const metrics = useMemo(() => {
++    // When no real financials land for the active ticker, do NOT silently
++    // surface financialMetrics (which is hardcoded AAPL data) for a
++    // non-AAPL ticker. Render empty so the `metrics.length === 0` branch
++    // below shows MetricCardSkeleton instead.
++    let metricsResult: typeof financialMetrics = [];
++
++    const inc = financialsData?.income ?? [];
++    const bal = financialsData?.balance ?? [];
++    if (inc.length > 0) {
++      const incAsc = [...inc].sort((a, b) => (a.date < b.date ? -1 : 1));
++      const balAsc = [...bal].sort((a, b) => (a.date < b.date ? -1 : 1));
++
++      const safeYoy = (arr: typeof inc, key: keyof typeof inc[number]) => {
++        if (arr.length < 2) return 0;
++        const prev = arr[arr.length - 2][key] as number;
++        const current = arr[arr.length - 1][key] as number;
++        if (!prev) return 0;
++        return ((current - prev) / Math.abs(prev)) * 100;
++      };
++
++      metricsResult = [
++        {
++          name: "insights.revenue",
++          unit: "B",
++          yoy: safeYoy(incAsc, "revenue"),
++          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.revenue / 1e9 })),
++          type: "bar",
++          color: "blue",
++        },
++        {
++          name: "insights.ebitda",
++          unit: "B",
++          yoy: safeYoy(incAsc, "ebitda"),
++          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.ebitda / 1e9 })),
++          type: "bar",
++          color: "blue",
++        },
++        {
++          name: "insights.grossProfit",
++          unit: "B",
++          yoy: safeYoy(incAsc, "grossProfit"),
++          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.grossProfit / 1e9 })),
++          type: "bar",
++          color: "blue",
++        },
++        {
++          name: "insights.operatingIncome",
++          unit: "B",
++          yoy: safeYoy(incAsc, "operatingIncome"),
++          data: (incAsc.filter((row) => row.operatingIncome !== undefined) as typeof inc).map((d) => ({
++            date: d.calendarYear,
++            value: (d.operatingIncome ?? 0) / 1e9,
++          })),
++          type: "bar",
++          color: "blue",
++        },
++        {
++          name: "insights.netIncome",
++          unit: "B",
++          yoy: safeYoy(incAsc, "netIncome"),
++          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.netIncome / 1e9 })),
++          type: "bar",
++          color: "blue",
++        },
++        {
++          name: "insights.eps",
++          unit: "$",
++          yoy: safeYoy(incAsc, "eps"),
++          data: incAsc.map((d) => ({ date: d.calendarYear, value: d.eps })),
++          type: "line",
++          color: "blue",
++        },
++        {
++          name: "insights.cashAndEquivalents",
++          unit: "B",
++          yoy:
++            balAsc.length >= 2
++              ? ((balAsc[balAsc.length - 1].cashAndCashEquivalents - balAsc[balAsc.length - 2].cashAndCashEquivalents) /
++                  Math.abs(balAsc[balAsc.length - 2].cashAndCashEquivalents)) *
++                100
++              : 0,
++          data: balAsc.map((d) => ({ date: d.calendarYear, value: d.cashAndCashEquivalents / 1e9 })),
++          type: "bar",
++          color: "green",
++        },
++        {
++          name: "insights.totalAssets",
++          unit: "B",
++          yoy:
++            balAsc.length >= 2
++              ? ((balAsc[balAsc.length - 1].totalAssets - balAsc[balAsc.length - 2].totalAssets) / Math.abs(balAsc[balAsc.length - 2].totalAssets)) * 100
++              : 0,
++          data: balAsc.map((d) => ({ date: d.calendarYear, value: (d.totalAssets ?? 0) / 1e9 })),
++          type: "bar",
++          color: "purple",
++        },
++      ];
++    }
++    return metricsResult;
++  }, [financialsData]);
++
++  // Today vs previous-close delta (NOT a true post-market price Γאפ FMP free
++  // tier doesn't carry after-hours quote). When a paid key/upgrade adds a
++  // dedicated extended-hours field, replace this with that value.
++  // Note: surfacing as "Today vs Prev Close" rather than "After Hours" so the
++  // label matches the math.
++  const todayVsPrevClose = useMemo(() => {
++    if (!quoteData?.price || !quoteData?.previousClose) return null;
++    const delta = quoteData.price - quoteData.previousClose;
++    return {
++      price: quoteData.price,
++      delta,
++      deltaPct: (delta / quoteData.previousClose) * 100,
++    };
++  }, [quoteData]);
++
++  const earningsDate = useMemo(() => {
++    if (!quoteData?.earningsAnnouncement) return null;
++    const d = new Date(quoteData.earningsAnnouncement);
++    if (Number.isNaN(d.getTime())) return null;
++    return d.toISOString().slice(0, 10);
++  }, [quoteData?.earningsAnnouncement]);
++
++  // NOTE: `categoryColor` and `getCategoryStyle` previously lived here to
++  // color news-pill chips per category, but Index.tsx no longer renders
++  // news pills (the CompanyProfile sub-component handles news). Both
++  // aliases are removed so future readers don't wire them back up Γאפ news
++  // styling lives in `client/components/CompanyProfile.tsx`.
++
++  return (
++    <div className="w-full bg-background dark">
++      <div className="max-w-7xl mx-auto px-4 py-8">
++        {/* Centered Header Section */}
++        <div className="mb-12 text-center">
++          <div className="flex items-center justify-center gap-4 mb-4">
++            <TickerLogo ticker={ticker} size="md" />
++            <div>
++              <h1 className="text-3xl font-bold text-foreground">
++                {overviewData?.companyName ?? ticker}
++              </h1>
++              <p className="text-sm text-muted-foreground">
++                {ticker} | {overviewData?.exchange ?? "Γאפ"}
++              </p>
++            </div>
++          </div>
++
++          {/* Stock Price */}
++          <div className="mb-3">
++            {quoteLoading ? (
++              <HeaderPriceSkeleton />
++            ) : quoteData?.price ? (
++              <div className="flex items-baseline justify-center gap-3">
++                <span className="text-5xl font-bold text-foreground" dir="ltr">
++                  ${quoteData.price.toFixed(2)}
++                </span>
++                <span className="flex items-center gap-1" dir="ltr">
++                  <span
++                    className={`text-lg font-semibold ${quoteData.change >= 0 ? "text-chart-green" : "text-red-400"}`}
++                  >
++                    {quoteData.change >= 0 ? "+" : ""}
++                    {quoteData.change.toFixed(2)}
++                  </span>
++                  <span
++                    className={`px-2 py-1 rounded text-xs font-semibold ${quoteData.changesPercentage >= 0 ? "bg-chart-green/20 text-chart-green" : "bg-red-400/20 text-red-400"}`}
++                  >
++                    {quoteData.changesPercentage >= 0 ? "+" : ""}
++                    {quoteData.changesPercentage.toFixed(2)}%
++                  </span>
++                </span>
++              </div>
++            ) : (
++              <div className="text-center text-slate-400 text-xl">{t("index.unavailableApi")}</div>
++            )}
++          </div>
++
++          {/* Today vs Prev Close Γאפ fed by live quote */}
++          <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-muted-foreground">
++            <span>
++              {t("index.change")}{" "}
++              {todayVsPrevClose ? (
++                <span
++                  className={todayVsPrevClose.delta >= 0 ? "text-green-400" : "text-red-400"}
++                  dir="ltr"
++                >
++                  {todayVsPrevClose.delta >= 0 ? "+" : ""}
++                  {todayVsPrevClose.delta.toFixed(2)} ({todayVsPrevClose.delta >= 0 ? "+" : ""}
++                  {todayVsPrevClose.deltaPct.toFixed(2)}%)
++                </span>
++              ) : (
++                <span className="text-slate-500" dir="ltr">Γאפ</span>
++              )}
++            </span>
++            <span>
++              {t("index.earnings")}{" "}
++              {earningsDate ? (
++                <span className="text-blue-400" dir="ltr">{earningsDate}</span>
++              ) : (
++                <span className="text-slate-500" dir="ltr">Γאפ</span>
++              )}
++            </span>
++          </div>
++        </div>
++
++        {/* Quality Brief Section */}
++        <div className="bg-card rounded-lg p-8 border border-border mb-12">
++          <h2 className="text-xl font-semibold text-foreground mb-4">{t("index.qualityInBrief")}</h2>
++          <ul className="space-y-3 text-sm text-foreground">
++            <li className="flex gap-2">
++              <span className="text-chart-green font-bold shrink-0">Γאó</span>
++              <span dangerouslySetInnerHTML={{ __html: t("index.news1") }} />
++            </li>
++            <li className="flex gap-2">
++              <span className="text-chart-green font-bold shrink-0">Γאó</span>
++              <span dangerouslySetInnerHTML={{ __html: t("index.news2") }} />
++            </li>
++          </ul>
++          <button className="mt-4 text-blue-400 hover:text-blue-300 text-sm font-medium">
++            {t("index.viewMore")}
++          </button>
++        </div>
++
++        {/* Charts Grid - 4x2 Γאפ three render states driven by query fetch status */}
++        <h2 className="text-2xl font-semibold text-foreground mb-6">
++          {t("index.financialMetricsTitle")}
++        </h2>
++        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
++          {/* Cache-key switch (e.g. /stock/AAPL Γזע /stock/MSFT) resets isFetched
++              to false even though we may have stale data on disk; the skeleton
++              flash masks the cache-miss transition so don't add an enabled:
++              guard here without also handling that path. */}
++          {!financialsFetched ? (
++            <>
++              {Array.from({ length: 8 }).map((_, i) => (
++                <MetricCardSkeleton key={i} />
++              ))}
++            </>
++          ) : metrics.length === 0 ? (
++            <div className="col-span-full bg-card border border-border rounded-xl px-6 py-10 text-center">
++              <p className="text-sm text-muted-foreground">
++                {t("index.metricsUnavailable", { ticker })}
++              </p>
++              <button
++                type="button"
++                onClick={() => {
++                  // .catch(() => null) future-proofs against the void-discard
++                  // shape Γאפ if anyone later awaits this or chains .then(), the
++                  // pipeline still won't surface an unhandled rejection. The
++                  // FMP free tier frequently returns the same empty array on
++                  // refetch, so this button is honest about a likely no-op.
++                  refetchFinancials().catch(() => null);
++                }}
++                className="mt-4 text-xs text-blue-400 hover:text-blue-300 transition-colors"
++              >
++                {t("index.metricsRetry")}
++              </button>
++            </div>
++          ) : (
++            metrics.map((metric, idx) => {
++              const latestVal = metric.data[metric.data.length - 1]?.value || 0;
++              const yoyChange = metric.yoy || 0;
++              return (
++                <InsightsCard
++                  key={idx}
++                  title={t(metric.name) === metric.name ? metric.name.split(".")[1] : t(metric.name)}
++                  value={`${latestVal.toFixed(2)}${metric.unit === "$" ? "" : metric.unit}`}
++                  badgeText={`${yoyChange >= 0 ? "+" : ""}${yoyChange.toFixed(2)}%`}
++                  badgeType={yoyChange >= 0 ? "positive" : "negative"}
++                  metricId={metric.name}
++                  metricData={metric}
++                />
++              );
++            })
++          )}
++        </div>
++
++        {/* Company Profile Section */}
++        <CompanyProfile ticker={ticker} />
++      </div>
++
++      {/* Chart Modal */}
++      {selectedMetric && (
++        <ChartModal
++          metric={selectedMetric}
++          isOpen={selectedMetric !== null}
++          onClose={() => setSelectedMetric(null)}
++          ticker={ticker}
++        />
++      )}
++    </div>
++  );
++}

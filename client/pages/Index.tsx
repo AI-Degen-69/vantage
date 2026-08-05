@@ -17,6 +17,7 @@ import {
   useProviderHealth,
   useProviderUsage,
   useScreenerAsset,
+  useStockYahooFallbackFinancials,
 } from "@/hooks/useStockData";
 import {
   cagrAtYearsBack,
@@ -36,9 +37,7 @@ export default function Index() {
   const ticker = urlTicker?.toUpperCase() || "AAPL";
 
   const { data: quoteData, isLoading: quoteLoading } = useStockQuote(ticker);
-  const { data: overviewData, isLoading: overviewLoading } =
-    useStockProfile(ticker);
-  const { data: screenerAsset } = useScreenerAsset(ticker);
+  const { data: overviewData, isLoading: overviewLoading } = useStockProfile(ticker);
   // isFetched becomes true once the first query attempt settles (success
   // OR failure). We need it to distinguish "still loading" from "loaded
   // with no data" — otherwise the metrics grid shows skeletons forever
@@ -254,8 +253,65 @@ export default function Index() {
     return metricsResult;
   }, [financialsData]);
 
+  // ── Yahoo fallback path (FMP rate-limited) ────────────────────────────────
+  // When FMP is degraded AND the primary metrics grid is empty, swap to a
+  // Yahoo-driven 4-card snapshot view: Revenue / EBITDA / Gross Profit /
+  // EPS-est, each labeled "(Yahoo estimate)" so stale-free-tier data
+  // can't read as a real primary source. Gated by `enabled` so a healthy
+  // FMP probe never fires the Yahoo round-trip. Shares the query key
+  // `["stockYahooFallbackFinancials", ticker]` with any other observer,
+  // so React Query dedupes across renders.
+  const { data: yahooFallbackData } = useStockYahooFallbackFinancials(
+    ticker,
+    { enabled: fmpDown && financialsFetched && metrics.length === 0 },
+  );
+  // `hasAnyFallbackValue` gates the fallback render on the basis that a
+  // valid Yahoo response always carries at least one finite number — a
+  // payload of all `null` (which the server emits on total upstream
+  // failure) should fall through to the existing "Metrics unavailable"
+  // empty-state rather than render four dashes posing as a snapshot.
+  const hasAnyFallbackValue = (
+    yf?: typeof yahooFallbackData,
+  ): boolean => {
+    if (!yf) return false;
+    return (
+      yf.revenue !== null ||
+      yf.ebitda !== null ||
+      yf.grossProfit !== null ||
+      yf.operatingMargin !== null ||
+      yf.profitMargin !== null ||
+      yf.grossMargin !== null ||
+      yf.revenueGrowth !== null ||
+      yf.earningsGrowth !== null ||
+      yf.totalCash !== null ||
+      yf.totalDebt !== null ||
+      yf.enterpriseValue !== null ||
+      yf.trailingEps !== null ||
+      yf.forwardEps !== null ||
+      yf.epsEstimateNextQtr !== null ||
+      yf.revenueEstimateNextQtr !== null
+    );
+  };
+  const showYahooFallback =
+    fmpDown &&
+    financialsFetched &&
+    metrics.length === 0 &&
+    hasAnyFallbackValue(yahooFallbackData);
 
-
+  // Today vs previous-close delta (NOT a true post-market price — FMP free
+  // tier doesn't carry after-hours quote). When a paid key/upgrade adds a
+  // dedicated extended-hours field, replace this with that value.
+  // Note: surfacing as "Today vs Prev Close" rather than "After Hours" so the
+  // label matches the math.
+  const todayVsPrevClose = useMemo(() => {
+    if (!quoteData?.price || !quoteData?.previousClose) return null;
+    const delta = quoteData.price - quoteData.previousClose;
+    return {
+      price: quoteData.price,
+      delta,
+      deltaPct: (delta / quoteData.previousClose) * 100,
+    };
+  }, [quoteData]);
 
   // Locale-aware earnings-date formatted via `formatEarningsDate` (en:
   // "Apr 22, 2026", he: "22 באפר 2026"). The previous `toISOString().slice(0,10)`
@@ -276,140 +332,93 @@ export default function Index() {
   return (
     <div className="w-full bg-background dark">
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* ── Hero ── */}
-        <div className="mb-12 relative rounded-2xl overflow-hidden border border-border/60">
-          {/* Subtle radial glow behind the logo */}
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              background:
-                "radial-gradient(ellipse 60% 80% at 50% 0%, hsl(var(--primary)/0.12) 0%, transparent 70%)",
-            }}
-          />
-
-          <div className="relative px-8 pt-10 pb-8 flex flex-col items-center text-center">
-            {/* Logo — large */}
-            <div className="mb-5 ring-2 ring-border/40 rounded-2xl shadow-xl shadow-black/40">
-              <TickerLogo ticker={ticker} size="xl" />
-            </div>
-
-            {/* Company name + exchange badge */}
-            <h1 className="font-display text-4xl font-bold text-foreground tracking-tight mb-1">
-              {overviewData?.companyName ?? screenerAsset?.name ?? ticker}
-            </h1>
-            <p className="text-sm text-muted-foreground font-mono tracking-widest uppercase mb-5">
-              {ticker}
-              {(overviewData?.exchange ?? screenerAsset?.exchange) && (
-                <> · {overviewData?.exchange ?? screenerAsset?.exchange}</>
-              )}
-            </p>
-
-            {/* Divider */}
-            <div className="w-16 h-px bg-border/60 mb-6" />
-
-            {/* Price block */}
-            <div className="mb-2">
-              {quoteLoading ? (
-                <HeaderPriceSkeleton />
-              ) : quoteData?.price ? (
-                <div className="inline-flex items-center justify-center gap-3" dir="ltr">
-                  <span className="text-5xl font-bold text-foreground font-mono tabular-nums tracking-tight leading-none">
-                    ${quoteData.price.toFixed(2)}
-                  </span>
-                  <div className="flex flex-col items-start justify-between self-stretch py-0.5">
-                    <span
-                      className={`text-base font-semibold font-mono tabular-nums leading-none ${quoteData.change >= 0 ? "text-chart-positive" : "text-chart-negative"}`}
-                    >
-                      {quoteData.change >= 0 ? "+" : ""}{quoteData.change.toFixed(2)}
-                    </span>
-                    <span
-                      className={`px-2 py-0.5 rounded-md text-sm font-semibold font-mono tabular-nums leading-none ${quoteData.changesPercentage >= 0 ? "bg-chart-positive/15 text-chart-positive" : "bg-chart-negative/15 text-chart-negative"}`}
-                    >
-                      {quoteData.changesPercentage >= 0 ? "+" : ""}{quoteData.changesPercentage.toFixed(2)}%
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-muted-foreground text-lg">{t("index.unavailableApi")}</div>
-              )}
-            </div>
-
-            {/* Earnings sub-line */}
-            <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs text-muted-foreground mt-3">
-              <span>
-                {t("index.earnings")}{" "}
-                {earningsDate ? (
-                  <span className="text-primary font-mono" dir="ltr">{earningsDate}</span>
-                ) : (
-                  <span className="text-muted-foreground/50" dir="ltr">—</span>
-                )}
-              </span>
-            </div>
-
-            {/* Context chips — sector / industry / market cap */}
-            {(overviewData?.sector ?? screenerAsset?.sector ?? overviewData?.industry ?? quoteData?.marketCap) && (
-              <div className="flex flex-wrap justify-center gap-2 mt-6">
-                {(overviewData?.sector ?? screenerAsset?.sector) && (
-                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-muted/60 text-muted-foreground border border-border/50">
-                    {overviewData?.sector ?? screenerAsset?.sector}
-                  </span>
-                )}
-                {(overviewData?.industry ?? screenerAsset?.industry) && (
-                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-muted/60 text-muted-foreground border border-border/50">
-                    {overviewData?.industry ?? screenerAsset?.industry}
-                  </span>
-                )}
-                {quoteData?.marketCap && (
-                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
-                    {quoteData.marketCap >= 1e12
-                      ? `$${(quoteData.marketCap / 1e12).toFixed(2)}T`
-                      : quoteData.marketCap >= 1e9
-                      ? `$${(quoteData.marketCap / 1e9).toFixed(1)}B`
-                      : `$${(quoteData.marketCap / 1e6).toFixed(0)}M`}{" "}
-                    Market Cap
-                  </span>
-                )}
-              </div>
-            )}
-
-            <StockFundamentalsStrip
-              quote={quoteData}
-              metrics={stockMetricsData}
-              annualFinancials={financialsData}
-              quarterlyFinancials={quarterlyFinancialsData}
-              analyst={analystData}
-              marketCap={quoteData?.marketCap ?? overviewData?.marketCap ?? screenerAsset?.market_cap}
-              loading={
-                quoteLoading ||
-                stockMetricsLoading ||
-                quarterlyFinancialsLoading
-              }
-            />
-
-            {/* Quality brief stays in the hero to avoid a second full-width card. */}
-            <div className="w-full mt-6 pt-5 border-t border-border/50 text-left">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <h2 className="font-display text-[11px] font-semibold uppercase tracking-[0.14em] text-foreground/80 mb-2">
-                    {t("index.qualityInBrief")}
-                  </h2>
-                  <ul className="grid gap-1.5 text-xs text-foreground/90 sm:grid-cols-2 sm:gap-x-6">
-                    <li className="flex gap-2">
-                      <span className="text-primary font-bold shrink-0">—</span>
-                      <span dangerouslySetInnerHTML={{ __html: t("index.news1") }} />
-                    </li>
-                    <li className="flex gap-2">
-                      <span className="text-primary font-bold shrink-0">—</span>
-                      <span dangerouslySetInnerHTML={{ __html: t("index.news2") }} />
-                    </li>
-                  </ul>
-                </div>
-                <button className="shrink-0 text-primary hover:opacity-80 transition-opacity text-xs font-medium sm:mt-5">
-                  {t("index.viewMore")}
-                </button>
-              </div>
+        {/* Centered Header Section */}
+        <div className="mb-12 text-center">
+          <div className="flex items-center justify-center gap-4 mb-4">
+            <TickerLogo ticker={ticker} size="md" />
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">
+                {overviewData?.companyName ?? ticker}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {ticker} | {overviewData?.exchange ?? "—"}
+              </p>
             </div>
           </div>
+
+          {/* Stock Price */}
+          <div className="mb-3">
+            {quoteLoading ? (
+              <HeaderPriceSkeleton />
+            ) : quoteData?.price ? (
+              <div className="flex items-baseline justify-center gap-3">
+                <span className="text-5xl font-bold text-foreground" dir="ltr">
+                  ${quoteData.price.toFixed(2)}
+                </span>
+                <span className="flex items-center gap-1" dir="ltr">
+                  <span
+                    className={`text-lg font-semibold ${quoteData.change >= 0 ? "text-chart-green" : "text-red-400"}`}
+                  >
+                    {quoteData.change >= 0 ? "+" : ""}
+                    {quoteData.change.toFixed(2)}
+                  </span>
+                  <span
+                    className={`px-2 py-1 rounded text-xs font-semibold ${quoteData.changesPercentage >= 0 ? "bg-chart-green/20 text-chart-green" : "bg-red-400/20 text-red-400"}`}
+                  >
+                    {quoteData.changesPercentage >= 0 ? "+" : ""}
+                    {quoteData.changesPercentage.toFixed(2)}%
+                  </span>
+                </span>
+              </div>
+            ) : (
+              <div className="text-center text-slate-400 text-xl">{t("index.unavailableApi")}</div>
+            )}
+          </div>
+
+          {/* Today vs Prev Close — fed by live quote */}
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-muted-foreground">
+            <span>
+              {t("index.change")}{" "}
+              {todayVsPrevClose ? (
+                <span
+                  className={todayVsPrevClose.delta >= 0 ? "text-green-400" : "text-red-400"}
+                  dir="ltr"
+                >
+                  {todayVsPrevClose.delta >= 0 ? "+" : ""}
+                  {todayVsPrevClose.delta.toFixed(2)} ({todayVsPrevClose.delta >= 0 ? "+" : ""}
+                  {todayVsPrevClose.deltaPct.toFixed(2)}%)
+                </span>
+              ) : (
+                <span className="text-slate-500" dir="ltr">—</span>
+              )}
+            </span>
+            <span>
+              {t("index.earnings")}{" "}
+              {earningsDate ? (
+                <span className="text-blue-400" dir="ltr">{earningsDate}</span>
+              ) : (
+                <span className="text-slate-500" dir="ltr">—</span>
+              )}
+            </span>
+          </div>
+        </div>
+
+        {/* Quality Brief Section */}
+        <div className="bg-card rounded-lg p-8 border border-border mb-12">
+          <h2 className="text-xl font-semibold text-foreground mb-4">{t("index.qualityInBrief")}</h2>
+          <ul className="space-y-3 text-sm text-foreground">
+            <li className="flex gap-2">
+              <span className="text-chart-green font-bold shrink-0">•</span>
+              <span dangerouslySetInnerHTML={{ __html: t("index.news1") }} />
+            </li>
+            <li className="flex gap-2">
+              <span className="text-chart-green font-bold shrink-0">•</span>
+              <span dangerouslySetInnerHTML={{ __html: t("index.news2") }} />
+            </li>
+          </ul>
+          <button className="mt-4 text-blue-400 hover:text-blue-300 text-sm font-medium">
+            {t("index.viewMore")}
+          </button>
         </div>
 
         {/* Charts Grid - 4x2 — three render states driven by query fetch status */}
