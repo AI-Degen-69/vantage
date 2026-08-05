@@ -69,6 +69,43 @@ describe("LocalMemoryStore", () => {
     const reloaded = await s.load("fmp", "2026-08-04");
     expect(reloaded.timestamps).toEqual([1, 2, 3]);
   });
+
+  it("pruneOlderThan deletes buckets strictly older than the cutoff day", async () => {
+    const s = new LocalMemoryStore();
+    await s.save("fmp", "2026-06-01", { timestamps: [1], lastRateLimitAt: null });
+    await s.save("fmp", "2026-06-15", { timestamps: [2], lastRateLimitAt: null });
+    await s.save("alphavantage", "2026-06-20", { timestamps: [3], lastRateLimitAt: 5 });
+    await s.save("fmp", "2026-07-01", { timestamps: [4], lastRateLimitAt: null });
+    await s.save("yahoo", "2026-07-20", { timestamps: [5], lastRateLimitAt: null });
+    // Cutoff 2026-07-02 keeps the `day < cutoff` semantics straight: the
+    // 2026-07-01 bucket is deleted because it is strictly earlier than
+    // the 2026-07-02 cutoff, making the strict-less boundary unambiguous.
+    const result = await s.pruneOlderThan("2026-07-02");
+    expect(result).toEqual({ scannedCount: 5, prunedCount: 4 });
+    expect(await s.load("fmp", "2026-06-01")).toEqual({ timestamps: [], lastRateLimitAt: null });
+    expect(await s.load("fmp", "2026-06-15")).toEqual({ timestamps: [], lastRateLimitAt: null });
+    expect(await s.load("alphavantage", "2026-06-20")).toEqual({ timestamps: [], lastRateLimitAt: null });
+    expect(await s.load("fmp", "2026-07-01")).toEqual({ timestamps: [], lastRateLimitAt: null });
+    // 2026-07-20 stays (above cutoff).
+    const kept = await s.load("yahoo", "2026-07-20");
+    expect(kept.timestamps).toEqual([5]);
+  });
+
+  it("pruneOlderThan returns 0/0 when nothing falls below the cutoff", async () => {
+    const s = new LocalMemoryStore();
+    await s.save("fmp", "2026-08-01", { timestamps: [1], lastRateLimitAt: null });
+    await s.save("fmp", "2026-08-02", { timestamps: [2], lastRateLimitAt: null });
+    const result = await s.pruneOlderThan("2026-01-01");
+    expect(result).toEqual({ scannedCount: 2, prunedCount: 0 });
+    expect((await s.load("fmp", "2026-08-01")).timestamps).toEqual([1]);
+    expect((await s.load("fmp", "2026-08-02")).timestamps).toEqual([2]);
+  });
+
+  it("pruneOlderThan throws on a malformed cutoff so the call site surfaces the bug", async () => {
+    const s = new LocalMemoryStore();
+    await expect(s.pruneOlderThan("yesterday")).rejects.toThrow(/YYYY-MM-DD/);
+    await expect(s.pruneOlderThan("2026-13-40")).rejects.toThrow(/YYYY-MM-DD/);
+  });
 });
 
 describe("VercelKvStore — happy path", () => {
@@ -216,6 +253,79 @@ describe("VercelKvStore — failure modes", () => {
     ).resolves.toBeUndefined();
     expect(warnSpy).toHaveBeenCalled();
     warnSpy.mockRestore();
+  });
+});
+
+describe("VercelKvStore — pruneOlderThan", () => {
+  it("walks SCAN with cursor + filters by trailing :YYYY-MM-DD, then DELs in batches", async () => {
+    // Stateful fetch mock: SCAN iterates cursor "0" → "3" → "0"; DEL
+    // takes whatever keys we pass it.
+    const scancalls: string[] = [];
+    const delcalls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        const body = JSON.parse(init?.body as string);
+        const cmd = body[0];
+        if (cmd === "SCAN") {
+          const cursor = body[1];
+          scancalls.push(cursor);
+          if (cursor === "0") {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => [null, ["3", ["vantage:usage:fmp:2026-06-01", "vantage:usage:fmp:2026-06-15"]]],
+              text: async () => "",
+            };
+          }
+          // cursor "3" — second page returns one more + closed cursor.
+          return {
+            ok: true,
+            status: 200,
+            json: async () => [null, ["0", ["vantage:usage:fmp:2026-07-01"]]],
+            text: async () => "",
+          };
+        }
+        if (cmd === "DEL") {
+          const keys = body.slice(1);
+          delcalls.push(...keys);
+          return { ok: true, status: 200, json: async () => [null, keys.length], text: async () => "" };
+        }
+        return { ok: true, status: 200, json: async () => [null, "OK"], text: async () => "" };
+      }),
+    );
+    const s = new VercelKvStore({ url: "https://kv.example", token: "tok" });
+    const result = await s.pruneOlderThan("2026-07-01");
+    expect(result).toEqual({ scannedCount: 3, prunedCount: 2 });
+    expect(scancalls).toEqual(["0", "3"]);
+    // Only the two below-cutoff keys get DEL'd; the 2026-07-01 stays.
+    expect(delcalls).toEqual(["vantage:usage:fmp:2026-06-01", "vantage:usage:fmp:2026-06-15"]);
+  });
+
+  it("returns 0/0 + warns when SCAN responds non-OK (no DEL attempted)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: false,
+        status: 500,
+        statusText: "Internal",
+        json: async () => {
+          throw new Error("no body");
+        },
+        text: async () => "",
+      })),
+    );
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const s = new VercelKvStore({ url: "https://kv.example", token: "tok" });
+    const result = await s.pruneOlderThan("2026-08-01");
+    expect(result).toEqual({ scannedCount: 0, prunedCount: 0 });
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("throws on a malformed cutoff (call-site bug surfacing)", async () => {
+    const s = new VercelKvStore({ url: "https://kv.example", token: "tok" });
+    await expect(s.pruneOlderThan("not-a-date")).rejects.toThrow(/YYYY-MM-DD/);
   });
 });
 
