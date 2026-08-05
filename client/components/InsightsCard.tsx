@@ -12,6 +12,7 @@ interface InsightsCardProps {
   badgeType?: "positive" | "negative" | "neutral";
   metricId: string; // Refers to the financialMetric name to pull historical data
   metricData: FinancialMetric; // The actual metric data with historical series
+  ticker?: string;
 }
 
 /**
@@ -31,6 +32,7 @@ export default function InsightsCard({
   badgeType = "neutral",
   metricId,
   metricData,
+  ticker,
 }: InsightsCardProps) {
   const { t } = useI18n();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -172,6 +174,7 @@ export default function InsightsCard({
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         metric={metricData}
+        ticker={ticker}
       />
     </>
   );
