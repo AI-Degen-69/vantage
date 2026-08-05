@@ -1021,6 +1021,20 @@ export async function handleProviderUsage(req, res) {
       });
       return;
     }
+    if (String(req.query?.mode ?? '') === 'retention') {
+      // Prune-stats diagnostic — returns the last retention sweep
+      // (or null if none has run in this process yet), plus the
+      // days/interval knobs it runs against.
+      const trackerModule = await import('../server/services/apiUsageTracker.js');
+      const stats = trackerModule.__test__ ? trackerModule.__test__.pruneStats() : null;
+      res.json({
+        lastPrune: stats,
+        daysThreshold: 30,
+        intervalMs: 6 * 60 * 60 * 1000,
+        checkedAt: new Date().toISOString(),
+      });
+      return;
+    }
     const { getProviderUsage } = await import('../server/services/apiUsageTracker.js');
     // getProviderUsage is async because KV-backed deployments need to
     // await cold-start hydration. Local dev (no KV env vars) resolves

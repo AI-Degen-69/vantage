@@ -162,6 +162,125 @@ describe("fmp.ts → apiUsageTracker (cache-vs-count integration)", () => {
 });
 
 /**
+ * KV retention / prune sweep — the 30-day / 6h budget guard that keeps
+ * the `vantage:usage:*` namespace from eating Vercel KV's free-tier
+ * 30K-write budget on stale day-keys. The "30 days" and "6 hours" are
+ * module-level constants (`PRUNE_RETENTION_DAYS`, `PRUNE_INTERVAL_MS`)
+ * and exercised through the public `pruneStats` / `runPruneForTests`
+ * test seams.
+ */
+describe("apiUsageTracker (KV retention / prune sweep)", () => {
+  it("sweep records the cutoff day as 30 days before `now`", async () => {
+    usageStoreTest.setStoreForTests(new LocalMemoryStore());
+    await __test__.reset();
+    await __test__.resetPruneStats();
+    // 2026-08-04 22:00:00 UTC.
+    const FIXED_NOW = Date.UTC(2026, 7, 4, 22, 0, 0);
+    await __test__.runPruneForTests(FIXED_NOW);
+    const stats = __test__.pruneStats();
+    expect(stats).not.toBeNull();
+    // 30 days back from 2026-08-04 → 2026-07-05.
+    expect(stats?.cutoffDayISO).toBe("2026-07-05");
+    expect(stats?.scannedCount).toBe(0); // empty store
+    expect(stats?.prunedCount).toBe(0);
+    expect(stats?.storeType).toBe("LocalMemoryStore");
+    expect(stats?.errorMessage).toBeNull();
+  });
+
+  it("frequency guard: at most once per 6h per process", async () => {
+    usageStoreTest.setStoreForTests(new LocalMemoryStore());
+    await __test__.reset();
+    await __test__.resetPruneStats();
+    const FIXED_NOW = Date.UTC(2026, 7, 4, 22, 0, 0);
+    // First sweep forced (lastAttemptAt starts at 0).
+    await __test__.runPruneForTests(FIXED_NOW);
+    const first = __test__.pruneStats()!;
+    expect(first.ranAt).toBe(FIXED_NOW);
+
+    // Pin the guard's last-attempt timestamp explicitly so the test
+    // doesn't race the production `Date.now()`-based .finally().
+    // Without this, FIXED_NOW ≈ today means .finally()'s Date.now()
+    // can land at a value that, modulo ms, lets the second call slip past.
+    __test__.setLastPruneAttemptAt(FIXED_NOW);
+
+    // Second call within 6h HONORING the guard. Uses `pruneForTests`
+    // (NOT `runPruneForTests`) so the guard isn't reset — the in-band
+    // `if (now - lastPruneAttemptAt < 6h) return;` is what we're proving.
+    await __test__.pruneForTests(FIXED_NOW + 1_000);
+    const second = __test__.pruneStats()!;
+    expect(second.ranAt).toBe(first.ranAt);  // unchanged — guard absorbed
+  });
+
+  it("frequency guard re-allows a sweep after the 6h window has elapsed", async () => {
+    usageStoreTest.setStoreForTests(new LocalMemoryStore());
+    await __test__.reset();
+    await __test__.resetPruneStats();
+    const FIXED_NOW = Date.UTC(2026, 7, 4, 22, 0, 0);
+    await __test__.runPruneForTests(FIXED_NOW);
+    const first = __test__.pruneStats()!;
+    expect(first.ranAt).toBe(FIXED_NOW);
+
+    // Hand-roll clock: pretend the previous attempt was 6h59m ago.
+    __test__.setLastPruneAttemptAt(FIXED_NOW - 6 * 60 * 60 * 1000 - 59 * 60_000);
+
+    // Call prune honoring the guard with a timestamp beyond the 6h cooldown.
+    // The guard re-allows because the elapsed window exceeds the 6h
+    // cooldown; the prune runs and updates `lastPruneStats.ranAt` to the
+    // new timestamp.
+    const SECOND_NOW = FIXED_NOW + 7 * 60 * 60 * 1000;  // 7 hours later
+    await __test__.pruneForTests(SECOND_NOW);
+    const second = __test__.pruneStats()!;
+    expect(second.ranAt).toBe(SECOND_NOW);
+  });
+
+  it("actually deletes stale buckets from LocalMemoryStore", async () => {
+    const localStore = new LocalMemoryStore();
+    await localStore.save("fmp", "2026-06-15", { timestamps: [1], lastRateLimitAt: null });
+    await localStore.save("fmp", "2026-07-15", { timestamps: [2], lastRateLimitAt: null });
+    await localStore.save("alphavantage", "2026-07-20", { timestamps: [3], lastRateLimitAt: 5 });
+    usageStoreTest.setStoreForTests(localStore);
+    await __test__.reset();
+    await __test__.resetPruneStats();
+
+    const FIXED_NOW = Date.UTC(2026, 8, 1); // 2026-09-01
+    await __test__.runPruneForTests(FIXED_NOW);
+
+    const stats = __test__.pruneStats()!;
+    expect(stats.scannedCount).toBe(3);
+    // Cutoff 2026-08-02 → all three pre-cut buckets were removed.
+    expect(stats.prunedCount).toBe(3);
+    expect(await localStore.load("fmp", "2026-06-15")).toEqual({ timestamps: [], lastRateLimitAt: null });
+    expect(await localStore.load("fmp", "2026-07-15")).toEqual({ timestamps: [], lastRateLimitAt: null });
+    expect(await localStore.load("alphavantage", "2026-07-20")).toEqual({ timestamps: [], lastRateLimitAt: null });
+  });
+
+  it("captures the error message when the underlying store's prune throws", async () => {
+    const throwingStore = {
+      async load() { return { timestamps: [], lastRateLimitAt: null }; },
+      async save() { /* noop */ },
+      async pruneOlderThan() { throw new Error("KV out of memory"); },
+    };
+    usageStoreTest.setStoreForTests(throwingStore as never);
+    await __test__.reset();
+    await __test__.resetPruneStats();
+    await __test__.runPruneForTests();
+    const stats = __test__.pruneStats();
+    expect(stats?.errorMessage).toBe("KV out of memory");
+    expect(stats?.prunedCount).toBe(0);
+  });
+
+  it("resetPruneStats also clears the 6h guard so a manual sweep can re-run", async () => {
+    await __test__.runPruneForTests();
+    expect(__test__.pruneStats()).not.toBeNull();
+    __test__.resetPruneStats();
+    expect(__test__.pruneStats()).toBeNull();
+    // Re-run succeeds because the guard was reset to 0.
+    await __test__.runPruneForTests();
+    expect(__test__.pruneStats()).not.toBeNull();
+  });
+});
+
+/**
  * Cross-instance persistence via Vercel KV. We swap the backing store
  * to a hand-rolled implementation that mirrors the LocalMemoryStore
  * shape, prove recordCall + recordRateLimit route through the store,
@@ -192,6 +311,21 @@ describe("apiUsageTracker (KV store integration)", () => {
       },
       async save(p: TrackedProvider, day: string, snap: { timestamps: number[]; lastRateLimitAt: number | null }) {
         shared.set(`${p}:${day}`, { timestamps: snap.timestamps.slice(), lastRateLimitAt: snap.lastRateLimitAt });
+      },
+      async pruneOlderThan(cutoffDayISO: string) {
+        let scannedCount = 0;
+        let prunedCount = 0;
+        for (const [key] of shared.entries()) {
+          scannedCount++;
+          const sepIdx = key.lastIndexOf(":");
+          if (sepIdx < 0) continue;
+          const dayISO = key.slice(sepIdx + 1);
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dayISO) && dayISO < cutoffDayISO) {
+            shared.delete(key);
+            prunedCount++;
+          }
+        }
+        return { scannedCount, prunedCount };
       },
     });
 

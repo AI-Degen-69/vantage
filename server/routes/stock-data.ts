@@ -196,6 +196,20 @@ export const handleProviderUsage: RequestHandler = async (req, res) => {
     });
     return;
   }
+  if (String(req.query.mode ?? "") === "retention") {
+    // Prune-stats diagnostic. Returns the most recent retention sweep
+    // (or `null` if none has run in this process) plus the configuration
+    // knobs the sweep runs against — daysThreshold for transparency,
+    // intervalMs so users understand why this isn't run every request.
+    const { __test__: trackerTest } = await import("../services/apiUsageTracker");
+    res.json({
+      lastPrune: trackerTest.pruneStats(),
+      daysThreshold: 30,
+      intervalMs: 6 * 60 * 60 * 1000,
+      checkedAt: new Date().toISOString(),
+    });
+    return;
+  }
   // `stockService.getProviderUsage` is async because the tracker awaits
   // KV cold-start hydration when KV env vars are present. Awaits cheaply
   // (≤50ms typical) on first request after a cold start; subsequent
