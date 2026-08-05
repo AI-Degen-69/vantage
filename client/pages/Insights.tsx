@@ -59,7 +59,7 @@ export default function Insights() {
   // Pre-filter the universe BEFORE fetching quotes so we don't overload the backend
   const filteredUniverse = useMemo(() => {
     if (!allTabsData) return [];
-    
+
     const symbolTabs = new Map<string, InsightsTabId[]>();
     const allEntries = new Map<string, any>();
 
@@ -83,7 +83,7 @@ export default function Insights() {
     results = results.filter((row) => {
       const matchesSearch = row.symbol.toLowerCase().includes(q) || row.name.toLowerCase().includes(q);
       if (!matchesSearch) return false;
-      
+
       if (activeFilters.length > 0) {
         const matchScore = activeFilters.filter(f => row.tabs.includes(f)).length;
         if (matchScore === 0) return false;
@@ -182,7 +182,7 @@ export default function Insights() {
     <div className="w-full bg-background dark min-h-screen">
       {/* Header and Heatsheet Side-by-Side */}
       <div className="bg-card/50 border-b border-border px-8 py-8 flex flex-col xl:flex-row items-start xl:items-center gap-8 justify-between">
-        
+
         {/* Title and Search */}
         <div className="flex-1 w-full xl:max-w-sm 2xl:max-w-md">
           <h1 className="text-4xl font-bold text-foreground mb-8 text-start">

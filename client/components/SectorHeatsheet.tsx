@@ -18,14 +18,14 @@ interface SectorHeatsheetProps {
  * Returns a `background-color` string consumed inline by the cell <div>.
  */
 function cellColor(pct: number | null): string {
-  if (pct === null || !Number.isFinite(pct)) return "hsl(240 5% 15% / 0.3)"; // softer graticule
+  if (pct === null || !Number.isFinite(pct)) return "hsl(250 20% 16% / 0.5)"; // Graticule
   const intensity = Math.min(1, Math.abs(pct) / 3);
-  
+
   // Modern slightly muted colors (Green & Red)
   const alpha = 0.2 + intensity * 0.6;
   return pct >= 0
-    ? `hsl(142 71% 45% / ${alpha.toFixed(3)})` // Modern Green
-    : `hsl(348 83% 47% / ${alpha.toFixed(3)})`; // Modern Red
+    ? `hsl(155 55% 50% / ${alpha.toFixed(3)})` // Aurora Green
+    : `hsl(6 70% 58% / ${alpha.toFixed(3)})`; // Ember Red
 }
 
 /** Pick the readable text color given a tinted background: white for saturated fills, muted for null data. */

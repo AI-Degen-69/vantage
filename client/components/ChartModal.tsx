@@ -61,12 +61,12 @@ function formatMetricValue(value: number, unit: string, maxDecimals: number = 2)
   } else {
     suffix = unit || "";
   }
-  
+
   const formattedNum = new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 0,
     maximumFractionDigits: maxDecimals,
   }).format(value);
-  
+
   return `${prefix}${formattedNum}${suffix}`;
 }
 
@@ -367,13 +367,11 @@ export default function ChartModal({
               <XAxis
                 dataKey="date"
                 stroke={axisColor}
-                tick={{ fontSize: 12 }}
-                tickMargin={8}
+                tick={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11 }}
               />
               <YAxis
                 stroke={axisColor}
-                tick={{ fontSize: 12 }}
-                tickMargin={8}
+                tick={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11 }}
                 tickFormatter={(val) => formatMetricValue(val, metric.unit, 0)}
               />
               <Tooltip content={<CustomTooltip />} cursor={false} />
@@ -421,13 +419,11 @@ export default function ChartModal({
               <XAxis
                 dataKey="date"
                 stroke={axisColor}
-                tick={{ fontSize: 12 }}
-                tickMargin={8}
+                tick={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11 }}
               />
               <YAxis
                 stroke={axisColor}
-                tick={{ fontSize: 12 }}
-                tickMargin={8}
+                tick={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11 }}
                 tickFormatter={(val) => formatMetricValue(val, metric.unit, 0)}
               />
               <Tooltip content={<CustomTooltip />} cursor={false} />
@@ -467,13 +463,11 @@ export default function ChartModal({
               <XAxis
                 dataKey="date"
                 stroke={axisColor}
-                tick={{ fontSize: 12 }}
-                tickMargin={8}
+                tick={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11 }}
               />
               <YAxis
                 stroke={axisColor}
-                tick={{ fontSize: 12 }}
-                tickMargin={8}
+                tick={{ fontFamily: "JetBrains Mono, monospace", fontSize: 11 }}
                 tickFormatter={(val) => formatMetricValue(val, metric.unit, 0)}
               />
               <Tooltip content={<CustomTooltip />} cursor={false} />
@@ -505,11 +499,11 @@ export default function ChartModal({
   const showGrowthMetrics = timeframe !== "1Y";
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-background/85 backdrop-blur-sm z-50 flex items-center justify-center p-4"
       onClick={onClose}
     >
-      <div 
+      <div
         className="bg-card rounded-panel border border-primary/20 shadow-glow w-[95vw] max-w-6xl h-[90vh] max-h-[850px] flex flex-row overflow-hidden relative"
         onClick={(e) => e.stopPropagation()}
       >
@@ -592,8 +586,8 @@ export default function ChartModal({
                 onClick={() => setShowTable(!showTable)}
                 className={cn(
                   "flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors text-sm font-medium",
-                  showTable 
-                    ? "bg-primary text-primary-foreground border-primary" 
+                  showTable
+                    ? "bg-primary text-primary-foreground border-primary"
                     : "bg-transparent border-border hover:border-primary/40 hover:text-primary text-foreground"
                 )}
               >
@@ -684,7 +678,7 @@ export default function ChartModal({
                 <X className="w-4 h-4" />
               </button>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
               <div className="rounded-xl border border-border/50 overflow-hidden bg-card/40 backdrop-blur-md shadow-sm">
                 <table className="w-full text-sm text-left rtl:text-right border-collapse">
