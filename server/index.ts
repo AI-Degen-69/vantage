@@ -16,6 +16,7 @@ import {
   handleStockOverview,
   handleIndexQuotes,
   handleInsightsTab,
+  handleInsightsTabsAll,
   handleSmaDistances,
   handleFxRates,
   handleProviderHealth,
@@ -23,6 +24,13 @@ import {
   handleProviderUsage,
   handleSectorHeatmap,
 } from "./routes/stock-data";
+import {
+  handleScreenerSearch,
+  handleScreenerFilter,
+  handleScreenerAsset,
+  handleScreenerFacets,
+} from "./routes/screener";
+import { initFinanceDatabase } from "./services/financeDatabaseSync";
 
 /**
  * Creates and configures the Express application with middleware and API routes.
@@ -35,6 +43,9 @@ const API_RATE_STATE_MAX = 10_000;
 const apiRateState = new Map<string, { count: number; resetAt: number }>();
 
 function apiRateLimit(req: Request, res: Response, next: NextFunction): void {
+  if (req.path.startsWith("/screener")) {
+    return next();
+  }
   const now = Date.now();
   const key = req.ip || req.socket.remoteAddress || "unknown";
   const current = apiRateState.get(key);
@@ -70,6 +81,11 @@ function apiRateLimit(req: Request, res: Response, next: NextFunction): void {
 
 export function createServer() {
   const app = express();
+
+  // Initialize background database sync (fire and forget)
+  initFinanceDatabase().catch(err => {
+    console.error("[FinanceDatabase] Failed to initialize:", err);
+  });
 
   // Trust the hosting proxy only when deployment explicitly opts in. This
   // prevents a directly reachable instance from accepting a spoofed
@@ -109,12 +125,19 @@ export function createServer() {
   app.get("/api/stock-chart", handleStockChart);
   app.get("/api/index-quotes", handleIndexQuotes);
   app.get("/api/insights-tab", handleInsightsTab);
+  app.get("/api/insights-tabs-all", handleInsightsTabsAll);
   app.get("/api/sma-distances", handleSmaDistances);
   app.get("/api/fx-rates", handleFxRates);
   app.get("/api/provider-health", handleProviderHealth);
   app.get("/api/sector-heatmap", handleSectorHeatmap);
   app.get("/api/stock-yahoo-fallback-financials", handleStockYahooFallbackFinancials);
   app.get("/api/provider-usage", handleProviderUsage);
+
+  // Screener routes
+  app.get("/api/screener/search", handleScreenerSearch);
+  app.get("/api/screener/filter", handleScreenerFilter);
+  app.get("/api/screener/asset/:symbol", handleScreenerAsset);
+  app.get("/api/screener/facets", handleScreenerFacets);
 
   return app;
 }

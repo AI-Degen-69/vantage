@@ -170,11 +170,11 @@ export default function Watchlists() {
               >
                 <span>{list.name}</span>
                 {list.isSystem && (
-                  <span className="text-[9px] uppercase tracking-wide text-slate-500 bg-slate-700/50 px-1.5 py-0.5 rounded">
+                  <span className="text-xs uppercase tracking-wide text-slate-500 bg-slate-700/50 px-1.5 py-0.5 rounded">
                     {t("watchlists.systemBadge")}
                   </span>
                 )}
-                <span className="text-[10px] text-slate-500" dir="ltr">
+                <span className="text-xs text-slate-500" dir="ltr">
                   {list.symbols.length}
                 </span>
               </button>
@@ -220,7 +220,7 @@ export default function Watchlists() {
                 {active.isSystem && (
                   <span
                     title={t("watchlists.cannotRenameSystem")}
-                    className="text-[10px] uppercase tracking-wide text-slate-500 bg-slate-700/50 px-1.5 py-1 rounded"
+                    className="text-xs uppercase tracking-wide text-slate-500 bg-slate-700/50 px-1.5 py-1 rounded"
                   >
                     {t("watchlists.systemBadge")}
                   </span>
@@ -337,7 +337,7 @@ export default function Watchlists() {
           )}
         </div>
 
-        <p className="text-[11px] text-slate-500 text-center" dir="ltr">
+        <p className="text-xs text-slate-500 text-center" dir="ltr">
           {t("watchlists.dropToReorder")}
         </p>
 
@@ -385,7 +385,7 @@ export default function Watchlists() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold">{t("dipFinder.news")}</h3>
                 {(newsItems.length === 0 && !newsLoading) || isAnyFailing || yahooDown ? (
-                  <span className="text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded text-yellow-400 bg-yellow-500/10">
+                  <span className="text-xs font-medium uppercase tracking-wide px-2 py-0.5 rounded text-yellow-400 bg-yellow-500/10">
                     [MOCK]
                   </span>
                 ) : null}

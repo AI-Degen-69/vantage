@@ -13,6 +13,7 @@ import {
   useStockFinancials,
   useProviderHealth,
   useProviderUsage,
+  useScreenerAsset,
 } from "@/hooks/useStockData";
 import {
   cagrAtYearsBack,
@@ -34,6 +35,7 @@ export default function Index() {
   const { data: quoteData, isLoading: quoteLoading } = useStockQuote(ticker);
   const { data: overviewData, isLoading: overviewLoading } =
     useStockProfile(ticker);
+  const { data: screenerAsset } = useScreenerAsset(ticker);
   // isFetched becomes true once the first query attempt settles (success
   // OR failure). We need it to distinguish "still loading" from "loaded
   // with no data" — otherwise the metrics grid shows skeletons forever
@@ -285,10 +287,10 @@ export default function Index() {
             <TickerLogo ticker={ticker} size="md" />
             <div>
               <h1 className="font-display text-2xl font-bold text-foreground tracking-tight">
-                {overviewData?.companyName ?? ticker}
+                {overviewData?.companyName ?? screenerAsset?.name ?? ticker}
               </h1>
               <p className="text-xs text-muted-foreground font-mono tracking-wide">
-                {ticker} · {overviewData?.exchange ?? "—"}
+                {ticker} · {overviewData?.exchange ?? screenerAsset?.exchange ?? "—"}
               </p>
             </div>
           </div>

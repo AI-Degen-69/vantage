@@ -20,7 +20,7 @@ import type {
   YahooFallbackFinancials,
 } from "../../shared/api";
 
-const MAX_SYMBOLS = 50;
+const MAX_SYMBOLS = 1000;
 const TICKER_PATTERN = /^[A-Z]{1,5}(?:[.-][A-Z])?$/;
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -335,6 +335,14 @@ export const handleSectorHeatmap: RequestHandler = async (req, res) => {
 export const handleInsightsTab: RequestHandler = async (req, res) => {
   const tab = String(req.query.tab || "sp500");
   const data: InsightsTabResponse = stockService.getInsightsTab(tab);
+  res.json(data);
+};
+
+/**
+ * Returns all curated ticker universes for the multi-select filter feature.
+ */
+export const handleInsightsTabsAll: RequestHandler = async (req, res) => {
+  const data = stockService.getAllInsightsTabs();
   res.json(data);
 };
 

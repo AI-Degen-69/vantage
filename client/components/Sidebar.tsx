@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { BarChart3, List, TrendingUp, Calendar } from "lucide-react";
+import { BarChart3, List, TrendingUp, Calendar, Search } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { getLogoDevAttributionUrl } from "@/lib/logoDev";
@@ -9,6 +9,11 @@ const navItems = [
     i18nKey: "nav.insights",
     href: "/insights",
     icon: BarChart3,
+  },
+  {
+    i18nKey: "nav.screener",
+    href: "/screener",
+    icon: Search,
   },
   {
     i18nKey: "nav.watchlists",
@@ -74,7 +79,7 @@ export default function Sidebar() {
           href={getLogoDevAttributionUrl()}
           target="_blank"
           rel="noopener noreferrer"
-          className="mt-3 block text-[10px] text-muted-foreground hover:text-foreground transition-colors tracking-wide uppercase opacity-70 hover:opacity-100"
+          className="mt-3 block text-xs text-muted-foreground hover:text-foreground transition-colors tracking-wide uppercase opacity-70 hover:opacity-100"
           aria-label={t("attribution.logoDevAria")}
         >
           {t("attribution.logoDev")}

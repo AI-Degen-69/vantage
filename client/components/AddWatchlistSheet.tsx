@@ -231,7 +231,7 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
                   {t("watchlists.validCount", { count: visibleValidCount })}
                 </span>
                 {validated.isValidating && (
-                  <span className="text-[10px] text-amber-300" dir="ltr">
+                  <span className="text-xs text-amber-300" dir="ltr">
                     ● {t("watchlists.validatingLabel")}
                   </span>
                 )}
@@ -240,7 +240,7 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
                 {truncatedPreview.map((p) => (
                   <span
                     key={p.symbol}
-                    className={`text-[11px] font-bold px-2 py-0.5 rounded border ${
+                    className={`text-xs font-bold px-2 py-0.5 rounded border ${
                       p.state === "valid"
                         ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
                         : p.state === "invalid"
@@ -255,7 +255,7 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
                   </span>
                 ))}
                 {preview.length > truncatedPreview.length && (
-                  <span className="text-[11px] text-slate-500 px-2 py-0.5">
+                  <span className="text-xs text-slate-500 px-2 py-0.5">
                     +{preview.length - truncatedPreview.length}
                   </span>
                 )}
@@ -279,14 +279,14 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
                     {invalidSymbols.slice(0, 24).map((s) => (
                       <span
                         key={s}
-                        className="text-[11px] font-bold px-2 py-0.5 rounded border bg-red-500/15 text-red-300 border-red-500/30"
+                        className="text-xs font-bold px-2 py-0.5 rounded border bg-red-500/15 text-red-300 border-red-500/30"
                         title={t("watchlists.invalidChip")}
                       >
                         {s} <X className="w-3 h-3 inline-block -mt-0.5" />
                       </span>
                     ))}
                     {invalidSymbols.length > 24 && (
-                      <span className="text-[11px] text-slate-500 px-2 py-0.5" dir="ltr">
+                      <span className="text-xs text-slate-500 px-2 py-0.5" dir="ltr">
                         +{invalidSymbols.length - 24}
                       </span>
                     )}

@@ -1,5 +1,6 @@
 import YahooFinance from "yahoo-finance2";
 import NodeCache from "node-cache";
+import type { FinancialStatements } from "@shared/api";
 
 // Cache sector data for 15 minutes — sector/industry rarely changes
 const sectorCache = new NodeCache({ stdTTL: 900, checkperiod: 300 });
@@ -367,3 +368,4 @@ export async function fetchYahooBatchQuotes(tickers: string[]) {
         }
   );
 }
+

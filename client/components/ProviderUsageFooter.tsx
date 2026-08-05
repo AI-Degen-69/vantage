@@ -176,7 +176,7 @@ function ProviderPill({ entry, mode }: { entry: ProviderUsageEntry; mode: Displa
       <span className="text-muted-foreground" dir="ltr">{reset}</span>
       {entry.limitHint === "heuristic" && (
         <span
-          className="text-[9px] uppercase tracking-wide text-slate-500"
+          className="text-xs uppercase tracking-wide text-slate-500"
           aria-label={t("usage.heuristic")}
           title={t("usage.heuristicTooltip")}
         >
@@ -185,7 +185,7 @@ function ProviderPill({ entry, mode }: { entry: ProviderUsageEntry; mode: Displa
       )}
       {entry.isRateLimited && (
         <span
-          className="text-[10px] uppercase font-semibold text-red-300"
+          className="text-xs uppercase font-semibold text-red-300"
           title={t("usage.rateLimited")}
         >
           429
@@ -207,7 +207,7 @@ function ModeToggle({ mode, onChange }: { mode: DisplayMode; onChange: (m: Displ
     <div
       role="group"
       aria-label={t("usage.modeToggle.label")}
-      className="inline-flex items-center rounded-full border border-border bg-card/40 p-0.5 text-[10px] font-medium"
+      className="inline-flex items-center rounded-full border border-border bg-card/40 p-0.5 text-xs font-medium"
     >
       {(["used", "remaining"] as const).map((m) => {
         const active = m === mode;
@@ -280,7 +280,7 @@ export default function ProviderUsageFooter() {
       aria-label={t("usage.footerLabel")}
       className="w-full border-t border-border bg-card/60 backdrop-blur-sm px-4 py-2 flex items-center gap-3 flex-wrap shrink-0"
     >
-      <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-medium shrink-0">
+      <span className="text-xs uppercase tracking-wide text-muted-foreground font-medium shrink-0">
         {t("usage.title")}
       </span>
       <ModeToggle mode={mode} onChange={setMode} />

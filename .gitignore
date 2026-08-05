@@ -52,3 +52,9 @@ skills-lock.json
 .env.*.local
 .env*
 .gstack/
+git_log_card_utf8.txt
+git_log_card.txt
+git_log_index.txt
+.gitignore
+git_log_insights.txt
+data/financedb.sqlite

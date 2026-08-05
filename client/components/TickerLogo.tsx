@@ -24,7 +24,7 @@ interface TickerLogoProps {
 
 const sizeMap: Record<LogoSize, { box: string; text: string; rounded: string }> = {
   xs: { box: "w-6 h-6", text: "text-[8px]", rounded: "rounded" },
-  sm: { box: "w-8 h-8", text: "text-[10px]", rounded: "rounded" },
+  sm: { box: "w-8 h-8", text: "text-xs", rounded: "rounded" },
   md: { box: "w-12 h-12", text: "text-sm", rounded: "rounded-md" },
   lg: { box: "w-16 h-16", text: "text-base", rounded: "rounded-lg" },
 };

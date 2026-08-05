@@ -23,7 +23,7 @@ export default function BatchQuoteFallbackHint({ className = "" }: { className?:
   return (
     <span
       title={t("providerHealth.batchFallbackTooltip")}
-      className={`inline-flex items-center text-[10px] font-medium uppercase tracking-wide px-2 py-1 rounded text-sky-300 bg-sky-500/10 border border-sky-500/20 whitespace-nowrap ${className}`}
+      className={`inline-flex items-center text-xs font-medium uppercase tracking-wide px-2 py-1 rounded text-sky-300 bg-sky-500/10 border border-sky-500/20 whitespace-nowrap ${className}`}
     >
       {t("providerHealth.batchFallback")}
     </span>
