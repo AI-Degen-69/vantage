@@ -55,6 +55,8 @@ export interface StockQuote {
   earningsAnnouncement?: string | null;
   /** Annualized dividend yield as a percentage when supplied by the quote provider. */
   dividendYield?: number;
+  /** Annual cash dividend per share, used to audit/derive yield. */
+  dividendRate?: number;
   /** Dividend payout ratio as a percentage when supplied by the quote provider. */
   payoutRatio?: number;
 }
@@ -165,10 +167,20 @@ export interface CashFlowRow {
   dividendPayments?: number;
 }
 
+export type FinancialStatementProvider = "fmp" | "yahoo" | null;
+
+export interface FinancialStatementSources {
+  income: FinancialStatementProvider;
+  balance: FinancialStatementProvider;
+  cash: FinancialStatementProvider;
+}
+
 export interface FinancialStatements {
   income: IncomeStatementRow[];
   balance: BalanceSheetRow[];
   cash: CashFlowRow[];
+  /** Provider used for each independent statement; null means unavailable. */
+  sources?: FinancialStatementSources;
 }
 
 /* ------------------------------------------------------------------ *
@@ -216,6 +228,8 @@ export interface StockMetrics {
   metrics: KeyMetricsTTM;
   ratios: RatiosTTM;
   scores: FinancialScores | null;
+  /** Provider that supplied the metric snapshot; absent only for legacy payloads. */
+  source?: FinancialStatementProvider;
 }
 
 /* ------------------------------------------------------------------ *
@@ -299,7 +313,11 @@ export interface AnalystTrendPoint {
     low: number | null;
     high: number | null;
   };
-  epsTrend?: { current: number | null; sevenDaysAgo: number | null; thirtyDaysAgo: number | null };
+  epsTrend?: {
+    current: number | null;
+    sevenDaysAgo: number | null;
+    thirtyDaysAgo: number | null;
+  };
   epsRevisions?: { upLast7Days: number | null; upLast30Days: number | null };
 }
 
@@ -308,6 +326,18 @@ export type AnalystTrends = AnalystTrendPoint[];
 /* ------------------------------------------------------------------ *
  * Insider transactions (Yahoo)                                     *
  * ------------------------------------------------------------------ */
+export type InsiderTransactionCategory =
+  | "purchase"
+  | "sale"
+  | "award"
+  | "gift"
+  | "optionExercise"
+  | "withholding"
+  | "disposal"
+  | "optionGrant"
+  | "conversion"
+  | "other";
+
 export interface InsiderTransaction {
   filerName: string;
   filerRelation?: string;
@@ -329,16 +359,20 @@ export interface InsiderTransaction {
    * type-label and the price/value rendering branches in CompanyProfile.
    * Optional because some legacy payloads and the mock path omit it. */
   transactionCode?: string | null;
+  /** Number of securities transferred, not a dollar amount. */
   shares: number;
-  value: number;
-  /**
-   * Computed on the server (`value / shares`) ONLY when both upstream values
-   * are present and the transaction is a real cash flow — for `A`/
-   * `G`/`F`/`M`/`D`/`C` rows the derived price is meaningless, so the UI
-   * renders `—` instead. The server still computes and ships it because
-   * downstream aggregations (Sum-of-cash-flows) want the raw denominator.
-   */
-  price: number;
+  /** Reported transaction value, or a derived value for an exact reported price. */
+  value: number | null;
+  valueSource?: "reported" | "derived" | null;
+  /** Reported execution/exercise price when parseable; null for ranges or missing data. */
+  price: number | null;
+  /** Lower/upper bounds when Yahoo reports a price range. */
+  priceLow?: number | null;
+  priceHigh?: number | null;
+  /** Daily close on the transaction date, shown only as market context. */
+  marketClosePrice?: number | null;
+  category: InsiderTransactionCategory;
+  isAdministrative: boolean;
 }
 
 /* ------------------------------------------------------------------ *
@@ -576,54 +610,6 @@ export interface PortfolioMetrics {
  * Provider health (GET /api/provider-health)                        *
  * ------------------------------------------------------------------ */
 export type ProviderName = "yahoo" | "fmp" | "alphavantage";
-
-/* ------------------------------------------------------------------ *
- * Per-provider API usage bars (footer's progress pills)               *
- * ------------------------------------------------------------------ */
-
-/** Provider identifiers for `/api/provider-usage`. Mirrors `ProviderName` minus Logo.dev (client-direct). */
-export type ProviderUsageKey = "yahoo" | "fmp" | "alphavantage";
-
-/**
- * Single provider's usage row. The `limitHint: "documented" | "heuristic"`
- * differentiates FMP/AlphaVantage (real free-tier caps) from Yahoo
- * (undocumented but commonly ~200/hr per IP), so the footer pill can
- * color-code the warning level but never read the heuristic as a hard
- * cap.
- */
-export interface ProviderUsageEntry {
-  provider: ProviderUsageKey;
-  /** Display label: "FMP", "AlphaVantage", "Yahoo Finance". */
-  label: string;
-  /** Calls observed in the rolling window. */
-  used: number;
-  /** Hard limit if documented, heuristic ceiling otherwise. */
-  limit: number;
-  /** Percentage of the limit used, clamped to [0, 100]. */
-  usedPct: number;
-  /** `Math.max(0, limit - used)`. */
-  remaining: number;
-  /** Length of the rolling window in ms. */
-  windowMs: number;
-  /** Human-readable label like "24h" / "1h". */
-  windowLabel: string;
-  /** ISO 8601 timestamp when the oldest used-call drops off the window. */
-  resetsAt: string | null;
-  /** Seconds until `resetsAt` (0 if already passed). */
-  secondsToReset: number | null;
-  /** True if a 429 was observed within the window — pill flips red. */
-  isRateLimited: boolean;
-  /** ISO 8601 last 429 observation, null if no recent 429. */
-  lastRateLimitAt: string | null;
-  /** "documented" for FMP/AV; "heuristic" for Yahoo. */
-  limitHint: "documented" | "heuristic";
-}
-
-export interface ProviderUsageResponse {
-  /** ISO 8601 server timestamp at the snapshot moment. */
-  checkedAt: string;
-  entries: ProviderUsageEntry[];
-}
 
 /**
  * Live status of a single data-provider FEATURE probe. The response carries

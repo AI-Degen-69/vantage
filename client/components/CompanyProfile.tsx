@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import {
   useStockProfile,
@@ -5,32 +6,29 @@ import {
   useStockInsider,
   useStockNews,
   useStockMetrics,
-  useYahooDown,
   useScreenerAsset,
 } from "@/hooks/useStockData";
-import {
-  mockCompanyProfile,
-  mockAnalystEstimates,
-  mockInsiderTrades,
-  mockNews,
-  mockEmployeeCount,
-} from "@/lib/mockData";
 import { formatTradeDateLocale, parseTradeDateMs } from "@/lib/finance";
-import { BarChart, Bar, ResponsiveContainer, Tooltip, XAxis } from "recharts";
+import type { InsiderTransactionCategory } from "@shared/api";
 import { SectionCardSkeleton } from "@/components/Skeleton";
+import DataStatusBadge from "@/components/DataStatusBadge";
+import { Building2, ChartNoAxesCombined, Newspaper, Scale } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-/**
- * Renders a company profile and insights page for a stock ticker.
- *
- * @param ticker - The stock ticker to display; defaults to `AAPL`.
- * @returns The company profile page, loading skeleton, or mock-backed profile content.
- */
+type EstimateRow = {
+  period: string;
+  avg: number | null;
+  low: number | null;
+  high: number | null;
+};
+
 export default function CompanyProfile({
   ticker = "AAPL",
 }: {
   ticker?: string;
 }) {
   const { t } = useI18n();
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
 
   const { data: overviewData, isLoading: overviewLoading } =
     useStockProfile(ticker);
@@ -40,228 +38,85 @@ export default function CompanyProfile({
   const { data: newsData } = useStockNews(ticker);
   const { data: metricsData } = useStockMetrics(ticker);
 
-  // News / analyst / insider all come from Yahoo — when it's down those
-  // sections render mock fallbacks (and stale cached payloads look live),
-  // so surface [MOCK] from the health probe rather than waiting on data.
-  const yahooDown = useYahooDown();
-
   const description =
-    overviewData?.description ||
-    screenerAsset?.summary ||
-    mockCompanyProfile.description.replace(
-      "Apple Inc.",
-      `${ticker} Corporation`,
-    );
-  const sector = overviewData?.sector || screenerAsset?.sector || mockCompanyProfile.sector;
-  const industry = overviewData?.industry || screenerAsset?.industry || mockCompanyProfile.industry;
-  const ceo = overviewData?.ceo || mockCompanyProfile.ceo;
-  const beta = overviewData?.beta ?? mockCompanyProfile.beta;
-
-  const employees =
-    typeof overviewData?.fullTimeEmployees === "number"
-      ? overviewData.fullTimeEmployees
-      : mockCompanyProfile.employees;
-
-  // Fix: previously displayed peRatio under "Piotroski Score / 9". Use the real
-  // piotroskiScore from FMP financial-scores when available; otherwise fall
-  // back to peRatio but render the correct label.
+    overviewData?.description || screenerAsset?.summary || null;
+  const canExpandDescription = Boolean(description && description.length > 260);
+  const sector = overviewData?.sector || screenerAsset?.sector || null;
+  const industry = overviewData?.industry || screenerAsset?.industry || null;
+  const ceo = overviewData?.ceo || null;
+  const beta = overviewData?.beta ?? null;
   const piotroskiScore = metricsData?.scores?.piotroskiScore ?? null;
-  const peRatio = overviewData?.peRatio ?? null;
-  const piotroskiDisplayValue =
-    piotroskiScore !== null
-      ? `${piotroskiScore} / 9`
-      : peRatio !== null
-        ? peRatio.toFixed(2)
-        : "—";
-  const piotroskiLabelKey =
-    piotroskiScore !== null ? "insights.piotroskiScore" : "metrics.pe";
-
   const translatePeriod = (period: string) => {
-    if (period === "0q" || period === "Current Qtr")
-      return t("insights.currentQtr");
-    if (period === "0y" || period === "Current Year")
-      return t("insights.currentYear");
-    if (period === "+1y" || period === "Next Year")
-      return t("insights.nextYear");
+    if (period === "0q") return t("insights.currentQtr");
+    if (period === "0y") return t("insights.currentYear");
+    if (period === "+1y") return t("insights.nextYear");
     return period;
   };
 
-  // ---- News mapping (handles Yahoo v4 flat shape AND legacy content-wrapped shape) ----
-  const news =
-    newsData && newsData.length > 0
-      ? newsData.map((n) => ({
-          headline: n.title,
-          publisher: n.publisher,
-          // formatTradeDateLocale handles unix-seconds + unparseable gracefully;
-          // null result → "Recent" so the row still has a sensible label.
-          timestamp: n.providerPublishTime
-            ? (formatTradeDateLocale(n.providerPublishTime) ?? "Recent")
-            : "Recent",
-          // Pass `thumbnail` through so the render can build a news-card
-          // layout. Most Yahoo v4 news items carry `thumbnail.resolutions[]`
-          // upscaled already; the server normalizers extract one URL.
-          thumbnail: n.thumbnail ?? null,
-          // Type lets the UI hint "video" / "article" badges when Yahoo
-          // ships that classification (some sessions expose `type`).
-          type: n.type ?? null,
-          url: n.link || "#",
-        }))
-      : mockNews;
-  const isNewsMock = !newsData || newsData.length === 0 || yahooDown;
+  const news = (newsData ?? []).map((item) => ({
+    headline: item.title,
+    publisher: item.publisher,
+    timestamp: item.providerPublishTime
+      ? (formatTradeDateLocale(item.providerPublishTime) ?? "Recent")
+      : "Recent",
+    thumbnail: item.thumbnail ?? null,
+    url: item.link || "#",
+  }));
 
-  // ---- Insider mapping (Yahoo raw: shares/value come as {raw, fmt} objects) ----
-  // Sort on the RAW upstream `startDate` (number|string|null) BEFORE mapping
-  // to a render shape. Sorting the rendered locale-formatted string would
-  // be fragile — browsers don't all re-parse every locale output via
-  // Date.parse.
-  //
-  // Branching: `transactionCode` (Yahoo single-letter code) drives which
-  // short label we render AND whether the price/value columns are cash
-  // numbers vs "—". Without this branch, Award / Gift / Tax Withholding
-  // rows showed `0.00` and `$0` because the upstream `value` field was
-  // null/0 — the price column was `value / shares`, which is meaningless
-  // for non-cash grants and read as "the grant price was $0".
-  const insiders =
-    insiderData && insiderData.length > 0
-      ? [...insiderData]
-          .sort(
-            (a, b) =>
-              parseTradeDateMs(b.startDate) - parseTradeDateMs(a.startDate),
-          )
-          .map((i) => {
-            const code = (i.transactionCode ?? "").toUpperCase();
-            const typeLabel = i18nInsiderType(t, code, i.transactionText);
-            const isCash = code === "P" || code === "S";
-            return {
-              name: i.filerName,
-              // formatTradeDateLocale accepts UTC ms via parseTradeDate
-              // (the normalizer now guarantees UTC ms). Null renders as
-              // "—" rather than "Invalid Date" or "1/1/1970".
-              date: formatTradeDateLocale(i.startDate) ?? "—",
-              typeLabel,
-              code: code || "—",
-              isCash,
-              price: isCash && i.price > 0 ? i.price : null,
-              transacted: i.shares,
-              value: isCash && i.value !== 0 ? Math.abs(i.value) : null,
-            };
-          })
-      : [...mockInsiderTrades].sort(
-          (a, b) => parseTradeDateMs(b.date) - parseTradeDateMs(a.date),
-        );
-  const isInsiderMock = !insiderData || insiderData.length === 0 || yahooDown;
+  const insiders = (insiderData ?? [])
+    .slice()
+    .sort(
+      (a, b) => parseTradeDateMs(b.startDate) - parseTradeDateMs(a.startDate),
+    )
+    .map((item) => ({
+      name: item.filerName,
+      relation: item.filerRelation ?? null,
+      date: formatTradeDateLocale(item.startDate) ?? "—",
+      typeLabel: i18nInsiderCategory(t, item.category, item.transactionText),
+      category: item.category,
+      isAdministrative: item.isAdministrative,
+      transactionText: item.transactionText,
+      shares: item.shares,
+      price: item.price,
+      priceLow: item.priceLow ?? null,
+      priceHigh: item.priceHigh ?? null,
+      value: item.value,
+      marketClosePrice: item.marketClosePrice ?? null,
+    }));
 
-  // ---- Analyst trends (normalized upstream: earningsEstimate.avg is plain number) ----
-  let epsEstimates = mockAnalystEstimates.filter((e) => e.metric === "EPS");
-  let revEstimates = mockAnalystEstimates.filter((e) => e.metric === "Revenue");
-  let isAnalystMock = true;
-
-  if (analystData && analystData.length > 0) {
-    // Keep rendering real (possibly cached) estimates, but badge MOCK while
-    // Yahoo is down — the estimates are not live during the outage.
-    isAnalystMock = yahooDown;
-    epsEstimates = [];
-    revEstimates = [];
-    analystData.forEach((trend) => {
-      if (
-        trend.period === "0q" ||
-        trend.period === "0y" ||
-        trend.period === "+1y"
-      ) {
-        if (trend.earningsEstimate) {
-          // Preserve `null` from upstream — `?? 0` previously rendered every
-          // missing value as "0.00" which read like a real estimate of zero.
-          // The renderer falls back to `insights.unavailable` (\u2014) for
-          // genuinely missing cells so analysts can tell data absence from a real zero.
-          epsEstimates.push({
-            metric: "EPS",
-            period: trend.period as never,
-            avg: trend.earningsEstimate.avg ?? null,
-            low: trend.earningsEstimate.low ?? null,
-            high: trend.earningsEstimate.high ?? null,
-          });
-        }
-        if (trend.revenueEstimate) {
-          revEstimates.push({
-            metric: "Revenue",
-            period: trend.period as never,
-            avg:
-              trend.revenueEstimate.avg === null ||
-              trend.revenueEstimate.avg === undefined
-                ? null
-                : trend.revenueEstimate.avg / 1e9,
-            low:
-              trend.revenueEstimate.low === null ||
-              trend.revenueEstimate.low === undefined
-                ? null
-                : trend.revenueEstimate.low / 1e9,
-            high:
-              trend.revenueEstimate.high === null ||
-              trend.revenueEstimate.high === undefined
-                ? null
-                : trend.revenueEstimate.high / 1e9,
-          });
-        }
-      }
-    });
+  const epsEstimates: EstimateRow[] = [];
+  const revenueEstimates: EstimateRow[] = [];
+  for (const trend of analystData ?? []) {
+    if (!["0q", "0y", "+1y"].includes(trend.period)) continue;
+    if (trend.earningsEstimate) {
+      epsEstimates.push({
+        period: trend.period,
+        avg: trend.earningsEstimate.avg ?? null,
+        low: trend.earningsEstimate.low ?? null,
+        high: trend.earningsEstimate.high ?? null,
+      });
+    }
+    if (trend.revenueEstimate) {
+      revenueEstimates.push({
+        period: trend.period,
+        avg: toBillions(trend.revenueEstimate.avg),
+        low: toBillions(trend.revenueEstimate.low),
+        high: toBillions(trend.revenueEstimate.high),
+      });
+    }
   }
-
-  // Render an em-dash for any estimate that the server returned as null.
-  // Mirrors the upstream's "missing data" sentinel — keeps the row width
-  // intact so an all-missing row visually reads as "no live estimates"
-  // instead of "6.55 + 0.00 + 0.00".
-  const formatEstimate = (value: number | null): string =>
-    value === null || value === undefined || !Number.isFinite(value)
-      ? t("insights.unavailable")
-      : value.toFixed(2);
-  // Revenue is rendered in $B with a single decimal; EPS keeps two.
-  // Split helpers (instead of a precision arg) so each call site reads
-  // cleanly and a future refactor into a shared "<Metric>Estimate" row
-  // component stays a search-and-replace away.
-  const formatEstimateRev = (value: number | null): string =>
-    value === null || value === undefined || !Number.isFinite(value)
-      ? t("insights.unavailable")
-      : value.toFixed(1);
-
-  // Employee count: pull the *current* full-time-equivalent from FMP profile
-  // and inject it as the latest-year bar. Historical years stay mock-backed
-  // because the free tier has no historical employee-count endpoint (FMP
-  // `/stable/profile` is a current snapshot only). When the FTE is live the
-  // card drops `[MOCK]`; otherwise it stays to flag the gap honestly.
-  const currentYear = String(new Date().getFullYear());
-  const currentFte =
-    typeof overviewData?.fullTimeEmployees === "number" &&
-    Number.isFinite(overviewData.fullTimeEmployees) &&
-    overviewData.fullTimeEmployees > 0
-      ? overviewData.fullTimeEmployees
-      : null;
-  // Display only the live current-year snapshot when available (no mock history
-  // mix). If currentFte is null, keep the entire mock series with [MOCK] indicator.
-  const employeeCount =
-    currentFte !== null
-      ? [{ year: currentYear, count: currentFte }]
-      : mockEmployeeCount;
-  // Keep [MOCK] indicator enabled whenever synthetic history remains in the chart
-  // (which is whenever currentFte is null).
-  const isEmployeeMock = currentFte === null;
-
-  // Profile is only "mock" when NEITHER the FMP API NOR our local FinanceDatabase
-  // returned real data. If screenerAsset has a summary or sector, that's real
-  // metadata from our 300k-asset SQLite DB — not mock filler.
-  const isProfileMock = !overviewData && !screenerAsset && !overviewLoading;
 
   if (overviewLoading) {
     return (
-      <div className="space-y-6 mt-8">
+      <div className="mt-8 space-y-6">
         <SkeletonHeader />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="col-span-1 lg:col-span-2 space-y-6">
-            <SectionCardSkeleton height={120} />
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2">
+            <SectionCardSkeleton height={360} />
             <SectionCardSkeleton height={260} />
           </div>
           <div className="space-y-6">
-            <SectionCardSkeleton height={220} />
-            <SectionCardSkeleton height={220} />
+            <SectionCardSkeleton height={360} />
             <SectionCardSkeleton height={220} />
           </div>
         </div>
@@ -270,587 +125,520 @@ export default function CompanyProfile({
   }
 
   return (
-    <div className="space-y-6 mt-8">
-      <h2 className="text-2xl font-bold text-foreground">
-        {t("insights.companyProfile")}
-        {isProfileMock && (
-          <span className="text-xs text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded ml-2 align-middle">
-            [MOCK]
-          </span>
-        )}
-      </h2>
+    <div className="mt-8 space-y-6">
+      <SectionHeading
+        icon={Building2}
+        title={t("insights.companyProfile")}
+        live={Boolean(overviewData || screenerAsset)}
+        source="FMP / FinanceDatabase"
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Left Column: Details & Description */}
-        <div className="col-span-1 md:col-span-2 space-y-6">
-          <div className="bg-card border border-border rounded-panel p-6">
-            <p className="text-muted-foreground text-sm leading-relaxed mb-6">
-              {description}
-            </p>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-4 gap-x-2">
-              <KV label={t("insights.ceo")} value={ceo} />
-              <KV label={t("insights.sector")} value={sector} />
-              <KV label={t("insights.industry")} value={industry} />
-              <KV
-                label={t("insights.employees")}
-                value={
-                  typeof employees === "number"
-                    ? employees.toLocaleString()
-                    : String(employees)
-                }
-              />
-              <KV
-                label={t("insights.beta")}
-                value={beta !== null ? beta.toFixed(2) : "—"}
-              />
-              <KV
-                label={t(piotroskiLabelKey)}
-                value={piotroskiDisplayValue}
-                accentClass="text-chart-positive"
-              />
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+        <section
+          className={`order-1 rounded-panel border border-border bg-card p-5 lg:col-span-2 ${
+            descriptionExpanded ? "" : "lg:h-[364px] overflow-hidden"
+          }`}
+          aria-labelledby="company-profile-card-title"
+        >
+          <h2 id="company-profile-card-title" className="sr-only">
+            {t("insights.companyProfile")}
+          </h2>
+          {description && (
+            <div className="mb-4">
+              <p
+                id="company-description"
+                className={`text-base leading-7 text-muted-foreground ${descriptionExpanded ? "" : "line-clamp-4"}`}
+              >
+                {description}
+              </p>
+              {canExpandDescription && (
+                <button
+                  type="button"
+                  className="mt-2 inline-flex min-h-8 items-center rounded-md text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+                  onClick={() => setDescriptionExpanded((value) => !value)}
+                  aria-expanded={descriptionExpanded}
+                  aria-controls="company-description"
+                >
+                  {descriptionExpanded
+                    ? t("insights.showLess")
+                    : t("insights.showMore")}
+                </button>
+              )}
             </div>
+          )}
 
-            {(overviewData?.cik ||
-              overviewData?.isin ||
-              overviewData?.cusip ||
-              overviewData?.ipoDate ||
-              overviewData?.lastDividend !== undefined ||
-              overviewData?.exchangeFullName ||
-              overviewData?.isEtf ||
-              overviewData?.isFund ||
-              overviewData?.isAdr ||
-              overviewData?.isActivelyTrading !== undefined) && (
-              <div className="mt-6 pt-4 border-t border-border">
-                <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-3">
-                  {t("insights.idChips")}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {overviewData?.cik && (
-                    <Chip label={t("insights.cik")} value={overviewData.cik} />
-                  )}
-                  {overviewData?.isin && (
-                    <Chip
-                      label={t("insights.isin")}
-                      value={overviewData.isin}
-                    />
-                  )}
-                  {overviewData?.cusip && (
-                    <Chip
-                      label={t("insights.cusip")}
-                      value={overviewData.cusip}
-                    />
-                  )}
-                  {overviewData?.ipoDate && (
-                    <Chip
-                      label={t("insights.ipoDate")}
-                      value={overviewData.ipoDate}
-                    />
-                  )}
-                  {overviewData?.exchangeFullName && (
-                    <Chip
-                      label={t("insights.exchangeDescription")}
-                      value={overviewData.exchangeFullName}
-                    />
-                  )}
-                  {overviewData?.lastDividend !== undefined && (
-                    <Chip
-                      label={t("insights.lastDividend")}
-                      value={`$${overviewData.lastDividend.toFixed(2)}`}
-                      tone="success"
-                    />
-                  )}
-                  {overviewData?.isEtf === true && (
-                    <FlagBadge label={t("insights.isEtf")} tone="purple" />
-                  )}
-                  {overviewData?.isFund === true && (
-                    <FlagBadge label={t("insights.isFund")} tone="cyan" />
-                  )}
-                  {overviewData?.isAdr === true && (
-                    <FlagBadge label={t("insights.isAdr")} tone="amber" />
-                  )}
-                  {overviewData?.isActivelyTrading !== undefined && (
-                    <FlagBadge
-                      label={t("insights.activeStatus")}
-                      tone={
-                        overviewData.isActivelyTrading ? "success" : "danger"
-                      }
-                      value={
-                        overviewData.isActivelyTrading
-                          ? t("insights.yes")
-                          : t("insights.no")
-                      }
-                    />
-                  )}
-                  {overviewData?.defaultImage !== undefined && (
-                    <FlagBadge
-                      label="LOGO"
-                      tone={overviewData.defaultImage ? "amber" : "success"}
-                      value={overviewData.defaultImage ? "generic" : "company"}
-                    />
-                  )}
-                </div>
-              </div>
-            )}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-3">
+            <KV label={t("insights.ceo")} value={ceo} />
+            <KV label={t("insights.sector")} value={sector} />
+            <KV label={t("insights.industry")} value={industry} />
+            <KV
+              label={t("insights.beta")}
+              value={beta !== null ? beta.toFixed(2) : "—"}
+            />
+            <KV
+              label={t("insights.piotroskiScore")}
+              value={piotroskiScore !== null ? `${piotroskiScore} / 9` : "—"}
+              accentClass="text-chart-positive"
+            />
           </div>
 
-          {/* Insider Trading Table */}
-          <div className="bg-card border border-border rounded-panel p-6">
-            <h3 className="text-lg font-semibold mb-4">
-              {t("insights.insiderTrading")}
-              {isInsiderMock && (
-                <span className="text-xs text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded ml-2">
-                  [MOCK]
-                </span>
+          <div className="mt-5 border-t border-border pt-4">
+            <p className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              {t("insights.idChips")}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {overviewData?.cik && (
+                <Chip label={t("insights.cik")} value={overviewData.cik} />
               )}
-            </h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs text-muted-foreground uppercase border-b border-border">
-                  <tr>
-                    <th className="pb-3 font-medium">{t("common.name")}</th>
-                    <th className="pb-3 font-medium">{t("common.date")}</th>
-                    <th className="pb-3 font-medium">{t("common.type")}</th>
-                    <th className="pb-3 font-medium">{t("common.price")}</th>
-                    <th className="pb-3 font-medium">
-                      {t("common.transacted")}
-                    </th>
-                    <th className="pb-3 font-medium text-right">
-                      {t("common.value")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {insiders.slice(0, 5).map((trade, i) => (
-                    <tr key={i} className="hover:bg-muted/60 transition-colors">
-                      <td className="py-3 font-medium">{trade.name}</td>
+              {overviewData?.isin && (
+                <Chip label={t("insights.isin")} value={overviewData.isin} />
+              )}
+              {overviewData?.cusip && (
+                <Chip label={t("insights.cusip")} value={overviewData.cusip} />
+              )}
+              {overviewData?.ipoDate && (
+                <Chip
+                  label={t("insights.ipoDate")}
+                  value={overviewData.ipoDate}
+                />
+              )}
+              {overviewData?.exchangeFullName && (
+                <Chip
+                  label={t("insights.exchangeDescription")}
+                  value={overviewData.exchangeFullName}
+                />
+              )}
+              {overviewData?.lastDividend !== undefined && (
+                <Chip
+                  label={t("insights.lastDividend")}
+                  value={`$${overviewData.lastDividend.toFixed(2)}`}
+                  tone="success"
+                />
+              )}
+              {overviewData?.isActivelyTrading !== undefined && (
+                <FlagBadge
+                  label={t("insights.activeStatus")}
+                  tone={overviewData.isActivelyTrading ? "success" : "danger"}
+                  value={
+                    overviewData.isActivelyTrading
+                      ? t("insights.yes")
+                      : t("insights.no")
+                  }
+                />
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="order-2 rounded-panel border border-border bg-card p-5 lg:col-span-1 lg:h-[364px] lg:overflow-hidden">
+          <SectionHeading
+            icon={ChartNoAxesCombined}
+            title={t("insights.analystEstimates")}
+            live={Boolean(analystData?.length)}
+            source="Yahoo Finance consensus"
+          />
+          <EstimateTable
+            title="EPS"
+            rows={epsEstimates}
+            format={formatEstimate}
+            tone="primary"
+            translatePeriod={translatePeriod}
+            t={t}
+          />
+          <EstimateTable
+            title="Revenue (B)"
+            rows={revenueEstimates}
+            format={formatRevenueEstimate}
+            tone="positive"
+            translatePeriod={translatePeriod}
+            t={t}
+          />
+        </section>
+
+        <section className="order-3 rounded-panel border border-border bg-card p-6 lg:col-span-3">
+          <SectionHeading
+            icon={Scale}
+            title={t("insights.insiderTrading")}
+            live={Boolean(insiderData?.length)}
+            source="Yahoo Finance"
+          />
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[820px] text-left text-sm">
+              <thead className="border-b border-border text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="pb-3 font-medium">{t("common.name")}</th>
+                  <th className="pb-3 font-medium">{t("common.date")}</th>
+                  <th className="pb-3 font-medium">{t("common.type")}</th>
+                  <th className="pb-3 font-medium">{t("common.shares")}</th>
+                  <th className="pb-3 font-medium">
+                    {t("common.pricePerShare")}
+                  </th>
+                  <th className="pb-3 font-medium">{t("common.value")}</th>
+                  <th className="pb-3 text-right font-medium">
+                    {t("common.marketClose")}
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {insiders.slice(0, 8).map((trade, index) => {
+                  const tone =
+                    trade.category === "purchase"
+                      ? "text-chart-positive"
+                      : trade.category === "sale"
+                        ? "text-chart-negative"
+                        : "text-muted-foreground";
+                  const price =
+                    trade.price !== null
+                      ? `$${trade.price.toFixed(2)}`
+                      : trade.priceLow !== null && trade.priceHigh !== null
+                        ? `$${trade.priceLow.toFixed(2)}–$${trade.priceHigh.toFixed(2)}`
+                        : "—";
+                  return (
+                    <tr
+                      key={`${trade.name}-${trade.date}-${index}`}
+                      className="transition-colors hover:bg-muted/60"
+                    >
+                      <td className="py-3 font-medium">
+                        {trade.name}
+                        {trade.relation && (
+                          <span className="block text-xs font-normal text-muted-foreground">
+                            {trade.relation}
+                          </span>
+                        )}
+                      </td>
                       <td className="py-3 text-muted-foreground">
                         {trade.date}
                       </td>
-                      <td className="py-3 truncate max-w-[150px]">
-                        <span data-code={trade.code} title={trade.code}>
-                          {trade.typeLabel ?? "—"}
-                        </span>
-                      </td>
-                      <td className="py-3" dir="ltr">
-                        {trade.price !== null && trade.price !== undefined ? (
-                          `$${trade.price.toFixed(2)}`
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
+                      <td
+                        className={`max-w-[190px] py-3 ${tone}`}
+                        title={trade.transactionText}
+                      >
+                        {trade.typeLabel}
+                        {trade.isAdministrative && (
+                          <span className="block text-[10px] text-muted-foreground">
+                            {t("insider.administrative")}
+                          </span>
                         )}
+                      </td>
+                      <td className="py-3 font-mono tabular-nums" dir="ltr">
+                        {trade.shares.toLocaleString()}{" "}
+                        <span className="text-xs text-muted-foreground">
+                          {t("common.sharesUnit")}
+                        </span>
                       </td>
                       <td
-                        className={`py-3 ${trade.transacted > 0 ? "text-chart-positive" : "text-chart-negative"}`}
+                        className="py-3 font-mono tabular-nums"
                         dir="ltr"
+                        title={
+                          trade.price !== null
+                            ? t("insider.reportedPrice")
+                            : t("insider.priceUnavailable")
+                        }
                       >
-                        {trade.transacted > 0 ? "+" : ""}
-                        {(trade.transacted || 0).toLocaleString()}
+                        {price}
                       </td>
-                      <td className="py-3 text-right" dir="ltr">
-                        {trade.value !== null &&
-                        trade.value !== undefined &&
-                        trade.value !== 0 ? (
-                          `$${trade.value.toLocaleString()}`
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
+                      <td className="py-3 font-mono tabular-nums" dir="ltr">
+                        {trade.value !== null
+                          ? `$${formatCompactUsd(trade.value)}`
+                          : "—"}
+                      </td>
+                      <td
+                        className="py-3 text-right font-mono tabular-nums text-muted-foreground"
+                        dir="ltr"
+                        title={t("insider.marketCloseContext")}
+                      >
+                        {trade.marketClosePrice !== null
+                          ? `$${trade.marketClosePrice.toFixed(2)}`
+                          : "—"}
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        </div>
+        </section>
 
-        {/* Right Column: Charts & News */}
-        <div className="space-y-6">
-          {/* Analyst Estimates */}
-          <div className="bg-card border border-border rounded-panel p-6">
-            <h3 className="text-lg font-semibold mb-4">
-              {t("insights.analystEstimates")}
-              {isAnalystMock && (
-                <span className="text-xs text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded ml-2">
-                  [MOCK]
-                </span>
-              )}
-            </h3>
-            <div className="space-y-4">
-              <div className="grid grid-cols-4 gap-2 text-xs text-muted-foreground uppercase pb-2 border-b border-border">
-                <div className="col-span-1">{t("insights.period")}</div>
-                <div className="text-right">{t("insights.avg")}</div>
-                <div className="text-right">{t("insights.low")}</div>
-                <div className="text-right">{t("insights.high")}</div>
-              </div>
-              <div className="text-sm font-medium mb-2 text-primary">EPS</div>
-              {epsEstimates.map((est, i) => (
-                <div
-                  key={`eps-${i}`}
-                  className="grid grid-cols-4 gap-2 text-sm items-center py-1"
+        <section className="order-4 rounded-panel border border-border bg-card p-5 lg:col-span-3">
+          <SectionHeading
+            icon={Newspaper}
+            title={t("insights.news")}
+            live={Boolean(newsData?.length)}
+            source="Yahoo Finance"
+          />
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {news.slice(0, 8).map((item, index) => {
+              const initial = (item.publisher || "?")
+                .trim()
+                .charAt(0)
+                .toUpperCase();
+              return (
+                <a
+                  key={index}
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex min-w-0 gap-3 rounded-lg border-b border-border p-2.5 transition-colors hover:bg-muted/40 md:border-b-0 md:border-r md:last:border-r-0"
                 >
-                  <div className="text-muted-foreground">
-                    {translatePeriod(est.period)}
-                  </div>
-                  <div
-                    className="text-right font-bold text-primary font-mono tabular-nums"
-                    dir="ltr"
-                  >
-                    <span className="bg-primary/10 px-2 py-0.5 rounded">
-                      {formatEstimate(est.avg)}
-                    </span>
-                  </div>
-                  <div
-                    className="text-right text-muted-foreground font-mono tabular-nums"
-                    dir="ltr"
-                  >
-                    {formatEstimate(est.low)}
-                  </div>
-                  <div
-                    className="text-right text-muted-foreground font-mono tabular-nums"
-                    dir="ltr"
-                  >
-                    {formatEstimate(est.high)}
-                  </div>
-                </div>
-              ))}
-              <div className="text-sm font-medium mt-4 mb-2 text-chart-positive">
-                Revenue (B)
-              </div>
-              {revEstimates.map((est, i) => (
-                <div
-                  key={`rev-${i}`}
-                  className="grid grid-cols-4 gap-2 text-sm items-center py-1"
-                >
-                  <div className="text-muted-foreground">
-                    {translatePeriod(est.period)}
-                  </div>
-                  <div
-                    className="text-right font-bold text-primary font-mono tabular-nums"
-                    dir="ltr"
-                  >
-                    <span className="bg-primary/10 px-2 py-0.5 rounded">
-                      {formatEstimateRev(est.avg)}
-                    </span>
-                  </div>
-                  <div
-                    className="text-right text-muted-foreground font-mono tabular-nums"
-                    dir="ltr"
-                  >
-                    {formatEstimateRev(est.low)}
-                  </div>
-                  <div
-                    className="text-right text-muted-foreground font-mono tabular-nums"
-                    dir="ltr"
-                  >
-                    {formatEstimateRev(est.high)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Employee Count Chart — latest year is live from FMP profile;
-              historical years stay mock-backed (free tier has no historical
-              employee-count endpoint). We surface the gap with a footnote
-              rather than a [MOCK] chip when only the snapshot is live. */}
-          <div className="bg-card border border-border rounded-panel p-6">
-            <h3 className="text-lg font-semibold mb-4">
-              {t("insights.employeeCount")}
-              {isEmployeeMock && (
-                <span className="text-xs text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded ml-2">
-                  [MOCK]
-                </span>
-              )}
-            </h3>
-            <div className="h-40">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={employeeCount}>
-                  <defs>
-                    <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                      <stop
-                        offset="5%"
-                        stopColor="hsl(200 60% 60%)"
-                        stopOpacity={0.8}
-                      />
-                      <stop
-                        offset="95%"
-                        stopColor="hsl(200 60% 60%)"
-                        stopOpacity={0.2}
-                      />
-                    </linearGradient>
-                  </defs>
-                  <XAxis
-                    dataKey="year"
-                    tick={{ fill: "hsl(220 10% 60%)", fontSize: 12 }}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <Tooltip
-                    cursor={{ fill: "rgba(255, 255, 255, 0.05)" }}
-                    content={({ active, payload, label }: any) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="bg-card border border-border rounded-panel p-3 shadow-lg">
-                            <p className="text-muted-foreground text-xs mb-1">
-                              {label}
-                            </p>
-                            <p className="text-sm font-bold text-primary">
-                              <span dir="ltr">
-                                {payload[0].value.toLocaleString()}
-                              </span>{" "}
-                              <span className="mx-1">
-                                {t("insights.employees")}
-                              </span>
-                            </p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Bar
-                    dataKey="count"
-                    fill="url(#colorCount)"
-                    radius={[4, 4, 0, 0]}
-                    isAnimationActive={true}
-                    animationDuration={1000}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            {!isEmployeeMock && (
-              <p
-                className="text-xs text-muted-foreground mt-2 leading-snug"
-                title={t("insights.chartLiveSingleYear")}
-              >
-                {t("insights.chartLiveSingleYear")}
-              </p>
-            )}
-          </div>
-          {/* News Aggregator */}
-          <div className="bg-card border border-border rounded-panel p-6">
-            <h3 className="text-lg font-semibold mb-4">
-              {t("insights.news")}
-              {isNewsMock && (
-                <span className="text-xs text-yellow-500 bg-yellow-500/10 px-2 py-1 rounded ml-2">
-                  [MOCK]
-                </span>
-              )}
-            </h3>
-            <div className="space-y-3">
-              {news.slice(0, 8).map((n, i) => {
-                // Gradient placeholder when Yahoo didn't ship a thumbnail.
-                // Falls back to a single-letter chip with the publisher so the
-                // row still reads as "news" rather than a giant empty box.
-                const initial = (n.publisher || "?")
-                  .trim()
-                  .charAt(0)
-                  .toUpperCase();
-                return (
-                  <a
-                    key={i}
-                    href={n.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-start gap-3 group border-b border-border last:border-0 pb-3 last:pb-0"
-                  >
-                    {n.thumbnail ? (
-                      <img
-                        src={n.thumbnail}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                        className="w-16 h-16 rounded-md object-cover bg-muted flex-shrink-0"
-                      />
-                    ) : (
-                      <div
-                        className="w-16 h-16 rounded-md bg-gradient-to-br from-muted to-card flex items-center justify-center text-base font-bold text-muted-foreground flex-shrink-0"
-                        aria-hidden="true"
-                      >
-                        {initial}
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium group-hover:text-primary transition-colors line-clamp-2 mb-1">
-                        {n.headline}
-                      </p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="font-semibold truncate max-w-[140px]">
-                          {n.publisher}
-                        </span>
-                        <span>&bull;</span>
-                        <span>{n.timestamp}</span>
-                      </div>
+                  {item.thumbnail ? (
+                    <img
+                      src={item.thumbnail}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="h-14 w-14 shrink-0 rounded-md bg-muted object-cover"
+                    />
+                  ) : (
+                    <div
+                      className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-muted to-card text-base font-bold text-muted-foreground"
+                      aria-hidden="true"
+                    >
+                      {initial}
                     </div>
-                  </a>
-                );
-              })}
-            </div>
-            {!isNewsMock && news.length > 0 && (
-              <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border">
-                {t("news.footer", { count: Math.min(news.length, 8) })}
-              </p>
-            )}
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="line-clamp-2 text-[15px] font-medium leading-6 text-foreground transition-colors group-hover:text-primary"
+                      title={item.headline}
+                    >
+                      {item.headline}
+                    </p>
+                    <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                      <span
+                        className="truncate font-semibold"
+                        title={item.publisher}
+                      >
+                        {item.publisher}
+                      </span>
+                      <span aria-hidden="true">•</span>
+                      <span className="shrink-0">{item.timestamp}</span>
+                    </div>
+                  </div>
+                </a>
+              );
+            })}
           </div>
-        </div>
+          {news.length > 0 && (
+            <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
+              {t("news.footer", { count: Math.min(news.length, 8) })}
+            </p>
+          )}
+        </section>
       </div>
     </div>
   );
 }
 
-/**
- * Renders a labeled key-value display block.
- *
- * @param label - The text displayed above the value
- * @param value - The value to display
- * @param accentClass - Optional CSS classes applied to the value
- */
+function EstimateTable({
+  title,
+  rows,
+  format,
+  tone,
+  translatePeriod,
+  t,
+}: {
+  title: string;
+  rows: EstimateRow[];
+  format: (value: number | null) => string;
+  tone: "primary" | "positive";
+  translatePeriod: (period: string) => string;
+  t: (key: string) => string;
+}) {
+  return (
+    <div className="mb-4 last:mb-0">
+      <div
+        className={`mb-2 text-sm font-medium ${tone === "positive" ? "text-chart-positive" : "text-primary"}`}
+      >
+        {title}
+      </div>
+      <div className="grid grid-cols-4 gap-3 border-b border-border pb-2 text-xs uppercase text-muted-foreground">
+        <div>{t("insights.period")}</div>
+        <div className="text-right">{t("insights.avg")}</div>
+        <div className="text-right">{t("insights.low")}</div>
+        <div className="text-right">{t("insights.high")}</div>
+      </div>
+      {rows.map((row, index) => (
+        <div
+          key={`${title}-${index}`}
+          className="grid grid-cols-4 items-center gap-3 py-1.5 text-sm"
+        >
+          <div className="truncate text-muted-foreground">
+            {translatePeriod(row.period)}
+          </div>
+          <div
+            className="text-right font-mono font-bold tabular-nums text-primary"
+            dir="ltr"
+          >
+            <span className="rounded bg-primary/10 px-1.5 py-0.5">
+              {format(row.avg)}
+            </span>
+          </div>
+          <div
+            className="text-right font-mono tabular-nums text-muted-foreground"
+            dir="ltr"
+          >
+            {format(row.low)}
+          </div>
+          <div
+            className="text-right font-mono tabular-nums text-muted-foreground"
+            dir="ltr"
+          >
+            {format(row.high)}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function formatEstimate(value: number | null): string {
+  return value === null || !Number.isFinite(value) ? "—" : value.toFixed(2);
+}
+
+function formatRevenueEstimate(value: number | null): string {
+  return value === null || !Number.isFinite(value) ? "—" : value.toFixed(1);
+}
+
+function toBillions(value: number | null | undefined): number | null {
+  return value === null || value === undefined ? null : value / 1e9;
+}
+
 function KV({
   label,
   value,
-  accentClass,
+  accentClass = "",
 }: {
   label: string;
-  value: string;
+  value: string | null;
   accentClass?: string;
 }) {
   return (
-    <div className="flex flex-col items-start">
+    <div className="flex min-w-0 flex-col items-start">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p
-        className={`text-sm font-medium inline-block ${accentClass ?? ""}`}
+        className={`truncate text-sm font-medium ${accentClass}`}
         dir="ltr"
+        title={value ?? "—"}
       >
-        {value}
+        {value ?? "—"}
       </p>
     </div>
   );
 }
 
-/** Compact "LABEL value" pill used inside the identify strip. */
 function Chip({
   label,
   value,
-  tone,
+  tone = "normal",
 }: {
   label: string;
   value: string;
   tone?: "success" | "normal";
 }) {
-  const valueCls =
-    tone === "success"
-      ? "text-chart-positive font-semibold"
-      : "text-foreground font-medium";
   return (
     <span
-      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] bg-muted border border-border text-xs"
+      className="inline-flex max-w-full items-center gap-1.5 rounded-[6px] border border-border bg-muted px-2.5 py-1 text-xs"
       dir="ltr"
       title={`${label}: ${value}`}
     >
-      <span className="text-muted-foreground font-medium uppercase tracking-wider text-xs">
+      <span className="shrink-0 font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
-      <span className={valueCls}>{value}</span>
+      <span
+        className={
+          tone === "success"
+            ? "truncate font-semibold text-chart-positive"
+            : "truncate font-medium text-foreground"
+        }
+      >
+        {value}
+      </span>
     </span>
   );
 }
 
-/**
- * Renders a colored badge for a boolean-style label, optionally including a value.
- *
- * @param label - The badge label
- * @param tone - The badge color theme
- * @param value - An optional value displayed alongside the label
- */
 function FlagBadge({
   label,
   tone,
   value,
 }: {
   label: string;
-  tone: "purple" | "cyan" | "amber" | "success" | "danger";
-  value?: string;
+  tone: "success" | "danger";
+  value: string;
 }) {
-  const toneCls: Record<typeof tone, string> = {
-    purple: "bg-purple-500/10 text-purple-300 border-purple-500/30",
-    cyan: "bg-cyan-500/10 text-cyan-300 border-cyan-500/30",
-    amber: "bg-amber-500/10 text-amber-300 border-amber-500/30",
-    success:
-      "bg-chart-positive/10 text-chart-positive border-chart-positive/30",
-    danger: "bg-chart-negative/10 text-chart-negative border-chart-negative/30",
-  };
   return (
     <span
-      className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border text-xs font-medium uppercase tracking-wider ${toneCls[tone]}`}
-      title={value ? `${label}: ${value}` : label}
+      className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium uppercase tracking-wider ${tone === "success" ? "border-chart-positive/30 bg-chart-positive/10 text-chart-positive" : "border-chart-negative/30 bg-chart-negative/10 text-chart-negative"}`}
     >
       {label}
-      {value && (
-        <span className="text-xs opacity-75 normal-case tracking-normal">
-          {value}
-        </span>
-      )}
+      <span className="normal-case tracking-normal opacity-75">{value}</span>
     </span>
   );
 }
 
-/**
- * Renders a shimmering placeholder for a section header.
- */
-function SkeletonHeader() {
+function SectionHeading({
+  icon: Icon,
+  title,
+  live,
+  source,
+}: {
+  icon: LucideIcon;
+  title: string;
+  live: boolean;
+  source: string;
+}) {
   return (
-    <div className="h-7 w-48 bg-muted rounded-[6px] relative overflow-hidden before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.4s_infinite] before:bg-gradient-to-r before:from-transparent before:via-border/40 before:to-transparent" />
+    <div className="mb-4 flex items-center justify-between gap-3">
+      <h3 className="flex min-w-0 items-center gap-2 text-lg font-semibold text-foreground">
+        <Icon className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+        <span className="truncate">{title}</span>
+      </h3>
+      {live && (
+        <DataStatusBadge status="live" source={source} compact iconOnly />
+      )}
+    </div>
   );
 }
 
-/**
- * Map Yahoo's single-letter `transactionCode` to a short localised label.
- *
- * Yahoo's `quoteSummary.insiderTransactions.transactions[]` exposes a
- * `transactionCode` per row (`P`urchase / `S`ale / `A`ward / `G`ift /
- * `M` option-exercise / `F` tax-withholding / `D`isposal / `X` option
- * grant / `C` conversion / etc). The upstream `transactionText`
- * ("Stock Gift at price 0.00 per share.") doesn't fit a table cell, so
- * this helper reduces each row to a short noun via `t("insider.type.X")`,
- * falling back to the upstream text on `""` / unknown codes so legacy
- * rows still render something readable.
- *
- * Pure function — module scope rather than inline so the i18n-audit
- * static scanner picks up each literal `t("insider.type.X")` call site
- * independently. (A `\`insider.type.${code}\`` template literal would
- * collapse to `"insider.type.<code>"` in static scan, missing the 9
- * distinct keys; this switch exposes all of them to the audit.)
- *
- * Pure function — kept at module scope because the mapping is data-side,
- * not React-side, and unit tests can pin both known + unknown codes
- * without spinning up a renderer.
- */
-function i18nInsiderType(
+function SkeletonHeader() {
+  return (
+    <div className="relative h-7 w-48 overflow-hidden rounded-[6px] bg-muted before:absolute before:inset-0 before:-translate-x-full before:animate-[shimmer_1.4s_infinite] before:bg-gradient-to-r before:from-transparent before:via-border/40 before:to-transparent" />
+  );
+}
+
+function i18nInsiderCategory(
   t: (key: string) => string,
-  code: string,
+  category: InsiderTransactionCategory,
   fallback: string,
 ): string {
-  if (!code) return fallback || t("insider.type.other");
-  switch (code) {
-    case "P":
+  switch (category) {
+    case "purchase":
       return t("insider.type.P");
-    case "S":
+    case "sale":
       return t("insider.type.S");
-    case "A":
+    case "award":
       return t("insider.type.A");
-    case "G":
+    case "gift":
       return t("insider.type.G");
-    case "M":
+    case "optionExercise":
       return t("insider.type.M");
-    case "F":
+    case "withholding":
       return t("insider.type.F");
-    case "D":
+    case "disposal":
       return t("insider.type.D");
-    case "X":
+    case "optionGrant":
       return t("insider.type.X");
-    case "C":
+    case "conversion":
       return t("insider.type.C");
     default:
-      return fallback || code;
+      return fallback || t("insider.type.other");
   }
+}
+
+function formatCompactUsd(value: number): string {
+  const abs = Math.abs(value);
+  if (abs >= 1e9) return `${(value / 1e9).toFixed(2)}B`;
+  if (abs >= 1e6) return `${(value / 1e6).toFixed(2)}M`;
+  if (abs >= 1e3) return `${(value / 1e3).toFixed(1)}K`;
+  return value.toFixed(0);
 }

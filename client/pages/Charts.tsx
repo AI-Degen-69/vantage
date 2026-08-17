@@ -5,6 +5,9 @@ import { SectionCardSkeleton, HeaderPriceSkeleton } from "@/components/Skeleton"
 import TickerLogo from "@/components/TickerLogo";
 import { useStockQuote, useStockProfile, useYahooChartDown } from "@/hooks/useStockData";
 import { TrendingUp, TrendingDown, BarChart3, Calendar, Building2 } from "lucide-react";
+import PageHeader from "@/components/PageHeader";
+import DataLegend from "@/components/DataLegend";
+import DataStatusBadge from "@/components/DataStatusBadge";
 
 /**
  * Displays a discounted cash flow valuation chart for the selected stock ticker.
@@ -56,7 +59,20 @@ export default function Charts() {
     <div className="w-full bg-background dark min-h-screen p-8">
       <div className="max-w-5xl mx-auto space-y-8">
         {/* Header strip — ticker + company + price + day/year range */}
-        <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex flex-col gap-4">
+          <PageHeader
+            eyebrow={t("nav.charts")}
+            title={profileLoading ? "…" : profileData?.companyName ?? ticker}
+            description={profileData?.exchange ? `${ticker} · ${profileData.exchange}` : ticker}
+            status={currentPrice != null ? "live" : undefined}
+            source={currentPrice != null ? "Yahoo Finance" : undefined}
+            actions={
+              <>
+                {yahooChartDown && <DataStatusBadge status="mock" source="Chart fallback" />}
+                <DataLegend />
+              </>
+            }
+          />
           <div className="flex items-center gap-4 min-w-0">
             <TickerLogo ticker={ticker} size="md" />
             <div className="min-w-0">
@@ -86,17 +102,7 @@ export default function Charts() {
             </div>
           </div>
 
-          <div className="flex flex-col items-end gap-1">
-            {yahooChartDown && (
-              <span
-                className="text-xs font-medium uppercase tracking-wide px-2 py-0.5 rounded text-yellow-400 bg-yellow-500/10"
-                title={t("providerHealth.chartDownHint")}
-              >
-                [MOCK]
-              </span>
-            )}
-            <h2 className="text-2xl font-bold text-foreground self-start">{t("nav.charts")}</h2>
-          </div>
+          <div className="flex flex-col items-end gap-1" aria-hidden="true" />
         </div>
 
         {/* Price + range card */}

@@ -15,7 +15,7 @@ import { Search } from "lucide-react";
  * @returns The Tailwind CSS classes used to style the pill container.
  */
 function pillClassName() {
-  return "flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card/80 border border-border";
+  return "flex items-center gap-1.5 rounded-full border border-border bg-card/80 px-3 py-1.5";
 }
 
 /**
@@ -135,7 +135,7 @@ export default function TopBar() {
   const language = lang;
 
   return (
-    <header className="h-16 border-b border-border bg-background/80 backdrop-blur flex items-center justify-between px-6 sticky top-0 z-40 w-full shrink-0">
+    <header className="sticky top-0 z-40 flex min-h-16 w-full shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-background/80 px-4 py-3 backdrop-blur sm:px-6">
       {/* Left section: Wordmark + Breadcrumb */}
       <div className="flex items-center gap-4">
         <Link
@@ -166,10 +166,11 @@ export default function TopBar() {
       </div>
 
       {/* Center section: Search Bar */}
-      <div className="flex-1 flex justify-center max-w-xl mx-8">
+      <div className="order-3 flex w-full max-w-xl flex-1 justify-center sm:order-none sm:mx-8">
         <button
           onClick={() => setSearchOpen(true)}
-          className="flex items-center gap-2 w-full px-4 py-2 text-sm text-muted-foreground bg-muted/40 hover:bg-muted border border-border rounded-lg transition-colors"
+          aria-label="Search tickers and companies"
+          className="flex w-full items-center gap-2 rounded-lg border border-border bg-muted/40 px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted"
         >
           <Search className="w-4 h-4" />
           <span className="flex-1 text-left">Search tickers, companies...</span>
@@ -190,7 +191,7 @@ export default function TopBar() {
       <EarningsAlertHistoryButton />
 
       {/* Right section: Market index pills */}
-      <div className="flex items-center gap-2">
+      <div className="order-2 flex items-center gap-2 overflow-x-auto sm:order-none">
         <Pill
           label={t("topBar.indicesDow")}
           quote={data?.dow}

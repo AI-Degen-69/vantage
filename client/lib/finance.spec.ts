@@ -3,6 +3,8 @@ import {
   annualizedVolatility,
   cagr,
   cagrAtYearsBack,
+  cagrPercent,
+  yoyGrowth,
   detectPeriodGranularity,
   formatEarningsDate,
   formatTradeDateLocale,
@@ -74,6 +76,19 @@ describe("irrBisection", () => {
       { date: "2025-01-01", amount: 1100 },
     ]);
     expect(r.iterations).toBeLessThanOrEqual(60);
+  });
+});
+
+describe("growth helpers", () => {
+  it("computes YoY as a percentage and uses absolute prior values", () => {
+    expect(yoyGrowth(100, 125)).toBe(25);
+    expect(yoyGrowth(-100, -50)).toBe(50);
+    expect(yoyGrowth(0, 10)).toBeNull();
+  });
+
+  it("returns percentage CAGR without leaking decimal units", () => {
+    expect(cagrPercent(100, 200, 4)).toBeCloseTo(18.92, 1);
+    expect(cagrPercent(0, 200, 4)).toBeNull();
   });
 });
 

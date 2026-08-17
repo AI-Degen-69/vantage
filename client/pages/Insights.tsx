@@ -1,5 +1,17 @@
 import { useState, useMemo } from "react";
-import { Search, Settings, LayoutGrid, TrendingUp, Rocket, Coins, RefreshCcw, Bot, Cloud, Car, Gamepad2 } from "lucide-react";
+import {
+  Search,
+  Settings,
+  LayoutGrid,
+  TrendingUp,
+  Rocket,
+  Coins,
+  RefreshCcw,
+  Bot,
+  Cloud,
+  Car,
+  Gamepad2,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useI18n, translateSector } from "@/lib/i18n";
 import BatchQuoteFallbackHint from "@/components/BatchQuoteFallbackHint";
@@ -12,18 +24,21 @@ import {
 import { SectorHeatsheet } from "@/components/SectorHeatsheet";
 import TickerLogo from "@/components/TickerLogo";
 import type { InsightsTabId, StockQuote } from "@shared/api";
+import PageHeader from "@/components/PageHeader";
+import DataLegend from "@/components/DataLegend";
 
-const TABS: { id: InsightsTabId; i18nKey: string; Icon: React.ElementType }[] = [
-  { id: "sp500", i18nKey: "insights.tabs.sp500", Icon: LayoutGrid },
-  { id: "trending", i18nKey: "insights.tabs.trending", Icon: TrendingUp },
-  { id: "growth", i18nKey: "insights.tabs.growth", Icon: Rocket },
-  { id: "dividend", i18nKey: "insights.tabs.dividend", Icon: Coins },
-  { id: "buyback", i18nKey: "insights.tabs.buyback", Icon: RefreshCcw },
-  { id: "ai", i18nKey: "insights.tabs.ai", Icon: Bot },
-  { id: "cloud", i18nKey: "insights.tabs.cloud", Icon: Cloud },
-  { id: "ev", i18nKey: "insights.tabs.ev", Icon: Car },
-  { id: "leisure", i18nKey: "insights.tabs.leisure", Icon: Gamepad2 },
-];
+const TABS: { id: InsightsTabId; i18nKey: string; Icon: React.ElementType }[] =
+  [
+    { id: "sp500", i18nKey: "insights.tabs.sp500", Icon: LayoutGrid },
+    { id: "trending", i18nKey: "insights.tabs.trending", Icon: TrendingUp },
+    { id: "growth", i18nKey: "insights.tabs.growth", Icon: Rocket },
+    { id: "dividend", i18nKey: "insights.tabs.dividend", Icon: Coins },
+    { id: "buyback", i18nKey: "insights.tabs.buyback", Icon: RefreshCcw },
+    { id: "ai", i18nKey: "insights.tabs.ai", Icon: Bot },
+    { id: "cloud", i18nKey: "insights.tabs.cloud", Icon: Cloud },
+    { id: "ev", i18nKey: "insights.tabs.ev", Icon: Car },
+    { id: "leisure", i18nKey: "insights.tabs.leisure", Icon: Gamepad2 },
+  ];
 
 /**
  * Formats a market capitalization value using a compact human-readable unit.
@@ -59,12 +74,12 @@ export default function Insights() {
   // Pre-filter the universe BEFORE fetching quotes so we don't overload the backend
   const filteredUniverse = useMemo(() => {
     if (!allTabsData) return [];
-    
+
     const symbolTabs = new Map<string, InsightsTabId[]>();
     const allEntries = new Map<string, any>();
 
     for (const [tabId, entries] of Object.entries(allTabsData)) {
-      for (const entry of (entries as any[])) {
+      for (const entry of entries as any[]) {
         const sym = entry.symbol.toUpperCase();
         if (!symbolTabs.has(sym)) {
           symbolTabs.set(sym, []);
@@ -75,17 +90,21 @@ export default function Insights() {
     }
 
     const q = searchQuery.toLowerCase();
-    let results = Array.from(allEntries.values()).map(entry => ({
+    let results = Array.from(allEntries.values()).map((entry) => ({
       ...entry,
-      tabs: symbolTabs.get(entry.symbol.toUpperCase()) || []
+      tabs: symbolTabs.get(entry.symbol.toUpperCase()) || [],
     }));
 
     results = results.filter((row) => {
-      const matchesSearch = row.symbol.toLowerCase().includes(q) || row.name.toLowerCase().includes(q);
+      const matchesSearch =
+        row.symbol.toLowerCase().includes(q) ||
+        row.name.toLowerCase().includes(q);
       if (!matchesSearch) return false;
-      
+
       if (activeFilters.length > 0) {
-        const matchScore = activeFilters.filter(f => row.tabs.includes(f)).length;
+        const matchScore = activeFilters.filter((f) =>
+          row.tabs.includes(f),
+        ).length;
         if (matchScore === 0) return false;
       }
       return true;
@@ -95,11 +114,15 @@ export default function Insights() {
   }, [allTabsData, searchQuery, activeFilters]);
 
   // Combine symbols from the active filtered universe
-  const symbols = useMemo(() => filteredUniverse.map(e => e.symbol), [filteredUniverse]);
+  const symbols = useMemo(
+    () => filteredUniverse.map((e) => e.symbol),
+    [filteredUniverse],
+  );
   const {
     data: quoteData,
     isLoading: quotesLoading,
     isFetching: quotesFetching,
+    isError: quotesError,
   } = useBatchQuotes(symbols);
 
   // merge: universe row + matched live quote (by symbol) → UI card model.
@@ -127,8 +150,8 @@ export default function Insights() {
     // Sort (matchScore desc, marketCap desc)
     results.sort((a, b) => {
       if (activeFilters.length > 0) {
-        const scoreA = activeFilters.filter(f => a.tabs.includes(f)).length;
-        const scoreB = activeFilters.filter(f => b.tabs.includes(f)).length;
+        const scoreA = activeFilters.filter((f) => a.tabs.includes(f)).length;
+        const scoreB = activeFilters.filter((f) => b.tabs.includes(f)).length;
         if (scoreA !== scoreB) return scoreB - scoreA;
       }
       // fallback to market cap
@@ -143,22 +166,28 @@ export default function Insights() {
   // filtered is now just merged, since filtering was done beforehand
   const filtered = merged;
 
-  // Sector × 5-day heatmap. Lives entirely on the server side
-  // (`/api/sector-heatmap`): the route fans out `getChart` per symbol and
-  // aggregates by sector tag in one pass, node-caching the full response
-  // for 15 minutes. Curated sectors from the universe travel WITH the
-  // request so the server groups by the editorial tags even when provider
-  // profiles are unavailable; provider sectors fill only the gaps. Client
-  // staleTime matches the server TTL with a 5-minute loop so the user sees
-  // fresh intraday without hammering the cache.
-  const heatmapSymbols = useMemo(() => merged.map((r) => r.symbol), [merged]);
+  // The heatmap is intentionally independent from search and tab filters.
+  // It represents the US large-cap market structure using the curated S&P 500
+  // universe, while the cards below can still be narrowed interactively.
+  // Keeping these symbols stable also prevents a search like "NVDA" from
+  // turning the market heatmap into a one-stock panel.
+  const heatmapUniverse = useMemo(() => {
+    return (allTabsData?.sp500 ?? []) as Array<{
+      symbol: string;
+      sector?: string | null;
+    }>;
+  }, [allTabsData]);
+  const heatmapSymbols = useMemo(
+    () => heatmapUniverse.map((entry) => entry.symbol),
+    [heatmapUniverse],
+  );
   const heatmapSectors = useMemo(() => {
     const map: Record<string, string> = {};
-    for (const row of merged) {
-      if (row.sector) map[row.symbol.toUpperCase()] = row.sector;
+    for (const entry of heatmapUniverse) {
+      if (entry.sector) map[entry.symbol.toUpperCase()] = entry.sector;
     }
     return map;
-  }, [merged]);
+  }, [heatmapUniverse]);
   const {
     data: heatmapData,
     isLoading: heatmapLoading,
@@ -173,21 +202,32 @@ export default function Insights() {
   // be live during a Yahoo outage and this would mislabel them MOCK — gate
   // on `!isAnyLive || yahooDown` if that day comes.
   const yahooDown = useYahooDown();
-  const liveCount = merged.filter((r) => r.price !== undefined).length;
+  const liveCount = merged.filter((r) => Number.isFinite(r.price)).length;
   const totalCount = merged.length;
   const isLive = liveCount === totalCount && totalCount > 0 && !yahooDown;
   const isAnyLive = liveCount > 0 && !yahooDown;
+  const quoteStatusLabel = quotesError
+    ? "Live quote service unavailable"
+    : isLive
+      ? "All prices live"
+      : isAnyLive
+        ? `${liveCount}/${totalCount} prices live`
+        : "Waiting for live quotes";
 
   return (
     <div className="w-full bg-background dark min-h-screen">
-      {/* Header and Heatsheet Side-by-Side */}
-      <div className="bg-card/50 border-b border-border px-8 py-8 flex flex-col xl:flex-row items-start xl:items-center gap-8 justify-between">
-        
+      {/* Market header */}
+      <div className="bg-card/50 border-b border-border px-8 py-8">
         {/* Title and Search */}
-        <div className="flex-1 w-full xl:max-w-sm 2xl:max-w-md">
-          <h1 className="text-4xl font-bold text-foreground mb-8 text-start">
-            {t("insights.title")}
-          </h1>
+        <div className="w-full max-w-3xl">
+          <PageHeader
+            eyebrow="Market pulse"
+            title={t("insights.title")}
+            description="Curated universes with live quotes and a cached sector view."
+            status={isAnyLive ? "live" : undefined}
+            source={isAnyLive ? "Yahoo Finance" : undefined}
+            className="mb-8"
+          />
           <div className="relative flex items-center bg-background border border-border rounded-lg overflow-hidden shadow-sm">
             <Search className="w-4 h-4 ms-4 text-muted-foreground shrink-0" />
             <input
@@ -201,7 +241,7 @@ export default function Insights() {
               <Settings className="w-4 h-4 shrink-0" />
             </button>
           </div>
-          
+
           {/* Filters Bar under search */}
           <div className="flex flex-wrap gap-2 mt-4">
             {TABS.map((tab) => {
@@ -210,7 +250,13 @@ export default function Insights() {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveFilters(prev => prev.includes(tab.id) ? prev.filter(id => id !== tab.id) : [...prev, tab.id])}
+                  onClick={() =>
+                    setActiveFilters((prev) =>
+                      prev.includes(tab.id)
+                        ? prev.filter((id) => id !== tab.id)
+                        : [...prev, tab.id],
+                    )
+                  }
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
                     isActive
                       ? "bg-primary text-primary-foreground font-semibold shadow-sm scale-105 border-transparent"
@@ -224,16 +270,20 @@ export default function Insights() {
             })}
           </div>
         </div>
+      </div>
 
-        {/* Sector Heatsheet */}
-        <div className="w-full xl:w-auto xl:min-w-[750px] bg-background/40 rounded-xl overflow-hidden border border-border/50 shadow-sm">
+      {/* Market-wide sector heatmap. This stays mounted even when the provider
+          returns no rows, so an outage is explicit instead of becoming a large
+          unexplained blank area. */}
+      <section className="px-8 pt-6" aria-label="US market sector heatmap">
+        <div className="w-full rounded-xl overflow-hidden border border-border/60 bg-card/40 shadow-sm">
           <SectorHeatsheet
             heatmap={heatmapData ?? null}
             days={5}
-            isLoading={heatmapLoading && !heatmapData}
+            isLoading={tabLoading || (heatmapLoading && !heatmapData)}
           />
         </div>
-      </div>
+      </section>
       {heatmapFetching && !!heatmapData && (
         <div className="text-center text-xs text-muted-foreground -mt-2 mb-2">
           {t("common.search")}…
@@ -244,6 +294,7 @@ export default function Insights() {
       <div className="bg-card/30 border-b border-border overflow-x-auto">
         <div className="flex px-8 py-3 items-center justify-end gap-2">
           <BatchQuoteFallbackHint />
+          <DataLegend showDerived={false} />
           <span
             className={`text-xs font-medium uppercase tracking-wide px-2 py-1 rounded ${
               isLive
@@ -257,14 +308,16 @@ export default function Insights() {
                 ? "All prices live"
                 : isAnyLive
                   ? `${liveCount}/${totalCount} prices live`
-                  : "Showing curated names only — no live prices yet"
+                  : quoteStatusLabel
             }
           >
             {isLive
               ? t("insights.tabBadgeLive")
               : isAnyLive
                 ? `${liveCount}/${totalCount} LIVE`
-                : t("insights.tabBadgeMock")}
+                : quotesError
+                  ? "LIVE UNAVAILABLE"
+                  : "LOADING LIVE QUOTES"}
           </span>
         </div>
       </div>
@@ -348,14 +401,22 @@ export default function Insights() {
                       <div className="flex items-end justify-between mt-auto">
                         <p className="text-xs text-muted-foreground flex items-center gap-1">
                           <span>{t("insights.marketCap")}:</span>
-                          <span dir="ltr">{formatMarketCap(row.marketCap)}</span>
+                          <span dir="ltr">
+                            {formatMarketCap(row.marketCap)}
+                          </span>
                         </p>
                         <div className="flex -space-x-1 rtl:space-x-reverse">
                           {(row.tabs as InsightsTabId[]).map((tabId) => {
-                            const TabIcon = TABS.find(t => t.id === tabId)?.Icon;
+                            const TabIcon = TABS.find(
+                              (t) => t.id === tabId,
+                            )?.Icon;
                             if (!TabIcon) return null;
                             return (
-                              <div key={tabId} className="w-5 h-5 rounded-full bg-background border border-border flex items-center justify-center shadow-sm" title={t(`insights.tabs.${tabId}`)}>
+                              <div
+                                key={tabId}
+                                className="w-5 h-5 rounded-full bg-background border border-border flex items-center justify-center shadow-sm"
+                                title={t(`insights.tabs.${tabId}`)}
+                              >
                                 <TabIcon className="w-3 h-3 text-muted-foreground" />
                               </div>
                             );
@@ -584,8 +645,14 @@ export default function Insights() {
                     <p className="vt-sector flex items-center gap-1">
                       {row.sector ? translateSector(t, row.sector) : ""}
                       {(row.tabs as InsightsTabId[]).map((tabId) => {
-                        const TabIcon = TABS.find(t => t.id === tabId)?.Icon;
-                        return TabIcon ? <TabIcon key={tabId} className="w-3 h-3 text-muted-foreground" title={t(`insights.tabs.${tabId}`)} /> : null;
+                        const TabIcon = TABS.find((t) => t.id === tabId)?.Icon;
+                        return TabIcon ? (
+                          <TabIcon
+                            key={tabId}
+                            className="w-3 h-3 text-muted-foreground"
+                            title={t(`insights.tabs.${tabId}`)}
+                          />
+                        ) : null;
                       })}
                     </p>
                     <div className="vt-quote">
@@ -681,9 +748,15 @@ export default function Insights() {
                     <div className="vt-foot">
                       <div className="flex -space-x-1 rtl:space-x-reverse me-auto">
                         {(row.tabs as InsightsTabId[]).map((tabId) => {
-                          const TabIcon = TABS.find(t => t.id === tabId)?.Icon;
+                          const TabIcon = TABS.find(
+                            (t) => t.id === tabId,
+                          )?.Icon;
                           return TabIcon ? (
-                            <div key={tabId} className="w-4 h-4 rounded-full bg-background border border-border flex items-center justify-center shadow-sm" title={t(`insights.tabs.${tabId}`)}>
+                            <div
+                              key={tabId}
+                              className="w-4 h-4 rounded-full bg-background border border-border flex items-center justify-center shadow-sm"
+                              title={t(`insights.tabs.${tabId}`)}
+                            >
                               <TabIcon className="w-2.5 h-2.5 text-muted-foreground" />
                             </div>
                           ) : null;

@@ -12,7 +12,7 @@ import { useI18n } from "@/lib/i18n";
 import { useStockProfile } from "@/hooks/useStockData";
 
 export type LogoSize = "xs" | "sm" | "md" | "lg" | "xl";
-export type LogoVariant = "default" | "subtle";
+export type LogoVariant = "default" | "subtle" | "bare";
 
 interface TickerLogoProps {
   ticker: string;
@@ -225,9 +225,11 @@ export default function TickerLogo({
   }, [tier, ticker, size]);
 
   const surface =
-    variant === "subtle"
-      ? "bg-slate-800 text-slate-300 group-hover:bg-blue-600 group-hover:text-white"
-      : "bg-slate-800 text-slate-200 group-hover:bg-blue-600 group-hover:text-white";
+    variant === "bare"
+      ? "bg-transparent text-slate-200"
+      : variant === "subtle"
+        ? "bg-slate-800 text-slate-300 group-hover:bg-blue-600 group-hover:text-white"
+        : "bg-slate-800 text-slate-200 group-hover:bg-blue-600 group-hover:text-white";
 
   // Sector glyph uses the sector's tinted background; fall back to slate if
   // the profile sector didn't match our map (shouldn't happen given the
@@ -254,7 +256,7 @@ export default function TickerLogo({
         box,
         text,
         rounded,
-        showSectorGlyph ? sectorSurface : surface,
+        variant === "bare" ? "bg-transparent" : showSectorGlyph ? sectorSurface : surface,
         className,
       )}
       role="img"

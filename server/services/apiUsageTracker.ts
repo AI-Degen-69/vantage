@@ -22,13 +22,13 @@
  * Lifecycle:
  *   • Module init eagerly hydrates today's buckets for all three
  *     providers in parallel. Returns a stored `hydrationPromise` so
- *     tests / the `/api/provider-usage` route can `await` a clean
+ *     tests can `await` a clean
  *     state boundary.
  *   • `recordCall(provider)` / `recordRateLimit(provider)` mutate the
  *     in-process mirror synchronously (so subsequent reads within the
  *     same lambda see the value immediately) and schedule a
  *     fire-and-forget KV write.
- *   • `getProviderUsage(now)` is async and awaits hydration.
+ *   • Usage snapshots are async and await hydration for tests/diagnostics.
  *
  * Free-tier budgets (per docs/data-providers.md):
  *   - FMP           250 calls / 24 h (documented)

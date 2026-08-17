@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useI18n } from "@/lib/i18n";
 import { Info } from "lucide-react";
-import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, ReferenceLine } from "recharts";
 
 interface DCFWidgetProps {
   currentPrice: number;
@@ -146,6 +146,13 @@ export default function DCFWidget({ currentPrice = 150.0 }: DCFWidgetProps) {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+              <ReferenceLine
+                y={0}
+                stroke="#e2e8f0"
+                strokeOpacity={0.85}
+                strokeWidth={2}
+                ifOverflow="extendDomain"
+              />
               <XAxis dataKey="year" tick={{ fill: "#64748b", fontSize: 12 }} tickLine={false} axisLine={false} />
               <YAxis yAxisId="left" tick={{ fill: "#64748b", fontSize: 12 }} tickLine={false} axisLine={false} tickFormatter={(v) => `$${v}`} />
               <Tooltip 

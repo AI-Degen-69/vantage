@@ -59,6 +59,79 @@ export function HeaderPriceSkeleton() {
 }
 
 /**
+ * Skeleton for the "Analyst Outlook & Range" card on Index.tsx.
+ *
+ * Mirrors the loaded card's footprint (header row with badge, 52-week range
+ * block, 2x2 stat grid) so the card frame and height stay stable while
+ * quote/analyst data loads — no layout jump at first paint.
+ */
+export function AnalystCardSkeleton() {
+  return (
+    <div aria-hidden="true">
+      {/* Header row: title + badge */}
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-2 w-2 rounded-full" />
+          <Skeleton className="h-3 w-36" />
+        </div>
+        <Skeleton className="h-5 w-24" rounded="rounded" />
+      </div>
+
+      {/* 52-week range block */}
+      <div className="mb-4 p-3.5 rounded-lg bg-muted/30 border border-border/40 space-y-3">
+        <div className="flex items-center justify-between gap-4">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="h-4 w-28" />
+        </div>
+        <Skeleton className="h-2.5 w-full rounded-full" />
+        <Skeleton className="h-3 w-16 mx-auto" />
+      </div>
+
+      {/* 2x2 stat grid */}
+      <div className="grid grid-cols-2 gap-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={`analyst-skel-${i}`}
+            className="p-3 rounded-lg bg-muted/20 border border-border/30 space-y-1.5"
+          >
+            <Skeleton className="h-2.5 w-20" />
+            <Skeleton className="h-4 w-16" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Skeleton for the "Quality in Brief" news list on Index.tsx.
+ *
+ * Mirrors three news-item rows (two-line title + publisher/date meta) so the
+ * card's list area holds its height while news data loads. The card's real
+ * header stays mounted outside this component, so only the list swaps.
+ */
+export function NewsCardSkeleton() {
+  return (
+    <div className="flex flex-col gap-3.5" aria-hidden="true">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div
+          key={`news-skel-${i}`}
+          className="flex flex-col gap-1.5 p-2.5 rounded-lg"
+        >
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
+          <div className="flex items-center gap-2 pt-0.5">
+            <Skeleton className="h-4 w-16" rounded="rounded" />
+            <span className="text-xs text-muted-foreground">•</span>
+            <Skeleton className="h-3 w-16" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
  * Renders a section card placeholder with a configurable content block height.
  *
  * @param height - The height of the card's main placeholder block in pixels.

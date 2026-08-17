@@ -16,7 +16,6 @@ import type {
   InsiderTransaction,
   NewsItem,
   ProviderHealthResponse,
-  ProviderUsageResponse,
   SmaDistanceResponse,
   SectorHeatmapMetadata,
   SectorHeatmapResponse,
@@ -27,6 +26,7 @@ import type {
 import type { QuickStat } from "@/lib/mockData";
 import { serializeSectorMeta } from "@shared/sectorMeta";
 import type { CompanyProfile as ApiCompanyProfile } from "@shared/api";
+import { chunkSymbols } from "@/lib/batchQuotes";
 
 interface IndexQuotesResponse {
   dow: IndexQuote | null;
@@ -74,8 +74,32 @@ export function useBatchQuotes(tickers: string[]) {
   const key = sortedTickers.join(",");
   return useQuery({
     queryKey: ["batchQuotes", key],
-    queryFn: () =>
-      fetchJSON<BatchQuoteResponse>(`/api/stock-batch-quotes?symbols=${encodeURIComponent(sortedTickers.join(","))}`),
+    queryFn: async () => {
+      // The route caps each request at 50 symbols. Insights can combine
+      // several universes, so split rather than turning the entire quote
+      // request into one 400 and leaving every card blank.
+      const batches = chunkSymbols(sortedTickers);
+      const responses = await Promise.allSettled(
+        batches.map((batch) =>
+          fetchJSON<BatchQuoteResponse>(
+            `/api/stock-batch-quotes?symbols=${encodeURIComponent(batch.join(","))}`,
+          ),
+        ),
+      );
+      const successful = responses.filter(
+        (response): response is PromiseFulfilledResult<BatchQuoteResponse> =>
+          response.status === "fulfilled",
+      );
+      if (successful.length === 0) {
+        const firstFailure = responses.find(
+          (response): response is PromiseRejectedResult => response.status === "rejected",
+        );
+        throw firstFailure?.reason ?? new Error("All quote batches failed");
+      }
+      return {
+        quotes: successful.flatMap((response) => response.value.quotes),
+      } satisfies BatchQuoteResponse;
+    },
     enabled: tickers.length > 0,
     refetchInterval: 60_000,
   });
@@ -239,30 +263,6 @@ export function useFmpBatchQuoteRestricted() {
 }
 
 /**
- * Live rolling-window per-provider API usage for the footer pills.
- *
- * The server keeps a process-singleton tracker that increments on every
- * upstream call (`fmp.ts`, wrapped `yahooFinance`, AV probes, etc.) and
- * reports back the `used` count + a `secondsToReset` horizon. The footer
- * renders a progress bar per provider; ResetsAt is reset to zero once
- * the oldest in-window call drops off.
- *
- * - `staleTime: 5_000` keeps the footer reactive to incoming calls
- *   without hammering the API — every 5s the bar nudges.
- * - `refetchInterval: 15_000` re-polls on a slow cadence, so a stale
- *   burst of upstream calls shows up within ~15s instead of after the
- *   next navigation.
- */
-export function useProviderUsage() {
-  return useQuery({
-    queryKey: ["providerUsage"],
-    queryFn: () => fetchJSON<ProviderUsageResponse>(`/api/provider-usage`),
-    staleTime: 5_000,
-    refetchInterval: 15_000,
-  });
-}
-
-/**
  * Retrieves exchange rates for the requested currencies.
  *
  * @param currencies - The currencies to include in the exchange-rate response.
@@ -413,6 +413,18 @@ export function useStockNews(ticker: string) {
  * @param to - The end date of the range
  * @returns The query result containing the earnings events
  */
+export function useTickerEarningsCalendar(ticker: string, from: string, to: string) {
+  return useQuery({
+    queryKey: ["tickerEarningsCalendar", ticker, from, to],
+    queryFn: async () => {
+      const events = await fetchJSON<EarningsEvent[]>(`/api/earnings-calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+      return events.filter((event) => event.symbol.toUpperCase() === ticker.toUpperCase());
+    },
+    enabled: !!ticker && !!from && !!to,
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useEarningsCalendar(from: string, to: string) {
   return useQuery({
     queryKey: ["earningsCalendar", from, to],

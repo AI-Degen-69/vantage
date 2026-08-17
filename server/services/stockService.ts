@@ -1,6 +1,6 @@
-import yahooFinanceDefault from 'yahoo-finance2';
-import { apiUsageTracker, __test__ as usageTestSeam, getProviderUsage as _getProviderUsage } from './apiUsageTracker';
-import NodeCache from 'node-cache';
+import yahooFinanceDefault from "yahoo-finance2";
+import { apiUsageTracker, __test__ as usageTestSeam } from "./apiUsageTracker";
+import NodeCache from "node-cache";
 import {
   AnalystTrendPoint,
   AnalystTrends,
@@ -32,13 +32,16 @@ import {
   StockMetrics,
   StockQuote,
   YahooFallbackFinancials,
-} from '../../shared/api';
-import { insightsTabUniverses } from './insightsUniverses';
+} from "../../shared/api";
+import { insightsTabUniverses } from "./insightsUniverses";
 // Relative path (not `@shared/...`) so the helper resolves cleanly under Vite's
 // config-file resolver, which doesn't apply its own `resolve.alias` map when
 // bundling vite.config.ts at startup. The TS path alias still works — this is
 // purely a runtime resolution concern at config-load time.
-import { aggregateSectorHeatmap, type SectorHeatmapInputRow } from '../../shared/aggregateSectorHeatmap';
+import {
+  aggregateSectorHeatmap,
+  type SectorHeatmapInputRow,
+} from "../../shared/aggregateSectorHeatmap";
 import {
   buildFmpBatchUrl,
   buildHeatmapRows,
@@ -47,14 +50,22 @@ import {
   createInFlightRegistry,
   orderByRequestedSymbols,
   resolveOrderedBatch,
-} from './marketDataReliability';
-import { normalizeSectorMeta } from '../../shared/sectorMeta';
-import { providerStatusFromProbe } from '../../shared/providerHealth';
+} from "./marketDataReliability";
+import { normalizeSectorMeta } from "../../shared/sectorMeta";
+import { providerStatusFromProbe } from "../../shared/providerHealth";
+import {
+  classifyTransaction,
+  parseTransactionPrice,
+  resolveTransactionValue,
+} from "./insiderUtils";
+import { mergeFinancialStatements } from "./financialStatementFallback";
 
 // yahoo-finance2 v4 ships the class as its default export. Use one shared
 // instance per process; constructing it "throwaway" per call degrades
 // Yahoo's rate-limit grace and triggers the survey notice on every fetch.
-const yahooFinanceInner = new yahooFinanceDefault({ suppressNotices: ['yahooSurvey'] });
+const yahooFinanceInner = new yahooFinanceDefault({
+  suppressNotices: ["yahooSurvey"],
+});
 // Wrap each method in a Proxy that records one call per top-level
 // invocation in apiUsageTracker. Every fetchYahooQuote / yahooFinance.quoteSummary
 // / yahooFinance.chart / yahooFinance.search call auto-counts without
@@ -63,9 +74,9 @@ const yahooFinanceInner = new yahooFinanceDefault({ suppressNotices: ['yahooSurv
 const yahooFinance: typeof yahooFinanceInner = new Proxy(yahooFinanceInner, {
   get(target, prop: string | symbol) {
     const value = (target as unknown as Record<string | symbol, unknown>)[prop];
-    if (typeof value === 'function') {
+    if (typeof value === "function") {
       return (...args: unknown[]) => {
-        apiUsageTracker.recordCall('yahoo');
+        apiUsageTracker.recordCall("yahoo");
         return (value as (...a: unknown[]) => unknown).apply(target, args);
       };
     }
@@ -131,8 +142,8 @@ function throttledWarn(key: string, ...args: unknown[]): void {
 }
 
 // ---- Key/env --------------------------------------------------------------
-const FMP_KEY = process.env.FMP_KEY || '';
-const AV_KEY = process.env.AV_KEY || '';
+const FMP_KEY = process.env.FMP_KEY || "";
+const AV_KEY = process.env.AV_KEY || "";
 
 /**
  * FMP deprecated the legacy /api/v3/ endpoints for all but pre-Aug-2025
@@ -140,11 +151,15 @@ const AV_KEY = process.env.AV_KEY || '';
  * and allow opting back into the legacy v3 shapes with FMP_USE_STABLE=0
  * (e.g. for grandfather-licensed keys).
  */
-const FMP_USE_STABLE = process.env.FMP_USE_STABLE !== '0';
-const FMP_BASE = FMP_USE_STABLE ? 'https://financialmodelingprep.com/stable' : 'https://financialmodelingprep.com/api/v3';
+const FMP_USE_STABLE = process.env.FMP_USE_STABLE !== "0";
+const FMP_BASE = FMP_USE_STABLE
+  ? "https://financialmodelingprep.com/stable"
+  : "https://financialmodelingprep.com/api/v3";
 
 /** Earnings-calendar endpoint name — `/stable/` uses `earnings-calendar` (plural, hyphen); legacy v3 still accepts `earning_calendar` (singular, underscore). Hoisted alongside `FMP_BASE` so both shape decisions read the same env var at module init. */
-const EARNINGS_ENDPOINT = FMP_USE_STABLE ? 'earnings-calendar' : 'earning_calendar';
+const EARNINGS_ENDPOINT = FMP_USE_STABLE
+  ? "earnings-calendar"
+  : "earning_calendar";
 
 /**
  * Chart endpoint — `/stable/` exposes EOD bars via `historical-price-eod/full`
@@ -154,7 +169,9 @@ const EARNINGS_ENDPOINT = FMP_USE_STABLE ? 'earnings-calendar' : 'earning_calend
  * chart UI sees real OHLC bar geometry; Yahoo historical remains the
  * always-on fallback.
  */
-const CHART_ENDPOINT = FMP_USE_STABLE ? 'historical-price-eod/full' : 'historical-price-full';
+const CHART_ENDPOINT = FMP_USE_STABLE
+  ? "historical-price-eod/full"
+  : "historical-price-full";
 
 /**
  * Quote endpoint — `/stable/` requires the query-param shape `?symbol=...`;
@@ -170,7 +187,7 @@ const QUOTE_USE_QUERY_PARAM = FMP_USE_STABLE;
  * @returns `true` if an FMP API key is available, `false` otherwise.
  */
 function hasFmp(): boolean {
-  return typeof FMP_KEY === 'string' && FMP_KEY.length > 0;
+  return typeof FMP_KEY === "string" && FMP_KEY.length > 0;
 }
 
 /**
@@ -186,25 +203,38 @@ function hasFmp(): boolean {
  * @param timeoutMs - Maximum request duration in milliseconds
  * @returns The parsed response data, or `null` when the request fails
  */
-export async function fetchJSON<T = any>(url: string, label: string, timeoutMs = 12000): Promise<T | null> {
+export async function fetchJSON<T = any>(
+  url: string,
+  label: string,
+  timeoutMs = 12000,
+): Promise<T | null> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetch(url, { signal: ctrl.signal });
     if (!res.ok) {
       // 404 / 403 from FMP shows up here — caller decides what to do.
-      throttledWarn(`fetcher:${label}:http`, `[stockService] ${label} failed: http_${res.status}`);
+      throttledWarn(
+        `fetcher:${label}:http`,
+        `[stockService] ${label} failed: http_${res.status}`,
+      );
       return null;
     }
     try {
       return (await res.json()) as T;
     } catch {
-      throttledWarn(`fetcher:${label}:json`, `[stockService] ${label} failed: invalid_json`);
+      throttledWarn(
+        `fetcher:${label}:json`,
+        `[stockService] ${label} failed: invalid_json`,
+      );
       return null;
     }
   } catch (e: any) {
-    const kind = e?.name === 'AbortError' ? 'timeout' : 'network_error';
-    throttledWarn(`fetcher:${label}:${kind}`, `[stockService] ${label} failed: ${kind}`);
+    const kind = e?.name === "AbortError" ? "timeout" : "network_error";
+    throttledWarn(
+      `fetcher:${label}:${kind}`,
+      `[stockService] ${label} failed: ${kind}`,
+    );
     return null;
   } finally {
     clearTimeout(timer);
@@ -218,8 +248,14 @@ export async function fetchJSON<T = any>(url: string, label: string, timeoutMs =
  * @param params - Additional query parameters
  * @returns The complete FMP API URL
  */
-function fmpUrl(endpoint: string, params: Record<string, string | number> = {}): string {
-  const qs = new URLSearchParams({ apikey: FMP_KEY, ...params as any }).toString();
+function fmpUrl(
+  endpoint: string,
+  params: Record<string, string | number> = {},
+): string {
+  const qs = new URLSearchParams({
+    apikey: FMP_KEY,
+    ...(params as any),
+  }).toString();
   return `${FMP_BASE}/${endpoint}?${qs}`;
 }
 
@@ -231,12 +267,23 @@ function fmpUrl(endpoint: string, params: Record<string, string | number> = {}):
  * @param extra - Additional query parameters
  * @returns The complete FMP request URL
  */
-function tickerUrl(name: string, symbol: string, extra: Record<string, string | number | boolean> = {}): string {
+function tickerUrl(
+  name: string,
+  symbol: string,
+  extra: Record<string, string | number | boolean> = {},
+): string {
   if (QUOTE_USE_QUERY_PARAM) {
-    const qs = new URLSearchParams({ apikey: FMP_KEY, symbol, ...extra as any }).toString();
+    const qs = new URLSearchParams({
+      apikey: FMP_KEY,
+      symbol,
+      ...(extra as any),
+    }).toString();
     return `${FMP_BASE}/${name}?${qs}`;
   }
-  const qs = new URLSearchParams({ apikey: FMP_KEY, ...extra as any }).toString();
+  const qs = new URLSearchParams({
+    apikey: FMP_KEY,
+    ...(extra as any),
+  }).toString();
   return `${FMP_BASE}/${name}/${symbol}?${qs}`;
 }
 
@@ -251,24 +298,26 @@ function tickerUrl(name: string, symbol: string, extra: Record<string, string | 
 function detectUpstreamError(bodyText: string): string | null {
   try {
     const parsed = JSON.parse(bodyText);
-    if (!parsed || typeof parsed !== 'object') return null;
+    if (!parsed || typeof parsed !== "object") return null;
     const msg =
-      parsed['Error Message'] ??
+      parsed["Error Message"] ??
       parsed.Note ??
       parsed.Information ??
       parsed.error ??
       parsed.message ??
       null;
-    return typeof msg === 'string' && msg.length > 0 ? msg : null;
+    return typeof msg === "string" && msg.length > 0 ? msg : null;
   } catch {
     return null;
   }
 }
 
 /** Probe a URL with a bounded timeout; null on network error/timeout. */
-async function probeUrlStatus(
-  url: string,
-): Promise<{ status: number; latencyMs: number; errorMessage: string | null } | null> {
+async function probeUrlStatus(url: string): Promise<{
+  status: number;
+  latencyMs: number;
+  errorMessage: string | null;
+} | null> {
   const started = Date.now();
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), PROVIDER_HEALTH_TIMEOUT_MS);
@@ -290,7 +339,7 @@ async function probeUrlStatus(
 /** Race a promise against a timeout, clearing the timer when it settles first. */
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('timeout')), ms);
+    const timer = setTimeout(() => reject(new Error("timeout")), ms);
     promise.then(
       (value) => {
         clearTimeout(timer);
@@ -307,89 +356,131 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 // ---- Normalizers ----------------------------------------------------------
 /** Convert an FMP profile object (camelCase OR PascalCase) to our shared shape. */
 function normalizeProfile(raw: any): CompanyProfile {
-  if (!raw || typeof raw !== 'object') {
+  if (!raw || typeof raw !== "object") {
     return {
-      symbol: '', companyName: '', description: '', sector: '', industry: '',
-      ceo: '', fullTimeEmployees: null, beta: null, peRatio: null,
+      symbol: "",
+      companyName: "",
+      description: "",
+      sector: "",
+      industry: "",
+      ceo: "",
+      fullTimeEmployees: null,
+      beta: null,
+      peRatio: null,
     };
   }
   const pick = (...keys: string[]) => {
     for (const k of keys) {
-      if (raw[k] !== undefined && raw[k] !== null && raw[k] !== '') return raw[k];
+      if (raw[k] !== undefined && raw[k] !== null && raw[k] !== "")
+        return raw[k];
     }
     return undefined;
   };
   const toNum = (v: unknown): number | null => {
-    if (v === undefined || v === null || v === '') return null;
-    const n = typeof v === 'string' ? Number(v) : (v as number);
+    if (v === undefined || v === null || v === "") return null;
+    const n = typeof v === "string" ? Number(v) : (v as number);
     return Number.isFinite(n) ? n : null;
   };
   const toBool = (v: unknown): boolean | undefined => {
     if (v === undefined || v === null) return undefined;
-    if (typeof v === 'boolean') return v;
-    if (typeof v === 'string') {
+    if (typeof v === "boolean") return v;
+    if (typeof v === "string") {
       const s = v.toLowerCase();
-      if (s === 'true') return true;
-      if (s === 'false') return false;
+      if (s === "true") return true;
+      if (s === "false") return false;
     }
     return undefined;
   };
 
-  const employeesRaw = pick('fullTimeEmployees', 'FullTimeEmployees');
+  const employeesRaw = pick("fullTimeEmployees", "FullTimeEmployees");
   return {
-    symbol: String(pick('symbol', 'Symbol') ?? ''),
-    companyName: String(pick('companyName', 'CompanyName') ?? ''),
-    description: String(pick('description', 'Description') ?? ''),
-    sector: String(pick('sector', 'Sector') ?? ''),
-    industry: String(pick('industry', 'Industry') ?? ''),
-    ceo: String(pick('ceo', 'CEO') ?? ''),
-    website: pick('website', 'Website'),
-    country: pick('country', 'Country'),
-    state: pick('state', 'State'),
-    city: pick('city', 'City'),
-    address: pick('address', 'Address'),
-    phone: pick('phone', 'Phone'),
+    symbol: String(pick("symbol", "Symbol") ?? ""),
+    companyName: String(pick("companyName", "CompanyName") ?? ""),
+    description: String(pick("description", "Description") ?? ""),
+    sector: String(pick("sector", "Sector") ?? ""),
+    industry: String(pick("industry", "Industry") ?? ""),
+    ceo: String(pick("ceo", "CEO") ?? ""),
+    website: pick("website", "Website"),
+    country: pick("country", "Country"),
+    state: pick("state", "State"),
+    city: pick("city", "City"),
+    address: pick("address", "Address"),
+    phone: pick("phone", "Phone"),
     fullTimeEmployees: employeesRaw ? toNum(employeesRaw) : null,
-    beta: toNum(pick('beta', 'Beta')),
-    peRatio: toNum(pick('peRatio', 'PERatio', 'pe')),
-    marketCap: toNum(pick('marketCap', 'mktCap', 'MarketCap')),
-    price: toNum(pick('price', 'Price')),
-    exchange: pick('exchange', 'Exchange'),
-    exchangeFullName: pick('exchangeFullName', 'ExchangeFullName'),
-    currency: pick('currency', 'Currency'),
-    ipoDate: pick('ipoDate', 'IpoDate'),
-    image: pick('image', 'Image'),
+    beta: toNum(pick("beta", "Beta")),
+    peRatio: toNum(pick("peRatio", "PERatio", "pe")),
+    marketCap: toNum(pick("marketCap", "mktCap", "MarketCap")),
+    price: toNum(pick("price", "Price")),
+    exchange: pick("exchange", "Exchange"),
+    exchangeFullName: pick("exchangeFullName", "ExchangeFullName"),
+    currency: pick("currency", "Currency"),
+    ipoDate: pick("ipoDate", "IpoDate"),
+    image: pick("image", "Image"),
     /* ---- /stable/-only identity fields (always optional; absent on legacy v3) ---- */
-    cik: pick('cik'),
-    isin: pick('isin'),
-    cusip: pick('cusip'),
-    lastDividend: toNum(pick('lastDividend', 'LastDividend')) ?? undefined,
-    isEtf: toBool(pick('isEtf', 'IsEtf')),
-    isFund: toBool(pick('isFund', 'IsFund')),
-    isAdr: toBool(pick('isAdr', 'IsAdr')),
-    isActivelyTrading: toBool(pick('isActivelyTrading', 'IsActivelyTrading')),
-    defaultImage: toBool(pick('defaultImage', 'DefaultImage')),
+    cik: pick("cik"),
+    isin: pick("isin"),
+    cusip: pick("cusip"),
+    lastDividend: toNum(pick("lastDividend", "LastDividend")) ?? undefined,
+    isEtf: toBool(pick("isEtf", "IsEtf")),
+    isFund: toBool(pick("isFund", "IsFund")),
+    isAdr: toBool(pick("isAdr", "IsAdr")),
+    isActivelyTrading: toBool(pick("isActivelyTrading", "IsActivelyTrading")),
+    defaultImage: toBool(pick("defaultImage", "DefaultImage")),
   };
 }
 
+export function normalizeYahooPercentage(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return undefined;
+  return Math.abs(n) <= 1 ? n * 100 : n;
+}
+
+function normalizeDividendYield(
+  rawYield: unknown,
+  dividendRate: unknown,
+  price: unknown,
+): number | undefined {
+  const direct = Number(rawYield);
+  const rate = Number(dividendRate);
+  const currentPrice = Number(price);
+  if (
+    Number.isFinite(rate) &&
+    rate >= 0 &&
+    Number.isFinite(currentPrice) &&
+    currentPrice > 0
+  ) {
+    const derived = (rate / currentPrice) * 100;
+    // A declared rate and current price are auditable; prefer them over
+    // Yahoo's version-dependent dividendYield field.
+    return derived <= 20 ? derived : undefined;
+  }
+  if (!Number.isFinite(direct) || direct < 0 || direct > 20) return undefined;
+  // QuoteSummary's decimal form (0.0004 = 0.04%) is normalized here too.
+  return direct <= 1 ? direct * 100 : direct;
+}
+
 function normalizeQuote(raw: any): StockQuote | null {
-  if (!raw || typeof raw !== 'object') return null;
+  if (!raw || typeof raw !== "object") return null;
   const toNum = (v: unknown): number | undefined => {
-    if (v === undefined || v === null || v === '') return undefined;
-    const n = typeof v === 'string' ? Number(v) : (v as number);
+    if (v === undefined || v === null || v === "") return undefined;
+    const n = typeof v === "string" ? Number(v) : (v as number);
     return Number.isFinite(n) ? n : undefined;
   };
   const price = toNum(raw.price);
   if (price === undefined || price <= 0) return null;
   return {
-    symbol: String(raw.symbol ?? ''),
+    symbol: String(raw.symbol ?? ""),
     name: raw.name ?? raw.companyName,
     price,
     change: toNum(raw.change) ?? 0,
     // /stable/ returns `changePercentage` (no 's'); legacy v3 returns
     // `changesPercentage`; very-legacy returns `changePercent`. Maintain
     // backward compatibility without breaking the /stable/ upgrade.
-    changesPercentage: toNum(raw.changesPercentage ?? raw.changePercentage ?? raw.changePercent) ?? 0,
+    changesPercentage:
+      toNum(
+        raw.changesPercentage ?? raw.changePercentage ?? raw.changePercent,
+      ) ?? 0,
     previousClose: toNum(raw.previousClose),
     dayLow: toNum(raw.dayLow),
     dayHigh: toNum(raw.dayHigh),
@@ -405,8 +496,13 @@ function normalizeQuote(raw: any): StockQuote | null {
     eps: toNum(raw.eps),
     pe: toNum(raw.pe),
     earningsAnnouncement: raw.earningsAnnouncement ?? null,
-    dividendYield: toNum(raw.dividendYield),
-    payoutRatio: toNum(raw.payoutRatio),
+    dividendRate: toNum(raw.dividendRate),
+    dividendYield: normalizeDividendYield(
+      raw.dividendYield,
+      raw.dividendRate,
+      price,
+    ),
+    payoutRatio: normalizeYahooPercentage(raw.payoutRatio),
   };
 }
 
@@ -421,13 +517,13 @@ function normalizeIncomeRow(raw: any): IncomeStatementRow {
   // /stable/ statements expose `fiscalYear` (e.g. 2025), not `calendarYear`.
   // The shared row type and client charts key off `calendarYear`, so prefer
   // it but fall back to `fiscalYear` so the restored free-tier data renders.
-  const year = raw.calendarYear ?? raw.fiscalYear ?? '';
+  const year = raw.calendarYear ?? raw.fiscalYear ?? "";
   return {
-    date: String(raw.date ?? ''),
-    symbol: String(raw.symbol ?? ''),
-    reportedCurrency: String(raw.reportedCurrency ?? 'USD'),
+    date: String(raw.date ?? ""),
+    symbol: String(raw.symbol ?? ""),
+    reportedCurrency: String(raw.reportedCurrency ?? "USD"),
     calendarYear: String(year),
-    period: String(raw.period ?? ''),
+    period: String(raw.period ?? ""),
     revenue: toNum(raw.revenue) ?? 0,
     costOfRevenue: toNum(raw.costOfRevenue),
     grossProfit: toNum(raw.grossProfit) ?? 0,
@@ -448,13 +544,13 @@ function normalizeIncomeRow(raw: any): IncomeStatementRow {
  */
 function normalizeBalanceRow(raw: any): BalanceSheetRow {
   const toNum = (v: any) => (v === undefined ? undefined : Number(v));
-  const year = raw.calendarYear ?? raw.fiscalYear ?? '';
+  const year = raw.calendarYear ?? raw.fiscalYear ?? "";
   return {
-    date: String(raw.date ?? ''),
-    symbol: String(raw.symbol ?? ''),
-    reportedCurrency: String(raw.reportedCurrency ?? 'USD'),
+    date: String(raw.date ?? ""),
+    symbol: String(raw.symbol ?? ""),
+    reportedCurrency: String(raw.reportedCurrency ?? "USD"),
     calendarYear: String(year),
-    period: String(raw.period ?? ''),
+    period: String(raw.period ?? ""),
     totalAssets: toNum(raw.totalAssets) ?? 0,
     totalLiabilities: toNum(raw.totalLiabilities),
     totalEquity: toNum(raw.totalEquity),
@@ -472,13 +568,13 @@ function normalizeBalanceRow(raw: any): BalanceSheetRow {
  */
 function normalizeCashRow(raw: any): CashFlowRow {
   const toNum = (v: any) => (v === undefined ? undefined : Number(v));
-  const year = raw.calendarYear ?? raw.fiscalYear ?? '';
+  const year = raw.calendarYear ?? raw.fiscalYear ?? "";
   return {
-    date: String(raw.date ?? ''),
-    symbol: String(raw.symbol ?? ''),
-    reportedCurrency: String(raw.reportedCurrency ?? 'USD'),
+    date: String(raw.date ?? ""),
+    symbol: String(raw.symbol ?? ""),
+    reportedCurrency: String(raw.reportedCurrency ?? "USD"),
     calendarYear: String(year),
-    period: String(raw.period ?? ''),
+    period: String(raw.period ?? ""),
     operatingCashFlow: toNum(raw.operatingCashFlow) ?? 0,
     capitalExpenditure: toNum(raw.capitalExpenditure),
     freeCashFlow: toNum(raw.freeCashFlow) ?? 0,
@@ -495,19 +591,19 @@ function normalizeCashRow(raw: any): CashFlowRow {
  */
 function normalizeEarningEvent(raw: any): EarningsEvent {
   const toNum = (v: any): number | null => {
-    if (v === undefined || v === null || v === '') return null;
+    if (v === undefined || v === null || v === "") return null;
     const n = Number(v);
     return Number.isFinite(n) ? n : null;
   };
   return {
-    symbol: String(raw.symbol ?? ''),
-    date: String(raw.date ?? ''),
+    symbol: String(raw.symbol ?? ""),
+    date: String(raw.date ?? ""),
     marketCap: toNum(raw.marketCap ?? raw.mktCap),
     epsEstimated: toNum(raw.epsEstimated ?? raw.epsEstimate),
     eps: toNum(raw.eps),
     revenueEstimated: toNum(raw.revenueEstimated ?? raw.revenueEstimate),
     revenue: toNum(raw.revenue),
-    time: String(raw.time ?? 'bmo'),
+    time: String(raw.time ?? "bmo"),
   };
 }
 
@@ -523,11 +619,13 @@ function normalizeNewsItem(raw: any): NewsItem {
   const c = raw.content ?? raw;
   const t = c.providerPublishTime ?? c.pubDate ?? raw.providerPublishTime;
   return {
-    title: String(c.title ?? c.headline ?? raw.title ?? ''),
-    publisher: String(c.providerName ?? c.publisher ?? raw.publisher ?? 'News'),
-    providerPublishTime: typeof t === 'number' ? t : Math.floor(Date.now() / 1000),
-    link: String(c.clickUrl ?? c.url ?? c.link ?? raw.link ?? '#'),
-    thumbnail: c.thumbnail?.resolutions?.[0]?.url ?? c.thumbnail ?? raw.thumbnail,
+    title: String(c.title ?? c.headline ?? raw.title ?? ""),
+    publisher: String(c.providerName ?? c.publisher ?? raw.publisher ?? "News"),
+    providerPublishTime:
+      typeof t === "number" ? t : Math.floor(Date.now() / 1000),
+    link: String(c.clickUrl ?? c.url ?? c.link ?? raw.link ?? "#"),
+    thumbnail:
+      c.thumbnail?.resolutions?.[0]?.url ?? c.thumbnail ?? raw.thumbnail,
     type: c.type ?? raw.type,
   };
 }
@@ -594,12 +692,14 @@ function toDateMs(value: unknown): number | null {
       if (Number.isFinite(ms) && ms >= INSIDER_DATE_MIN_MS) return ms;
     } else if (typeof raw === "string") {
       const parsed = Date.parse(raw);
-      if (Number.isFinite(parsed) && parsed >= INSIDER_DATE_MIN_MS) return parsed;
+      if (Number.isFinite(parsed) && parsed >= INSIDER_DATE_MIN_MS)
+        return parsed;
     }
     const fmt = obj.fmt;
     if (typeof fmt === "string") {
       const parsed = Date.parse(fmt);
-      if (Number.isFinite(parsed) && parsed >= INSIDER_DATE_MIN_MS) return parsed;
+      if (Number.isFinite(parsed) && parsed >= INSIDER_DATE_MIN_MS)
+        return parsed;
     }
   }
   return null;
@@ -612,8 +712,13 @@ function toDateMs(value: unknown): number | null {
  * @returns A normalized insider transaction with numeric shares, value, and price fields
  */
 function normalizeInsider(raw: any): InsiderTransaction {
-  const shares = toNumberLoose(raw.shares) ?? 0;
-  const value = toNumberLoose(raw.value) ?? 0;
+  const shares = Math.abs(toNumberLoose(raw.shares) ?? 0);
+  const parsedPrice = parseTransactionPrice(raw.transactionText ?? raw.type);
+  const resolvedValue = resolveTransactionValue(raw.value, shares, parsedPrice);
+  const transaction = classifyTransaction(
+    raw.transactionText ?? raw.type,
+    raw.transactionCode,
+  );
   // Date extraction is the high-risk one — Yahoo v4 returns startDate as a
   // native Date object OR an ISO string OR a {raw, fmt} object OR a plain
   // unix-second number. The legacy code only handled the `.raw` object
@@ -623,25 +728,29 @@ function normalizeInsider(raw: any): InsiderTransaction {
   // so UI text via `formatTradeDateLocale` reads as a real date.
   const startDate = toDateMs(raw.startDate);
   return {
-    filerName: String(raw.filerName ?? raw.name ?? 'Insider'),
-    filerRelation: typeof raw.filerRelation === 'string'
-      ? raw.filerRelation
-      : raw.filerRelation?.raw ?? undefined,
-    transactionText: String(raw.transactionText ?? raw.type ?? 'Transaction'),
+    filerName: String(raw.filerName ?? raw.name ?? "Insider"),
+    filerRelation:
+      typeof raw.filerRelation === "string"
+        ? raw.filerRelation
+        : (raw.filerRelation?.raw ?? undefined),
+    transactionText: String(raw.transactionText ?? raw.type ?? "Transaction"),
     // Pass through the per-transaction single-letter code so the UI can
     // branch on it (purchase / sale / award / gift / etc) and render the
     // right format. Optional here because some sessions omit it.
-    transactionCode: typeof raw.transactionCode === 'string'
-      ? raw.transactionCode.trim().toUpperCase() || null
-      : null,
+    transactionCode:
+      typeof raw.transactionCode === "string"
+        ? raw.transactionCode.trim().toUpperCase() || null
+        : null,
     startDate,
     shares,
-    value,
-    // `price` is `value / shares` when both fields exist; for non-cash rows
-    // (gifts, awards, tax-withholding) the result is a fiction — the UI
-    // ignores it and renders "—". We still ship the field so any cash-flow
-    // aggregation can do "Sum(value) across rows" without re-deriving.
-    price: shares > 0 && value > 0 ? value / shares : 0,
+    value: resolvedValue.value,
+    valueSource: resolvedValue.source,
+    price: parsedPrice?.exact ?? null,
+    priceLow: parsedPrice?.low ?? null,
+    priceHigh: parsedPrice?.high ?? null,
+    marketClosePrice: null,
+    category: transaction.category,
+    isAdministrative: transaction.isAdministrative,
   };
 }
 
@@ -653,7 +762,7 @@ function normalizeInsider(raw: any): InsiderTransaction {
  */
 function normalizeChartPoint(raw: any) {
   return {
-    date: String(raw.date ?? ''),
+    date: String(raw.date ?? ""),
     open: Number(raw.open ?? 0),
     high: Number(raw.high ?? 0),
     low: Number(raw.low ?? 0),
@@ -674,32 +783,75 @@ function normalizeChartPoint(raw: any) {
 async function fetchProfileWithAvailability(
   symbol: string,
 ): Promise<{ profile: CompanyProfile | null; unavailable: boolean }> {
-  if (!hasFmp()) return { profile: null, unavailable: true };
-
+  let yahooProfile: CompanyProfile | null = null;
   try {
+    // Yahoo is the stable identity fallback. FMP profile remains preferred
+    // when configured, but a free-tier FMP miss must not erase a valid name.
+    const yahoo = (await yahooFinance.quote(symbol).catch(() => null)) as any;
+    const yahooName = yahoo?.longName ?? yahoo?.shortName ?? yahoo?.displayName;
+    const yahooExchange = yahoo?.fullExchangeName ?? yahoo?.exchange;
+    yahooProfile = yahooName
+      ? {
+          symbol,
+          companyName: String(yahooName),
+          description: String(yahoo?.longBusinessSummary ?? ""),
+          sector: String(yahoo?.sector ?? ""),
+          industry: String(yahoo?.industry ?? ""),
+          ceo: "",
+          fullTimeEmployees: null,
+          beta: Number.isFinite(Number(yahoo?.beta))
+            ? Number(yahoo.beta)
+            : null,
+          peRatio: Number.isFinite(Number(yahoo?.trailingPE))
+            ? Number(yahoo.trailingPE)
+            : null,
+          marketCap: Number.isFinite(Number(yahoo?.marketCap))
+            ? Number(yahoo.marketCap)
+            : null,
+          price: Number.isFinite(Number(yahoo?.regularMarketPrice))
+            ? Number(yahoo.regularMarketPrice)
+            : null,
+          exchange: yahooExchange,
+          currency: yahoo?.currency,
+        }
+      : null;
+
+    if (!hasFmp())
+      return { profile: yahooProfile, unavailable: yahooProfile === null };
+
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 12_000);
     try {
-      const response = await fetch(tickerUrl('profile', symbol), { signal: ctrl.signal });
+      const response = await fetch(tickerUrl("profile", symbol), {
+        signal: ctrl.signal,
+      });
       if (!response.ok) {
-        throttledWarn(`profile/${symbol}`, `[stockService] profile/${symbol} HTTP ${response.status}`);
-        return { profile: null, unavailable: true };
+        throttledWarn(
+          `profile/${symbol}`,
+          `[stockService] profile/${symbol} HTTP ${response.status}`,
+        );
+        return { profile: yahooProfile, unavailable: yahooProfile === null };
       }
       const raw = (await response.json()) as any;
       const row = Array.isArray(raw) ? raw[0] : raw;
       const profile = row ? normalizeProfile(row) : null;
       const matchesRequestedSymbol =
         profile?.symbol.trim().toUpperCase() === symbol.toUpperCase();
+      const hasCompanyName = Boolean(profile?.companyName?.trim());
       return {
-        profile: matchesRequestedSymbol ? profile : null,
+        profile:
+          matchesRequestedSymbol && hasCompanyName ? profile : yahooProfile,
         unavailable: false,
       };
     } finally {
       clearTimeout(timer);
     }
   } catch (error: any) {
-    throttledWarn(`profile/${symbol}`, `[stockService] profile/${symbol} failed: ${error?.message ?? error}`);
-    return { profile: null, unavailable: true };
+    throttledWarn(
+      `profile/${symbol}`,
+      `[stockService] profile/${symbol} failed: ${error?.message ?? error}`,
+    );
+    return { profile: yahooProfile, unavailable: yahooProfile === null };
   }
 }
 
@@ -718,11 +870,13 @@ async function yahooChart(symbol: string): Promise<ChartSeries | null> {
       period2: new Date(),
       interval: "1d",
     });
-    const rows: any[] = Array.isArray(raw) ? raw : raw?.quotes ?? [];
+    const rows: any[] = Array.isArray(raw) ? raw : (raw?.quotes ?? []);
     if (rows.length === 0) return null;
     const historical = rows.map((r: any) => ({
       date: String(
-        r.date instanceof Date ? r.date.toISOString().slice(0, 10) : r.date ?? ""
+        r.date instanceof Date
+          ? r.date.toISOString().slice(0, 10)
+          : (r.date ?? ""),
       ),
       open: Number(r.open ?? 0),
       high: Number(r.high ?? 0),
@@ -738,7 +892,10 @@ async function yahooChart(symbol: string): Promise<ChartSeries | null> {
       historical,
     };
   } catch (e: any) {
-    throttledWarn(`yahoo_chart:${symbol}`, `[stockService] yahoo chart failed for ${symbol}: ${e?.message ?? e}`);
+    throttledWarn(
+      `yahoo_chart:${symbol}`,
+      `[stockService] yahoo chart failed for ${symbol}: ${e?.message ?? e}`,
+    );
     return null;
   }
 }
@@ -753,7 +910,8 @@ async function yahooQuote(symbol: string): Promise<StockQuote | null> {
     const q: any = await yahooFinance.quote(symbol);
     if (!q) return null;
     const toFinite = (value: unknown): number | undefined => {
-      if (value === null || value === undefined || value === "") return undefined;
+      if (value === null || value === undefined || value === "")
+        return undefined;
       const number = Number(value);
       return Number.isFinite(number) ? number : undefined;
     };
@@ -775,24 +933,38 @@ async function yahooQuote(symbol: string): Promise<StockQuote | null> {
       priceAvg200: toFinite(q.twoHundredDayAverage),
       marketCap: toFinite(q.marketCap),
       volume: toFinite(q.regularMarketVolume),
-      avgVolume: toFinite(q.averageDailyVolume10Day ?? q.averageDailyVolume3Month),
+      avgVolume: toFinite(
+        q.averageDailyVolume10Day ?? q.averageDailyVolume3Month,
+      ),
       exchange: q.exchange,
       sharesOutstanding: toFinite(q.sharesOutstanding),
       eps: toFinite(q.epsTrailingTwelveMonths),
       pe: toFinite(q.trailingPE),
       earningsAnnouncement: q.earningsTimestamp
         ? new Date(
-            typeof q.earningsTimestamp === "number" && q.earningsTimestamp < 1e12
+            typeof q.earningsTimestamp === "number" &&
+            q.earningsTimestamp < 1e12
               ? q.earningsTimestamp * 1000
-              : q.earningsTimestamp
+              : q.earningsTimestamp,
           ).toISOString()
         : null,
-      dividendYield: toFinite(q.dividendYield),
-      payoutRatio: toFinite(q.payoutRatio),
+      // Normalize Yahoo's mixed quote conventions into percentage points.
+      // Prefer dividendRate / price because it is auditable and prevents a
+      // decimal-vs-percent mismatch from displaying an impossible yield.
+      dividendRate: toFinite(q.dividendRate),
+      dividendYield: normalizeDividendYield(
+        q.dividendYield,
+        q.dividendRate,
+        price,
+      ),
+      payoutRatio: normalizeYahooPercentage(q.payoutRatio),
     };
   } catch (e: any) {
     // Yahoo v4 throws if the symbol is unknown — fall through to MOCK.
-    throttledWarn(`yahoo_quote:${symbol}`, `[stockService] yahoo quote failed for ${symbol}: ${e?.message ?? e}`);
+    throttledWarn(
+      `yahoo_quote:${symbol}`,
+      `[stockService] yahoo quote failed for ${symbol}: ${e?.message ?? e}`,
+    );
     return null;
   }
 }
@@ -819,7 +991,7 @@ export const stockService = {
       let result: StockQuote | null = await yahooQuote(normalizedSymbol);
       if (!result && hasFmp()) {
         const url = QUOTE_USE_QUERY_PARAM
-          ? fmpUrl('quote', { symbol: normalizedSymbol })
+          ? fmpUrl("quote", { symbol: normalizedSymbol })
           : fmpUrl(`quote/${normalizedSymbol}`);
         const raw = await fetchJSON<any>(url, `quote/${normalizedSymbol}`);
         if (raw) {
@@ -840,20 +1012,20 @@ export const stockService = {
       }
       if (!result && AV_KEY) {
         const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${normalizedSymbol}&apikey=${AV_KEY}`;
-        apiUsageTracker.recordCall('alphavantage');
+        apiUsageTracker.recordCall("alphavantage");
         const raw = await fetchJSON<any>(url, `av quote/${normalizedSymbol}`);
-        const g = raw?.['Global Quote'];
+        const g = raw?.["Global Quote"];
         if (g) {
           const toNum = (s: unknown) => {
-            const n = Number(String(s ?? '').replace(/[%,$]/g, ''));
+            const n = Number(String(s ?? "").replace(/[%,$]/g, ""));
             return Number.isFinite(n) ? n : undefined;
           };
           result = normalizeQuote({
-            symbol: g['01. symbol'] ?? normalizedSymbol,
-            price: toNum(g['05. price']),
-            change: toNum(g['09. change']),
-            changesPercentage: toNum(g['10. change percent']),
-            previousClose: toNum(g['08. previous close']),
+            symbol: g["01. symbol"] ?? normalizedSymbol,
+            price: toNum(g["05. price"]),
+            change: toNum(g["09. change"]),
+            changesPercentage: toNum(g["10. change percent"]),
+            previousClose: toNum(g["08. previous close"]),
           });
         }
       }
@@ -872,37 +1044,58 @@ export const stockService = {
     if (symbols.length === 0) return { quotes: [] };
     const requested = symbols.map((symbol) => symbol.trim().toUpperCase());
     const canonical = canonicalSymbols(requested);
-    const cacheKey = `batch_${canonical.join(',')}`;
+    const cacheKey = `batch_${canonical.join(",")}`;
     const cached = cache.get<BatchQuoteResponse>(cacheKey);
-    if (cached) return { quotes: orderByRequestedSymbols(requested, cached.quotes) };
+    if (cached)
+      return { quotes: orderByRequestedSymbols(requested, cached.quotes) };
 
-    const canonicalPayload = await batchQuoteInFlight.getOrCreate(cacheKey, async () => {
-      const existing = cache.get<BatchQuoteResponse>(cacheKey);
-      if (existing) return existing;
+    const canonicalPayload = await batchQuoteInFlight.getOrCreate(
+      cacheKey,
+      async () => {
+        const existing = cache.get<BatchQuoteResponse>(cacheKey);
+        if (existing) return existing;
 
-      const quotes = await resolveOrderedBatch<StockQuote>({
-        symbols: canonical,
-        concurrency: 8,
-        fetchBatch: async (batchSymbols) => {
-          if (!hasFmp()) return null;
-          const raw = await fetchJSON<any>(
-            buildFmpBatchUrl(FMP_BASE, FMP_KEY, batchSymbols, QUOTE_USE_QUERY_PARAM),
-            `batch quote: ${batchSymbols.length}`,
-            18000,
-          );
-          const rows = Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : null;
-          if (!rows) return null;
-          return rows.map(normalizeQuote).filter((quote): quote is StockQuote => quote !== null);
-        },
-        fetchSingle: (singleSymbol) => this.getQuote(singleSymbol),
-      });
-      const payload: BatchQuoteResponse = { quotes };
-      const hasLiveQuote = quotes.some(Boolean);
-      cache.set(cacheKey, payload, hasLiveQuote ? QUOTE_TTL : QUOTE_NEGATIVE_TTL);
-      return payload;
-    });
+        const quotes = await resolveOrderedBatch<StockQuote>({
+          symbols: canonical,
+          concurrency: 8,
+          fetchBatch: async (batchSymbols) => {
+            if (!hasFmp()) return null;
+            const raw = await fetchJSON<any>(
+              buildFmpBatchUrl(
+                FMP_BASE,
+                FMP_KEY,
+                batchSymbols,
+                QUOTE_USE_QUERY_PARAM,
+              ),
+              `batch quote: ${batchSymbols.length}`,
+              18000,
+            );
+            const rows = Array.isArray(raw)
+              ? raw
+              : Array.isArray(raw?.data)
+                ? raw.data
+                : null;
+            if (!rows) return null;
+            return rows
+              .map(normalizeQuote)
+              .filter((quote): quote is StockQuote => quote !== null);
+          },
+          fetchSingle: (singleSymbol) => this.getQuote(singleSymbol),
+        });
+        const payload: BatchQuoteResponse = { quotes };
+        const hasLiveQuote = quotes.some(Boolean);
+        cache.set(
+          cacheKey,
+          payload,
+          hasLiveQuote ? QUOTE_TTL : QUOTE_NEGATIVE_TTL,
+        );
+        return payload;
+      },
+    );
 
-    return { quotes: orderByRequestedSymbols(requested, canonicalPayload.quotes) };
+    return {
+      quotes: orderByRequestedSymbols(requested, canonicalPayload.quotes),
+    };
   },
 
   async getProfile(symbol: string): Promise<CompanyProfile | null> {
@@ -914,11 +1107,17 @@ export const stockService = {
   ): Promise<{ profile: CompanyProfile | null; unavailable: boolean }> {
     const normalizedSymbol = symbol.trim().toUpperCase();
     const cacheKey = `profile_${normalizedSymbol}`;
-    const cached = cache.get<{ profile: CompanyProfile | null; unavailable: boolean }>(cacheKey);
+    const cached = cache.get<{
+      profile: CompanyProfile | null;
+      unavailable: boolean;
+    }>(cacheKey);
     if (cached) return cached;
 
     return profileInFlight.getOrCreate(cacheKey, async () => {
-      const inFlightCached = cache.get<{ profile: CompanyProfile | null; unavailable: boolean }>(cacheKey);
+      const inFlightCached = cache.get<{
+        profile: CompanyProfile | null;
+        unavailable: boolean;
+      }>(cacheKey);
       if (inFlightCached) return inFlightCached;
       const result = await fetchProfileWithAvailability(normalizedSymbol);
       cache.set(cacheKey, result, result.profile ? 3600 : PROFILE_NEGATIVE_TTL);
@@ -930,19 +1129,30 @@ export const stockService = {
    * Fetch historical financial statements via Yahoo Finance fundamentalsTimeSeries.
    * Used as a fallback when FMP is unavailable or rate limited.
    */
-  async getYahooFinancialStatements(ticker: string, period: 'annual' | 'quarter' = 'annual', limit: number = 5): Promise<FinancialStatements> {
+  async getYahooFinancialStatements(
+    ticker: string,
+    period: "annual" | "quarter" = "annual",
+    limit: number = period === "quarter" ? 7 : 5,
+  ): Promise<FinancialStatements> {
     try {
-      const type = period === 'quarter' ? 'quarterly' : 'annual';
+      const type = period === "quarter" ? "quarterly" : "annual";
       const fallbackDate = new Date();
       // To get 20 quarters, we need at least 5 years. 6 years gives a safe buffer (24 quarters).
-      fallbackDate.setFullYear(fallbackDate.getFullYear() - 6); 
+      fallbackDate.setFullYear(fallbackDate.getFullYear() - 6);
       let res: any[] = await yahooFinance.fundamentalsTimeSeries(ticker, {
-        module: 'all',
+        module: "all",
         type,
         period1: fallbackDate.toISOString(),
       });
-      if (!res || res.length === 0) return { income: [], balance: [], cash: [] };
-      
+      if (!res || res.length === 0) {
+        return {
+          income: [],
+          balance: [],
+          cash: [],
+          sources: { income: null, balance: null, cash: null },
+        };
+      }
+
       // Yahoo returns chronological order. Slice to get the most recent `limit` items.
       if (res.length > limit) {
         res = res.slice(-limit);
@@ -950,15 +1160,44 @@ export const stockService = {
 
       // Normalize to our expected format
       const getPeriod = (r: any) => {
-        if (period === 'annual') return 'FY';
+        if (period === "annual") return "FY";
         const m = new Date(r.date).getMonth(); // 0-11
         return `Q${Math.ceil((m + 1) / 3)}`;
       };
 
-      const income = res.map((r: any) => ({
+      const hasFinite = (value: unknown): boolean => {
+        const n = Number(value);
+        return Number.isFinite(n);
+      };
+      const incomeRows = res.filter(
+        (r: any) =>
+          hasFinite(r.totalRevenue ?? r.revenue) ||
+          hasFinite(r.grossProfit) ||
+          hasFinite(r.netIncome) ||
+          hasFinite(r.basicEPS ?? r.dilutedEPS),
+      );
+      const balanceRows = res.filter(
+        (r: any) =>
+          hasFinite(r.totalAssets) ||
+          hasFinite(r.totalDebt) ||
+          hasFinite(
+            r.cashAndCashEquivalents ??
+              r.cashCashEquivalentsAndShortTermInvestments,
+          ),
+      );
+      const cashRows = res.filter(
+        (r: any) =>
+          hasFinite(
+            r.operatingCashFlow ?? r.cashFlowFromContinuingOperatingActivities,
+          ) ||
+          hasFinite(r.freeCashFlow) ||
+          hasFinite(r.capitalExpenditure),
+      );
+
+      const income = incomeRows.map((r: any) => ({
         date: new Date(r.date).toISOString().slice(0, 10),
         symbol: ticker,
-        reportedCurrency: 'USD',
+        reportedCurrency: "USD",
         calendarYear: new Date(r.date).getFullYear().toString(),
         period: getPeriod(r),
         revenue: r.totalRevenue || 0,
@@ -972,35 +1211,59 @@ export const stockService = {
         epsDiluted: r.dilutedEPS || 0,
       }));
 
-      const balance = res.map((r: any) => ({
+      const balance = balanceRows.map((r: any) => ({
         date: new Date(r.date).toISOString().slice(0, 10),
         symbol: ticker,
-        reportedCurrency: 'USD',
+        reportedCurrency: "USD",
         calendarYear: new Date(r.date).getFullYear().toString(),
         period: getPeriod(r),
         totalAssets: r.totalAssets || 0,
         totalLiabilities: r.totalLiabilitiesNetMinorityInterest || 0,
         totalEquity: r.stockholdersEquity || 0,
         totalDebt: r.totalDebt || 0,
-        cashAndCashEquivalents: r.cashAndCashEquivalents || r.cashCashEquivalentsAndShortTermInvestments || 0,
+        cashAndCashEquivalents:
+          r.cashAndCashEquivalents ||
+          r.cashCashEquivalentsAndShortTermInvestments ||
+          0,
         netDebt: r.netDebt || 0,
       }));
 
-      const cash = res.map((r: any) => ({
+      const cash = cashRows.map((r: any) => ({
         date: new Date(r.date).toISOString().slice(0, 10),
         symbol: ticker,
-        reportedCurrency: 'USD',
+        reportedCurrency: "USD",
         calendarYear: new Date(r.date).getFullYear().toString(),
         period: getPeriod(r),
-        operatingCashFlow: r.operatingCashFlow || r.cashFlowFromContinuingOperatingActivities || 0,
+        operatingCashFlow:
+          r.operatingCashFlow ||
+          r.cashFlowFromContinuingOperatingActivities ||
+          0,
         capitalExpenditure: r.capitalExpenditure || 0,
         freeCashFlow: r.freeCashFlow || 0,
       }));
 
-      return { income, balance, cash };
+      return {
+        income,
+        balance,
+        cash,
+        sources: {
+          income: income.length > 0 ? "yahoo" : null,
+          balance: balance.length > 0 ? "yahoo" : null,
+          cash: cash.length > 0 ? "yahoo" : null,
+        },
+      };
     } catch (e) {
-      throttledWarn(`yahooFinance:fundamentalsTimeSeries:${ticker}`, `[YahooFinance] Failed to fetch fundamentalsTimeSeries for ${ticker}:`, e);
-      return { income: [], balance: [], cash: [] };
+      throttledWarn(
+        `yahooFinance:fundamentalsTimeSeries:${ticker}`,
+        `[YahooFinance] Failed to fetch fundamentalsTimeSeries for ${ticker}:`,
+        e,
+      );
+      return {
+        income: [],
+        balance: [],
+        cash: [],
+        sources: { income: null, balance: null, cash: null },
+      };
     }
   },
 
@@ -1010,32 +1273,56 @@ export const stockService = {
   ): Promise<FinancialStatements> {
     const cacheKey = `financials_${symbol}_${period}`;
     if (cache.has(cacheKey)) return cache.get(cacheKey) as FinancialStatements;
-    
+
     let result: FinancialStatements = { income: [], balance: [], cash: [] };
-    const limit = period === "quarter" ? 20 : 5;
+    const limit = period === "quarter" ? 7 : 5;
+    let primary: FinancialStatements = {
+      income: [],
+      balance: [],
+      cash: [],
+    };
 
     if (hasFmp()) {
       const extra: Record<string, string | number> = { limit };
       if (period === "quarter") extra.period = "quarter";
       const [incomeRaw, balanceRaw, cashRaw] = await Promise.all([
-        fetchJSON<any[]>(tickerUrl('income-statement', symbol, extra), `income/${symbol}/${period}`),
-        fetchJSON<any[]>(tickerUrl('balance-sheet-statement', symbol, extra), `balance/${symbol}/${period}`),
-        fetchJSON<any[]>(tickerUrl('cash-flow-statement', symbol, extra), `cash/${symbol}/${period}`),
+        fetchJSON<any[]>(
+          tickerUrl("income-statement", symbol, extra),
+          `income/${symbol}/${period}`,
+        ),
+        fetchJSON<any[]>(
+          tickerUrl("balance-sheet-statement", symbol, extra),
+          `balance/${symbol}/${period}`,
+        ),
+        fetchJSON<any[]>(
+          tickerUrl("cash-flow-statement", symbol, extra),
+          `cash/${symbol}/${period}`,
+        ),
       ]);
-      
-      if (Array.isArray(incomeRaw) && incomeRaw.length > 0) {
-        result = {
-          income: incomeRaw.map(normalizeIncomeRow),
-          balance: Array.isArray(balanceRaw) ? balanceRaw.map(normalizeBalanceRow) : [],
-          cash: Array.isArray(cashRaw) ? cashRaw.map(normalizeCashRow) : [],
-        };
-      }
+
+      primary = {
+        income: Array.isArray(incomeRaw)
+          ? incomeRaw.map(normalizeIncomeRow)
+          : [],
+        balance: Array.isArray(balanceRaw)
+          ? balanceRaw.map(normalizeBalanceRow)
+          : [],
+        cash: Array.isArray(cashRaw) ? cashRaw.map(normalizeCashRow) : [],
+      };
     }
 
-    if (result.income.length === 0) {
-      // Fallback to Yahoo if FMP is unavailable, rate-limited, or fails
-      result = await this.getYahooFinancialStatements(symbol, period, limit);
-    }
+    // FMP is preferred when each statement is available. Yahoo supplies an
+    // independent fallback, so one missing FMP statement does not hide the
+    // other two. Avoid the extra Yahoo request when FMP already returned all
+    // three statement families; otherwise fetch Yahoo and merge per family.
+    const hasAllPrimaryStatements =
+      primary.income.length > 0 &&
+      primary.balance.length > 0 &&
+      primary.cash.length > 0;
+    const fallback = hasAllPrimaryStatements
+      ? { income: [], balance: [], cash: [] }
+      : await this.getYahooFinancialStatements(symbol, period, limit);
+    result = mergeFinancialStatements(primary, fallback);
 
     cache.set(cacheKey, result);
     return result;
@@ -1044,21 +1331,122 @@ export const stockService = {
   async getMetrics(symbol: string): Promise<StockMetrics> {
     const cacheKey = `metrics_${symbol}`;
     if (cache.has(cacheKey)) return cache.get(cacheKey) as StockMetrics;
-    if (!hasFmp()) return { metrics: {}, ratios: {}, scores: null };
+
+    const extract = (value: unknown): number | undefined => {
+      if (value === undefined || value === null || value === "")
+        return undefined;
+      if (typeof value === "object" && value !== null && "raw" in value) {
+        return extract((value as { raw?: unknown }).raw);
+      }
+      const n = Number(value);
+      return Number.isFinite(n) ? n : undefined;
+    };
+
+    const getYahooMetrics = async (): Promise<StockMetrics> => {
+      try {
+        const raw: any = await yahooFinance.quoteSummary(symbol, {
+          modules: ["defaultKeyStatistics", "financialData", "summaryDetail"],
+        });
+        const dks = raw?.defaultKeyStatistics ?? {};
+        const fd = raw?.financialData ?? {};
+        const sd = raw?.summaryDetail ?? {};
+        const metrics: KeyMetricsTTM = {
+          revenuePerShareTTM: extract(fd.revenuePerShare),
+          netIncomePerShareTTM: extract(dks.trailingEps),
+          peRatioTTM: extract(sd.trailingPE) ?? extract(dks.forwardPE),
+          dividendYielTTM: normalizeYahooPercentage(
+            extract(sd.dividendYield) ??
+              extract(sd.trailingAnnualDividendYield),
+          ),
+          priceToSalesRatioTTM:
+            extract(sd.priceToSalesTrailing12Months) ??
+            extract(dks.enterpriseToRevenue),
+          priceToBookRatioTTM: extract(dks.priceToBook),
+          evToSalesTTM: extract(dks.enterpriseToRevenue),
+          evToEBITDATTM: extract(dks.enterpriseToEbitda),
+          returnOnEquityTTM: extract(fd.returnOnEquity),
+          returnOnAssetsTTM: extract(fd.returnOnAssets),
+        };
+        const ratios: RatiosTTM = {
+          priceEarningsRatioTTM: extract(sd.trailingPE),
+          priceToBookRatioTTM: extract(dks.priceToBook),
+          priceToSalesRatioTTM:
+            extract(sd.priceToSalesTrailing12Months) ??
+            extract(dks.enterpriseToRevenue),
+          priceToEarningsGrowthRatioTTM: extract(dks.pegRatio),
+          netProfitMargin: normalizeYahooPercentage(extract(fd.profitMargins)),
+          operatingProfitMarginTTM: normalizeYahooPercentage(
+            extract(fd.operatingMargins),
+          ),
+          grossProfitMarginTTM: normalizeYahooPercentage(
+            extract(fd.grossMargins),
+          ),
+          dividendPayoutRatioTTM: normalizeYahooPercentage(
+            extract(sd.payoutRatio),
+          ),
+          currentRatio: extract(fd.currentRatio),
+          quickRatio: extract(fd.quickRatio),
+          debtToEquityRatio: extract(fd.debtToEquity),
+        };
+        const hasValues =
+          Object.values(metrics).some((v) => v !== undefined) ||
+          Object.values(ratios).some((v) => v !== undefined);
+        return {
+          metrics: hasValues ? metrics : {},
+          ratios: hasValues ? ratios : {},
+          scores: null,
+          source: hasValues ? "yahoo" : null,
+        };
+      } catch (error: any) {
+        throttledWarn(
+          `metrics-yahoo:${symbol}`,
+          `[stockService] Yahoo metrics ${symbol} failed: ${error?.message ?? error}`,
+        );
+        return { metrics: {}, ratios: {}, scores: null, source: null };
+      }
+    };
+
+    if (!hasFmp()) {
+      const result = await getYahooMetrics();
+      cache.set(cacheKey, result);
+      return result;
+    }
     const [m, r, s] = await Promise.all([
-      fetchJSON<any[]>(tickerUrl('key-metrics-ttm', symbol), `metrics/${symbol}`),
-      fetchJSON<any[]>(tickerUrl('ratios-ttm', symbol), `ratios/${symbol}`),
-      fetchJSON<any[]>(tickerUrl('financial-scores', symbol), `scores/${symbol}`),
+      fetchJSON<any[]>(
+        tickerUrl("key-metrics-ttm", symbol),
+        `metrics/${symbol}`,
+      ),
+      fetchJSON<any[]>(tickerUrl("ratios-ttm", symbol), `ratios/${symbol}`),
+      fetchJSON<any[]>(
+        tickerUrl("financial-scores", symbol),
+        `scores/${symbol}`,
+      ),
     ]);
     const m0 = Array.isArray(m) ? m[0] : m;
     const r0 = Array.isArray(r) ? r[0] : r;
     const s0 = Array.isArray(s) ? s[0] : s;
+    const hasObjectValues = (value: unknown): boolean =>
+      Boolean(
+        value &&
+          typeof value === "object" &&
+          Object.keys(value as object).length > 0,
+      );
+    if (!hasObjectValues(m0) && !hasObjectValues(r0) && !hasObjectValues(s0)) {
+      const result = await getYahooMetrics();
+      cache.set(cacheKey, result);
+      return result;
+    }
     const result: StockMetrics = {
       metrics: (m0 || {}) as KeyMetricsTTM,
       ratios: (r0 || {}) as RatiosTTM,
       scores: s0
-        ? { symbol: String(s0.symbol ?? symbol), altmanZScore: s0.altmanZScore, piotroskiScore: s0.piotroskiScore }
+        ? {
+            symbol: String(s0.symbol ?? symbol),
+            altmanZScore: s0.altmanZScore,
+            piotroskiScore: s0.piotroskiScore,
+          }
         : null,
+      source: "fmp",
     };
     cache.set(cacheKey, result);
     return result;
@@ -1069,7 +1457,9 @@ export const stockService = {
     const cacheKey = `analyst_${symbol}`;
     if (cache.has(cacheKey)) return cache.get(cacheKey) as AnalystTrends;
     try {
-      const raw: any = await yahooFinance.quoteSummary(symbol, { modules: ['earningsTrend'] });
+      const raw: any = await yahooFinance.quoteSummary(symbol, {
+        modules: ["earningsTrend"],
+      });
       const trend = raw?.earningsTrend?.trend ?? [];
       // Yahoo earningsTrend values come in two real-world shapes:
       //   1. `{ raw: number, fmt: "x.xx" }` objects (the documented form)
@@ -1103,27 +1493,38 @@ export const stockService = {
         return null;
       };
       const normalized: AnalystTrendPoint[] = trend.map((p: any) => ({
-        period: String(p.period ?? ''),
+        period: String(p.period ?? ""),
         endDate: p.endDate,
         growth: extract(p.growth),
         earningsEstimate: p.earningsEstimate
-          ? { avg: extract(p.earningsEstimate.avg), low: extract(p.earningsEstimate.low), high: extract(p.earningsEstimate.high) }
+          ? {
+              avg: extract(p.earningsEstimate.avg),
+              low: extract(p.earningsEstimate.low),
+              high: extract(p.earningsEstimate.high),
+            }
           : undefined,
         revenueEstimate: p.revenueEstimate
-          ? { avg: extract(p.revenueEstimate.avg), low: extract(p.revenueEstimate.low), high: extract(p.revenueEstimate.high) }
+          ? {
+              avg: extract(p.revenueEstimate.avg),
+              low: extract(p.revenueEstimate.low),
+              high: extract(p.revenueEstimate.high),
+            }
           : undefined,
         epsTrend: p.epsTrend
           ? {
               current: extract(p.epsTrend.current),
-              sevenDaysAgo: extract(p.epsTrend['7daysAgo']),
-              thirtyDaysAgo: extract(p.epsTrend['30daysAgo']),
+              sevenDaysAgo: extract(p.epsTrend["7daysAgo"]),
+              thirtyDaysAgo: extract(p.epsTrend["30daysAgo"]),
             }
           : undefined,
       }));
       cache.set(cacheKey, normalized);
       return normalized;
     } catch (e: any) {
-      throttledWarn(`analyst:${symbol}`, `[stockService] analyst ${symbol} failed: ${e?.message ?? e}`);
+      throttledWarn(
+        `analyst:${symbol}`,
+        `[stockService] analyst ${symbol} failed: ${e?.message ?? e}`,
+      );
       return [];
     }
   },
@@ -1150,9 +1551,14 @@ export const stockService = {
    * The provider-health probe + the index metrics grid decide WHEN this
    * is invoked; this method only decides WHAT to return when it is.
    */
-  async getYahooFallbackFinancials(symbol: string): Promise<YahooFallbackFinancials> {
+  async getYahooFallbackFinancials(
+    symbol: string,
+  ): Promise<YahooFallbackFinancials> {
     const cacheKey = `yahoo_fallback_financials_${symbol}`;
-    if (cache.has(cacheKey)) return cache.get<YahooFallbackFinancials>(cacheKey) as YahooFallbackFinancials;
+    if (cache.has(cacheKey))
+      return cache.get<YahooFallbackFinancials>(
+        cacheKey,
+      ) as YahooFallbackFinancials;
     return yahooFallbackInFlight.getOrCreate(cacheKey, async () => {
       // Re-check inside the in-flight registry: another concurrent caller
       // may have populated the cache between the outer miss and the
@@ -1195,9 +1601,11 @@ export const stockService = {
         // Same modules + shape as handleStockMetrics — `defaultKeyStatistics`
         // (EV, eps, debt ratio) + `financialData` (revenue, EBITDA, margins)
         // + `earningsTrend` (consensus next-quarter EPS / revenue).
-        const raw: any = await yahooFinance.quoteSummary(symbol, {
-          modules: ['defaultKeyStatistics', 'financialData', 'earningsTrend'],
-        }).catch(() => ({}));
+        const raw: any = await yahooFinance
+          .quoteSummary(symbol, {
+            modules: ["defaultKeyStatistics", "financialData", "earningsTrend"],
+          })
+          .catch(() => ({}));
         const dks = raw?.defaultKeyStatistics || {};
         const fd = raw?.financialData || {};
         const trends: any[] = raw?.earningsTrend?.trend ?? [];
@@ -1260,13 +1668,63 @@ export const stockService = {
     const cacheKey = `insider_${symbol}`;
     if (cache.has(cacheKey)) return cache.get(cacheKey) as InsiderTransaction[];
     try {
-      const raw: any = await yahooFinance.quoteSummary(symbol, { modules: ['insiderTransactions'] });
+      const raw: any = await yahooFinance.quoteSummary(symbol, {
+        modules: ["insiderTransactions"],
+      });
       const txs = raw?.insiderTransactions?.transactions ?? [];
       const normalized = txs.map((t: any) => normalizeInsider(t));
+
+      // Market close is reference context only; it is never used as the
+      // transaction price. Fetch one daily close series for the transaction
+      // window and attach exact-date matches when Yahoo provides them.
+      const dated = normalized.filter(
+        (transaction) => transaction.startDate !== null,
+      );
+      if (dated.length > 0) {
+        try {
+          const earliest = Math.min(
+            ...dated.map((transaction) => transaction.startDate as number),
+          );
+          const period1 = new Date(
+            Math.max(Date.UTC(2020, 0, 1), earliest - 7 * 86400000),
+          );
+          const chart: any = await yahooFinance.chart(symbol, {
+            period1,
+            period2: new Date(),
+            interval: "1d",
+          });
+          const closes = new Map<string, number>();
+          for (const point of chart?.quotes ?? []) {
+            const close = Number(point?.close);
+            if (!Number.isFinite(close)) continue;
+            const date =
+              point?.date instanceof Date
+                ? point.date.toISOString().slice(0, 10)
+                : String(point?.date ?? "").slice(0, 10);
+            if (/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) closes.set(date, close);
+          }
+          for (const transaction of normalized) {
+            if (transaction.startDate === null) continue;
+            const date = new Date(transaction.startDate)
+              .toISOString()
+              .slice(0, 10);
+            transaction.marketClosePrice = closes.get(date) ?? null;
+          }
+        } catch (error: any) {
+          throttledWarn(
+            `insider-close:${symbol}`,
+            `[stockService] insider market-close context failed for ${symbol}: ${error?.message ?? error}`,
+          );
+        }
+      }
+
       cache.set(cacheKey, normalized);
       return normalized;
     } catch (e: any) {
-      throttledWarn(`insider:${symbol}`, `[stockService] insider ${symbol} failed: ${e?.message ?? e}`);
+      throttledWarn(
+        `insider:${symbol}`,
+        `[stockService] insider ${symbol} failed: ${e?.message ?? e}`,
+      );
       return [];
     }
   },
@@ -1289,17 +1747,28 @@ export const stockService = {
       cache.set(cacheKey, normalized);
       return normalized;
     } catch (e: any) {
-      throttledWarn(`news:${symbol}`, `[stockService] news ${symbol} failed: ${e?.message ?? e}`);
+      throttledWarn(
+        `news:${symbol}`,
+        `[stockService] news ${symbol} failed: ${e?.message ?? e}`,
+      );
       return [];
     }
   },
 
-  async getEarningsCalendar(from: string, to: string): Promise<EarningsEvent[]> {
+  async getEarningsCalendar(
+    from: string,
+    to: string,
+  ): Promise<EarningsEvent[]> {
     const cacheKey = `earnings_cal_${from}_${to}`;
     if (cache.has(cacheKey)) return cache.get(cacheKey) as EarningsEvent[];
     if (!hasFmp()) return [];
-    const raw = await fetchJSON<any[]>(fmpUrl(EARNINGS_ENDPOINT, { from, to }), `earnings ${from}..${to}`);
-    const result: EarningsEvent[] = Array.isArray(raw) ? raw.map(normalizeEarningEvent) : [];
+    const raw = await fetchJSON<any[]>(
+      fmpUrl(EARNINGS_ENDPOINT, { from, to }),
+      `earnings ${from}..${to}`,
+    );
+    const result: EarningsEvent[] = Array.isArray(raw)
+      ? raw.map(normalizeEarningEvent)
+      : [];
 
     // FMP's calendar often omits market cap, while the client uses it for
     // the large/mid/small filters. Enrich distinct returned symbols from the
@@ -1318,7 +1787,12 @@ export const stockService = {
       const quotes = await this.getBatchQuotes(enrichSymbols);
       const marketCaps = new Map<string, number>();
       for (const quote of quotes.quotes) {
-        if (!quote?.symbol || quote.marketCap === undefined || quote.marketCap <= 0) continue;
+        if (
+          !quote?.symbol ||
+          quote.marketCap === undefined ||
+          quote.marketCap <= 0
+        )
+          continue;
         marketCaps.set(quote.symbol.toUpperCase(), quote.marketCap);
       }
       for (const event of result) {
@@ -1343,25 +1817,38 @@ export const stockService = {
       //   /api/v3/ → historical-price-full/X?timeseries=N (1 year daily)
       // On failure (404/402/403) fall back to Yahoo historical which is always on.
       if (hasFmp()) {
-        const url = QUOTE_USE_QUERY_PARAM
-          ? fmpUrl(CHART_ENDPOINT, { symbol: normalizedSymbol })
-          : fmpUrl(`${CHART_ENDPOINT}/${normalizedSymbol}`, { timeseries: 200 });
-        const raw = await fetchJSON<any>(url, `chart/${normalizedSymbol}`);
-        if (raw) {
-          // /stable/ of {symbol, historical: [...]}; v3 same shape (keyed under "historical").
-          const rows = Array.isArray(raw.historical)
-            ? raw.historical
-            : Array.isArray(raw)
-            ? raw
-            : [];
-          const series: ChartSeries = {
-            symbol: String(raw.symbol ?? normalizedSymbol),
-            historical: rows.map(normalizeChartPoint),
-          };
-          if (series.historical.length > 0) {
-            cache.set(cacheKey, series);
-            return series;
+        try {
+          const url = QUOTE_USE_QUERY_PARAM
+            ? fmpUrl(CHART_ENDPOINT, { symbol: normalizedSymbol })
+            : fmpUrl(`${CHART_ENDPOINT}/${normalizedSymbol}`, {
+                timeseries: 200,
+              });
+          const raw = await fetchJSON<any>(url, `chart/${normalizedSymbol}`);
+          if (raw) {
+            // /stable/ of {symbol, historical: [...]}; v3 same shape (keyed under "historical").
+            const rows = Array.isArray(raw.historical)
+              ? raw.historical
+              : Array.isArray(raw)
+                ? raw
+                : [];
+            const series: ChartSeries = {
+              symbol: String(raw.symbol ?? normalizedSymbol),
+              historical: rows.map(normalizeChartPoint),
+            };
+            if (series.historical.length > 0) {
+              cache.set(cacheKey, series);
+              return series;
+            }
           }
+        } catch (error) {
+          // A restricted/rate-limited FMP chart must not prevent the Yahoo
+          // fallback from running. Heatmap callers intentionally tolerate
+          // per-symbol failures, but this path should still recover data.
+          throttledWarn(
+            `chart:fmp:${normalizedSymbol}`,
+            `FMP chart ${normalizedSymbol}:`,
+            error instanceof Error ? error.message : String(error),
+          );
         }
       }
       const yahoo = await yahooChart(normalizedSymbol);
@@ -1383,15 +1870,19 @@ export const stockService = {
    * upstream call per refresh on the common case and avoids the 402 noise
    * in the server log.
    */
-  async getIndexQuotes(): Promise<{ dow: StockQuote | null; sp500: StockQuote | null; nasdaq: StockQuote | null }> {
-    const cacheKey = 'index_quotes';
+  async getIndexQuotes(): Promise<{
+    dow: StockQuote | null;
+    sp500: StockQuote | null;
+    nasdaq: StockQuote | null;
+  }> {
+    const cacheKey = "index_quotes";
     if (cache.has(cacheKey)) return cache.get(cacheKey) as any;
 
     // 1. Yahoo-first (parallel). Each index is a normal quote in y-finance v2.
     const [yahooSp, yahooIx, yahooDj] = await Promise.all([
-      yahooQuote('^GSPC'),
-      yahooQuote('^IXIC'),
-      yahooQuote('^DJI'),
+      yahooQuote("^GSPC"),
+      yahooQuote("^IXIC"),
+      yahooQuote("^DJI"),
     ]);
     let out = {
       sp500: yahooSp,
@@ -1401,21 +1892,27 @@ export const stockService = {
 
     // 2. FMP fallback only for the missing ones. /stable/ indices are paid,
     // so we surface 402 as "no data" rather than crashing.
-    if (hasFmp() && (!out.sp500?.symbol || !out.dow?.symbol || !out.nasdaq?.symbol)) {
-      try {          const raw = await fetchJSON<any>(
-            fmpUrl('quote', { symbol: '^GSPC,^IXIC,^DJI' }),
-            'index quotes (fmp fallback)',
-            10000,
-          );
+    if (
+      hasFmp() &&
+      (!out.sp500?.symbol || !out.dow?.symbol || !out.nasdaq?.symbol)
+    ) {
+      try {
+        const raw = await fetchJSON<any>(
+          fmpUrl("quote", { symbol: "^GSPC,^IXIC,^DJI" }),
+          "index quotes (fmp fallback)",
+          10000,
+        );
         const arr: any[] = Array.isArray(raw) ? raw : [];
         const find = (suffix: string) => {
-          const match = arr.find((r: any) => String(r.symbol ?? '').endsWith(suffix));
+          const match = arr.find((r: any) =>
+            String(r.symbol ?? "").endsWith(suffix),
+          );
           return match ? normalizeQuote(match) : null;
         };
         out = {
-          sp500: out.sp500 ?? find('GSPC'),
-          nasdaq: out.nasdaq ?? find('IXIC'),
-          dow: out.dow ?? find('DJI'),
+          sp500: out.sp500 ?? find("GSPC"),
+          nasdaq: out.nasdaq ?? find("IXIC"),
+          dow: out.dow ?? find("DJI"),
         };
       } catch {
         // Already warned by fetchJSON's throttled warn — silent here.
@@ -1436,20 +1933,23 @@ export const stockService = {
    * client-only change.
    */
   getInsightsTab(tab: string): InsightsTabResponse {
-    const validKey = (Object.keys(insightsTabUniverses) as InsightsTabId[]).includes(tab as InsightsTabId)
+    const validKey = (
+      Object.keys(insightsTabUniverses) as InsightsTabId[]
+    ).includes(tab as InsightsTabId)
       ? (tab as InsightsTabId)
-      : 'sp500';
-    const entries = insightsTabUniverses[validKey] ?? insightsTabUniverses.sp500;
+      : "sp500";
+    const entries =
+      insightsTabUniverses[validKey] ?? insightsTabUniverses.sp500;
     const labels: Record<InsightsTabId, string> = {
-      sp500: 'S&P 500',
-      trending: 'Trending',
-      growth: 'Growth',
-      dividend: 'Dividend',
-      buyback: 'Buyback',
-      ai: 'AI',
-      cloud: 'Cloud',
-      ev: 'EV',
-      leisure: 'Leisure',
+      sp500: "S&P 500",
+      trending: "Trending",
+      growth: "Growth",
+      dividend: "Dividend",
+      buyback: "Buyback",
+      ai: "AI",
+      cloud: "Cloud",
+      ev: "EV",
+      leisure: "Leisure",
     };
     return {
       tab: validKey,
@@ -1470,8 +1970,10 @@ export const stockService = {
    * Pulls USDEUR=X / USDILS=X / etc. from Yahoo in parallel and returns the
    * pair-quoted JSON the Portfolio UI uses for currency conversion. Cache 1h.
    */
-  async getFxRates(currencies: FxCurrency[] = ['USD', 'ILS', 'EUR']): Promise<FxRatesResponse> {
-    const cacheKey = `fx_${currencies.slice().sort().join(',')}`;
+  async getFxRates(
+    currencies: FxCurrency[] = ["USD", "ILS", "EUR"],
+  ): Promise<FxRatesResponse> {
+    const cacheKey = `fx_${currencies.slice().sort().join(",")}`;
     if (cache.has(cacheKey)) {
       return cache.get(cacheKey) as FxRatesResponse;
     }
@@ -1486,11 +1988,13 @@ export const stockService = {
         try {
           const r = await yahooFinance.quote(sym);
           const px = Number(r?.regularMarketPrice ?? NaN);
-          return Number.isFinite(px) && px > 0 ? ([sym.replace('=X', ''), px] as const) : null;
+          return Number.isFinite(px) && px > 0
+            ? ([sym.replace("=X", ""), px] as const)
+            : null;
         } catch {
           return null;
         }
-      })
+      }),
     );
     const rates: Record<string, number> = { USDUSD: 1 };
     for (const s of settled) {
@@ -1499,7 +2003,7 @@ export const stockService = {
     const out: FxRatesResponse = {
       rates,
       fetchedAt: new Date().toISOString(),
-      source: 'yahoo',
+      source: "yahoo",
     };
     cache.set(cacheKey, out, 3600);
     return out;
@@ -1534,11 +2038,18 @@ export const stockService = {
     sectorMeta: SectorHeatmapMetadata = {},
   ): Promise<SectorHeatmapResponse> {
     if (symbols.length === 0) {
-      return { days: [], rows: [], untagged: [], generatedAt: new Date().toISOString() };
+      return {
+        days: [],
+        rows: [],
+        untagged: [],
+        generatedAt: new Date().toISOString(),
+      };
     }
     const sortedSyms = canonicalSymbols(symbols);
     const allowKey =
-      sectorAllow && sectorAllow.length > 0 ? sectorAllow.slice().sort().join(',') : '*';
+      sectorAllow && sectorAllow.length > 0
+        ? sectorAllow.slice().sort().join(",")
+        : "*";
     // Normalize curated metadata once and keep only entries for symbols that
     // are actually part of this request — stray metadata for other tickers
     // would otherwise pollute the cache key without changing the result.
@@ -1548,7 +2059,12 @@ export const stockService = {
     for (const [sym, sector] of Object.entries(curated)) {
       if (requestedSet.has(sym)) curatedForRequest[sym] = sector;
     }
-    const cacheKey = buildSectorHeatmapCacheKey({ days, allowKey, meta: curatedForRequest, symbols: sortedSyms });
+    const cacheKey = buildSectorHeatmapCacheKey({
+      days,
+      allowKey,
+      meta: curatedForRequest,
+      symbols: sortedSyms,
+    });
     const cached = cache.get<SectorHeatmapResponse>(cacheKey);
     if (cached) return cached;
 
@@ -1574,7 +2090,11 @@ export const stockService = {
       });
       // Use short negative TTL for empty results to allow recovery from transient provider issues
       const isEmpty = result.rows.length === 0;
-      cache.set(cacheKey, result, isEmpty ? CHART_NEGATIVE_TTL : SECTOR_HEATMAP_TTL);
+      cache.set(
+        cacheKey,
+        result,
+        isEmpty ? CHART_NEGATIVE_TTL : SECTOR_HEATMAP_TTL,
+      );
       return result;
     });
   },
@@ -1585,59 +2105,82 @@ export const stockService = {
    * reducing to a mean. Cheap when symbols is < 25; deeper caching
    * recommended if expanded.
    */
-  async getSmaDistancesFor(symbols: string[], windowSize: number = 200): Promise<SmaDistanceResponse> {
+  async getSmaDistancesFor(
+    symbols: string[],
+    windowSize: number = 200,
+  ): Promise<SmaDistanceResponse> {
     if (symbols.length === 0) return { rows: [] };
     const cap = Math.max(5, Math.min(200, Math.floor(windowSize)));
     const rows: SmaDistanceRow[] = [];
     const BATCH_SIZE = 8;
     for (let i = 0; i < symbols.length; i += BATCH_SIZE) {
       const batchRows = await Promise.all(
-        symbols.slice(i, i + BATCH_SIZE).map(async (sym): Promise<SmaDistanceRow> => {
-        try {
-          const [chart, quote] = await Promise.all([
-            this.getChart(sym.toUpperCase()),
-            this.getQuote(sym.toUpperCase()),
-          ]);
-          if (!chart || chart.historical.length === 0) {
-            return { symbol: sym, sma200: null, distancePct: null, sampleSize: 0, price: null };
-          }
-          // Newest-last so `slice(-cap)` gives the most recent N closes.
-          // Using date sort — proxies are different, FYI historical may
-          // already be in date-asc order from Yahoo.
-          const historical = [...chart.historical].sort((a, b) =>
-            a.date < b.date ? -1 : a.date > b.date ? 1 : 0
-          );
-          const closes = historical
-            .map((p) => Number(p.close))
-            .filter((n) => Number.isFinite(n) && n > 0);
-          const tail = closes.slice(-cap);
-          if (tail.length === 0) {
-            return { symbol: sym, sma200: null, distancePct: null, sampleSize: 0, price: null };
-          }
-          const sum = tail.reduce((s, n) => s + n, 0);
-          const mean = sum / tail.length;
-          const price = quote?.price ?? tail[tail.length - 1];
-          const distancePct = mean > 0 ? ((price - mean) / mean) * 100 : null;
-          return { symbol: sym, sma200: mean, distancePct, sampleSize: tail.length, price };
-        } catch (e: any) {
-          throttledWarn(`sma:${sym}`, `[stockService] sma ${sym} failed: ${e?.message ?? e}`);
-          return { symbol: sym, sma200: null, distancePct: null, sampleSize: 0, price: null };
-        }
-        }),
+        symbols
+          .slice(i, i + BATCH_SIZE)
+          .map(async (sym): Promise<SmaDistanceRow> => {
+            try {
+              const [chart, quote] = await Promise.all([
+                this.getChart(sym.toUpperCase()),
+                this.getQuote(sym.toUpperCase()),
+              ]);
+              if (!chart || chart.historical.length === 0) {
+                return {
+                  symbol: sym,
+                  sma200: null,
+                  distancePct: null,
+                  sampleSize: 0,
+                  price: null,
+                };
+              }
+              // Newest-last so `slice(-cap)` gives the most recent N closes.
+              // Using date sort — proxies are different, FYI historical may
+              // already be in date-asc order from Yahoo.
+              const historical = [...chart.historical].sort((a, b) =>
+                a.date < b.date ? -1 : a.date > b.date ? 1 : 0,
+              );
+              const closes = historical
+                .map((p) => Number(p.close))
+                .filter((n) => Number.isFinite(n) && n > 0);
+              const tail = closes.slice(-cap);
+              if (tail.length === 0) {
+                return {
+                  symbol: sym,
+                  sma200: null,
+                  distancePct: null,
+                  sampleSize: 0,
+                  price: null,
+                };
+              }
+              const sum = tail.reduce((s, n) => s + n, 0);
+              const mean = sum / tail.length;
+              const price = quote?.price ?? tail[tail.length - 1];
+              const distancePct =
+                mean > 0 ? ((price - mean) / mean) * 100 : null;
+              return {
+                symbol: sym,
+                sma200: mean,
+                distancePct,
+                sampleSize: tail.length,
+                price,
+              };
+            } catch (e: any) {
+              throttledWarn(
+                `sma:${sym}`,
+                `[stockService] sma ${sym} failed: ${e?.message ?? e}`,
+              );
+              return {
+                symbol: sym,
+                sma200: null,
+                distancePct: null,
+                sampleSize: 0,
+                price: null,
+              };
+            }
+          }),
       );
       rows.push(...batchRows);
     }
     return { rows };
-  },
-
-  /**
-   * Per-provider API usage snapshot for the footer's progress bars.
-   * Thin pass-through to the singleton tracker so callers stay decoupled
-   * from `apiUsageTracker` directly. Async because the tracker awaits
-   * cold-start KV hydration when running on Vercel/serverless with KV.
-   */
-  async getProviderUsage() {
-    return _getProviderUsage();
   },
 
   /**
@@ -1656,7 +2199,7 @@ export const stockService = {
    * (the 1-min client poll therefore hits the cache 4/5 times).
    */
   async getProviderHealth(): Promise<ProviderHealthResponse> {
-    const cacheKey = 'provider_health';
+    const cacheKey = "provider_health";
     const cached = cache.get<ProviderHealthResponse>(cacheKey);
     if (cached) return cached;
 
@@ -1669,11 +2212,11 @@ export const stockService = {
         url: string,
       ): Promise<ProviderHealthEntry> => {
         const probeStart = Date.now();
-        apiUsageTracker.recordCall('fmp');
+        apiUsageTracker.recordCall("fmp");
         const result = await probeUrlStatus(url);
         const { status, detail } = providerStatusFromProbe(result);
         return {
-          provider: 'fmp',
+          provider: "fmp",
           feature,
           status,
           latencyMs: result ? result.latencyMs : Date.now() - probeStart,
@@ -1686,22 +2229,25 @@ export const stockService = {
         (async (): Promise<ProviderHealthEntry> => {
           const probeStart = Date.now();
           try {
-            const q: any = await withTimeout(yahooFinance.quote('AAPL'), PROVIDER_HEALTH_TIMEOUT_MS);
+            const q: any = await withTimeout(
+              yahooFinance.quote("AAPL"),
+              PROVIDER_HEALTH_TIMEOUT_MS,
+            );
             const price = Number(q?.regularMarketPrice ?? 0);
             return {
-              provider: 'yahoo',
-              feature: 'quote',
-              status: price > 0 ? 'ok' : 'down',
+              provider: "yahoo",
+              feature: "quote",
+              status: price > 0 ? "ok" : "down",
               latencyMs: Date.now() - probeStart,
-              detail: price > 0 ? undefined : 'empty quote',
+              detail: price > 0 ? undefined : "empty quote",
             };
           } catch (e: any) {
             return {
-              provider: 'yahoo',
-              feature: 'quote',
-              status: 'down',
+              provider: "yahoo",
+              feature: "quote",
+              status: "down",
               latencyMs: Date.now() - probeStart,
-              detail: e?.message ?? 'error',
+              detail: e?.message ?? "error",
             };
           }
         })(),
@@ -1715,29 +2261,29 @@ export const stockService = {
             const period1 = new Date();
             period1.setFullYear(period1.getFullYear() - 1);
             const raw: any = await withTimeout(
-              yahooFinance.chart('AAPL', {
+              yahooFinance.chart("AAPL", {
                 period1,
                 period2: new Date(),
-                interval: '1d',
+                interval: "1d",
               }),
               PROVIDER_HEALTH_TIMEOUT_MS,
             );
-            const rows: any[] = Array.isArray(raw) ? raw : raw?.quotes ?? [];
+            const rows: any[] = Array.isArray(raw) ? raw : (raw?.quotes ?? []);
             const hasClose = rows.some((r: any) => Number(r?.close ?? 0) > 0);
             return {
-              provider: 'yahoo',
-              feature: 'chart',
-              status: hasClose ? 'ok' : 'down',
+              provider: "yahoo",
+              feature: "chart",
+              status: hasClose ? "ok" : "down",
               latencyMs: Date.now() - probeStart,
-              detail: hasClose ? undefined : 'empty chart',
+              detail: hasClose ? undefined : "empty chart",
             };
           } catch (e: any) {
             return {
-              provider: 'yahoo',
-              feature: 'chart',
-              status: 'down',
+              provider: "yahoo",
+              feature: "chart",
+              status: "down",
               latencyMs: Date.now() - probeStart,
-              detail: e?.message ?? 'error',
+              detail: e?.message ?? "error",
             };
           }
         })(),
@@ -1745,34 +2291,52 @@ export const stockService = {
         hasFmp()
           ? (async (): Promise<ProviderHealthEntry[]> => {
               const quoteUrl = QUOTE_USE_QUERY_PARAM
-                ? fmpUrl('quote', { symbol: 'AAPL' })
+                ? fmpUrl("quote", { symbol: "AAPL" })
                 : fmpUrl(`quote/AAPL`);
               const batchUrl = QUOTE_USE_QUERY_PARAM
-                ? fmpUrl('batch-quote', { symbols: 'AAPL,MSFT,NVDA' })
+                ? fmpUrl("batch-quote", { symbols: "AAPL,MSFT,NVDA" })
                 : fmpUrl(`batch-quote/AAPL,MSFT,NVDA`);
-              return [await probeFmp('quote', quoteUrl), await probeFmp('batch-quote', batchUrl)];
+              return [
+                await probeFmp("quote", quoteUrl),
+                await probeFmp("batch-quote", batchUrl),
+              ];
             })()
           : Promise.resolve<ProviderHealthEntry[]>([
-              { provider: 'fmp', feature: 'quote', status: 'not_configured', latencyMs: null },
-              { provider: 'fmp', feature: 'batch-quote', status: 'not_configured', latencyMs: null },
+              {
+                provider: "fmp",
+                feature: "quote",
+                status: "not_configured",
+                latencyMs: null,
+              },
+              {
+                provider: "fmp",
+                feature: "batch-quote",
+                status: "not_configured",
+                latencyMs: null,
+              },
             ]),
         // AlphaVantage — only probed when a key is configured.
         AV_KEY
           ? (async (): Promise<ProviderHealthEntry> => {
               const probeStart = Date.now();
               const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=AAPL&apikey=${AV_KEY}`;
-              apiUsageTracker.recordCall('alphavantage');
+              apiUsageTracker.recordCall("alphavantage");
               const result = await probeUrlStatus(url);
               const { status, detail } = providerStatusFromProbe(result);
               return {
-                provider: 'alphavantage',
-                feature: 'quote',
+                provider: "alphavantage",
+                feature: "quote",
                 status,
                 latencyMs: result ? result.latencyMs : Date.now() - probeStart,
                 detail,
               };
             })()
-          : Promise.resolve<ProviderHealthEntry>({ provider: 'alphavantage', feature: 'quote', status: 'not_configured', latencyMs: null }),
+          : Promise.resolve<ProviderHealthEntry>({
+              provider: "alphavantage",
+              feature: "quote",
+              status: "not_configured",
+              latencyMs: null,
+            }),
       ]);
 
       const flat: ProviderHealthEntry[] = providers.flat();
@@ -1780,7 +2344,9 @@ export const stockService = {
         checkedAt: new Date().toISOString(),
         providers: flat,
         // known_restriction is an expected plan limitation, not an outage.
-        healthy: flat.every((p) => p.status === 'ok' || p.status === 'known_restriction'),
+        healthy: flat.every(
+          (p) => p.status === "ok" || p.status === "known_restriction",
+        ),
       };
       cache.set(cacheKey, result, PROVIDER_HEALTH_TTL);
       return result;
