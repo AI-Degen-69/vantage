@@ -14,6 +14,8 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  Cell,
+  ReferenceLine,
 } from "recharts";
 import { FinancialMetric } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
@@ -24,6 +26,12 @@ import {
   projectMetricSeries,
 } from "@/lib/finance";
 import { useStockFinancials } from "@/hooks/useStockData";
+import {
+  barGradientId,
+  barStroke,
+  calculateChartDomain,
+  getChartAvailability,
+} from "@/lib/chartStyles";
 
 interface ChartModalProps {
   metric: FinancialMetric;
@@ -48,6 +56,23 @@ type Granularity = "annual" | "quarter";
  * pre-built `metric.data` whenever quarter mode is on; the annual path
  * keeps `metric.data` untouched (no extra fetch, no flicker).
  */
+
+function currentQuarterLabel(): string {
+  const now = new Date();
+  return `Q${Math.floor(now.getUTCMonth() / 3) + 1} ${now.getUTCFullYear()}`;
+}
+
+function previousQuarterLabel(label: string): string {
+  const match = /^Q([1-4])\s+(\d{4})$/.exec(label);
+  if (!match) return label;
+  let quarter = Number(match[1]) - 1;
+  let year = Number(match[2]);
+  if (quarter < 1) {
+    quarter = 4;
+    year -= 1;
+  }
+  return `Q${quarter} ${year}`;
+}
 
 function formatMetricValue(value: number, unit: string, maxDecimals: number = 2) {
   let prefix = "";
@@ -85,11 +110,16 @@ export default function ChartModal({
   // call unconditionally because it disables on `!ticker`, but skipping
   // the request on the default annual render keeps the FMP budget lower
   // (the free tier is already at 5-statement-rows max).
-  const { data: quarterlyStatements, dataUpdatedAt: quarterlyUpdatedAt } =
-    useStockFinancials(ticker, {
-      period: "quarter",
-      enabled: isOpen && granularity === "quarter",
-    });
+  const {
+    data: quarterlyStatements,
+    dataUpdatedAt: quarterlyUpdatedAt,
+    isLoading: quarterlyLoading,
+    isError: quarterlyError,
+  } = useStockFinancials(ticker, {
+    period: "quarter",
+    enabled: isOpen && granularity === "quarter",
+  });
+  const quarterlySource = quarterlyStatements?.sources?.income ?? quarterlyStatements?.sources?.balance ?? quarterlyStatements?.sources?.cash ?? null;
 
   // Series used by the chart. Annual = pre-built points from Index.tsx.
   // Quarterly = freshly projected from the Q-fetch. Recomputed only when
@@ -106,56 +136,41 @@ export default function ChartModal({
             quarterlyStatements ?? { income: [], balance: [], cash: [] },
           )
         : [];
-      // 1Y = 4Q, 3Y = 12Q, 5Y = 20Q — quarter-stride back per year.
-      expectedCount = timeframe === "1Y" ? 4 : timeframe === "3Y" ? 12 : 20;
+      // 1Y = 4Q and 3Y = 12Q. Five-year windows are intentionally not
+      // offered until the provider returns enough endpoints.
+      expectedCount = timeframe === "1Y" ? 4 : 12;
       sliced = series.slice(-expectedCount);
     } else {
-      // Annual path: scale the 1/3/5-year window off the precomputed
-      // `metric.data` (which already covers ~5 FY). Year-stride back.
-      expectedCount = timeframe === "1Y" ? 1 : timeframe === "3Y" ? 3 : 5;
+      // Annual path: scale the 1/3-year window off the precomputed
+      // `metric.data`. Five-year windows are not offered without six
+      // annual endpoints.
+      expectedCount = timeframe === "1Y" ? 1 : 3;
       sliced = metric.data.slice(-expectedCount);
     }
 
-    if (sliced.length > 0 && sliced.length < expectedCount) {
-      const validValues = sliced.map(d => d.value).filter(v => typeof v === 'number');
-      const ghostHeight = validValues.length > 0 ? Math.max(...validValues) * 0.8 : 100;
+    if (sliced.length < expectedCount && (granularity === "quarter" || sliced.length > 0)) {
       const missingCount = expectedCount - sliced.length;
-      const ghosts = [];
-      let lastDateStr = sliced[0].date;
+      const lockedPeriods = [];
+      let lastDateStr = sliced[0]?.date ?? currentQuarterLabel();
 
       for (let i = 0; i < missingCount; i++) {
         let prevDate = `Locked - ${missingCount - i}`;
-        if (granularity === 'quarter') {
-          const m = lastDateStr.match(/Q([1-4])\s+(\d{4})/);
-          if (m) {
-            let q = parseInt(m[1], 10) - 1;
-            let y = parseInt(m[2], 10);
-            if (q < 1) { q = 4; y -= 1; }
-            prevDate = `Q${q} ${y}`;
-            lastDateStr = prevDate;
-          }
+        if (granularity === "quarter") {
+          prevDate = previousQuarterLabel(lastDateStr);
+          lastDateStr = prevDate;
         } else {
           const m = lastDateStr.match(/FY\s+(\d{4})/);
           if (m) {
-            let y = parseInt(m[1], 10) - 1;
+            const y = parseInt(m[1], 10) - 1;
             prevDate = `FY ${y}`;
             lastDateStr = prevDate;
           }
         }
-        ghosts.unshift({
-          date: prevDate,
-          value: null,
-          ghostValue: ghostHeight,
-          isLocked: true
-        });
+        lockedPeriods.unshift({ date: prevDate, value: null, isLocked: true });
       }
-      return [...ghosts, ...sliced];
+      return [...lockedPeriods, ...sliced];
     }
     return sliced;
-    // `quarterlyUpdatedAt` deliberately included so the chart re-projects
-    // when the Q-fetch lands without us having to share a `data` identity
-    // that's freshly-built per render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [granularity, timeframe, metric, quarterlyStatements, quarterlyUpdatedAt]);
 
   // Drive live CAGR/YoY numbers off the projected series so they flip
@@ -176,7 +191,6 @@ export default function ChartModal({
       return {
         yoy: metric.yoy,
         cagr3Y: metric.cagr3Y,
-        cagr5Y: metric.cagr5Y,
         methodology: "annual",
       } as const;
     }
@@ -192,18 +206,16 @@ export default function ChartModal({
       return {
         yoy: null,
         cagr3Y: null,
-        cagr5Y: null,
         methodology: "quarter",
       } as const;
     }
-    const rows = statements[meta.statement] as unknown as ReadonlyArray<
-      Record<string, unknown>
-    >;
+    const rows = [...(statements[meta.statement] as unknown as ReadonlyArray<Record<string, unknown>>)]
+      .sort((a, b) => String(a.date ?? "").localeCompare(String(b.date ?? "")));
+    const period = detectPeriodGranularity(rows);
     return {
       yoy: computeYoYFromRows(rows, meta.key),
-      cagr3Y: cagrAtYearsBack(rows, meta.key, 3, "quarter"),
-      cagr5Y: cagrAtYearsBack(rows, meta.key, 5, "quarter"),
-      methodology: "quarter",
+      cagr3Y: cagrAtYearsBack(rows, meta.key, 3, period),
+      methodology: period,
     } as const;
   }, [granularity, quarterlyStatements, metric, quarterlyUpdatedAt]);
 
@@ -240,12 +252,11 @@ export default function ChartModal({
   }, [filteredData, granularity, metric, quarterlyStatements]);
 
   // Reset toggle + timeframe when the modal closes / reopens so the next
-  // open starts at the default annual 1Y. Without this a user who
-  // closed the modal on "Quarterly · 5Y" would see "—" everywhere else
-  // unexpectedly.
+  // open starts at the default annual 1Y. The 5Y control remains available
+  // for the chart window, but no 5Y CAGR card is shown without six annual
+  // or twenty-one quarterly endpoints.
   useEffect(() => {
-    if (!isOpen) {
-      setGranularity("annual");
+    if (!isOpen) {      setGranularity("annual");
       setTimeframe("1Y");
     }
   }, [isOpen]);
@@ -277,6 +288,57 @@ export default function ChartModal({
   const chartColor = colorMap[metric.color] || "hsl(200 60% 60%)";
   const gridColor = "hsl(250 20% 16%)"; // Graticule
   const axisColor = "hsl(220 10% 60%)"; // Dust
+  const chartDomain = calculateChartDomain(filteredData.map((entry) => entry.value));
+  const requestedPeriodCount = granularity === "quarter" ? (timeframe === "1Y" ? 4 : 12) : 0;
+  const quarterlyAvailability = getChartAvailability(
+    filteredData.map((entry) => entry.value),
+    requestedPeriodCount,
+  );
+  const showQuarterlyMask =
+    granularity === "quarter" &&
+    (quarterlyError || quarterlyAvailability.hasUnavailable);
+  const quarterlyMaskWidth =
+    quarterlyAvailability.availableCount === 0
+      ? "100%"
+      : `${Math.round(quarterlyAvailability.fractionUnavailable * 100)}%`;
+
+  const quarterlyMask = granularity === "quarter" && (quarterlyLoading || showQuarterlyMask) ? (
+    <div
+      className="pointer-events-none absolute inset-y-0 left-0 z-10 flex flex-col items-center justify-center gap-2 overflow-hidden border-r border-border/70 bg-background/70 px-4 text-center backdrop-blur-md"
+      style={{ width: quarterlyLoading ? "100%" : quarterlyMaskWidth }}
+      role="status"
+      aria-live="polite"
+      aria-label={
+        quarterlyLoading
+          ? "Loading quarterly data"
+          : quarterlyAvailability.availableCount === 0
+            ? "Quarterly data unavailable"
+            : "Some quarterly history is unavailable"
+      }
+    >
+      <div className="rounded-full border border-border/70 bg-card/80 p-2.5 shadow-lg">
+        {quarterlyLoading ? (
+          <span className="block h-5 w-5 animate-pulse rounded-full bg-muted-foreground/50" aria-hidden="true" />
+        ) : (
+          <Lock className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+        )}
+      </div>
+      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        {quarterlyLoading
+          ? "Loading"
+          : quarterlyAvailability.availableCount === 0
+            ? "Unavailable"
+            : "Pro history"}
+      </span>
+      <span className="max-w-[13rem] text-xs leading-relaxed text-muted-foreground/80">
+        {quarterlyLoading
+          ? "Fetching quarterly statements..."
+          : quarterlyAvailability.availableCount === 0
+            ? "No quarterly statements were returned for this symbol."
+            : "Earlier quarterly periods are not available."}
+      </span>
+    </div>
+  ) : null;
 
   const renderChart = () => {
     const commonProps = {
@@ -336,31 +398,49 @@ export default function ChartModal({
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
-        <pattern id="lockedPattern" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <rect width="3" height="6" fill="rgba(255, 255, 255, 0.05)" />
-        </pattern>
       </defs>
     );
 
     switch (metric.type) {
       case "bar":
         return (
-          <ResponsiveContainer width="100%" height={400}>
+          <div className="relative h-[400px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
             <BarChart {...commonProps}>
               <defs>
+                {/* Positive bars fade from a quiet baseline to their
+                    strongest green at the top. Negative bars do the inverse:
+                    they begin quietly at zero and finish bright red at the
+                    bottom. Cells select the correct direction per datum. */}
                 <linearGradient
-                  id={`colorValue-bar-${metric.name}`}
+                  id={`colorValue-positive-${metric.name}`}
                   x1="0"
                   y1="0"
                   x2="0"
                   y2="1"
                 >
-                  <stop offset="5%" stopColor={chartColor} stopOpacity={0.65} />
-                  <stop
-                    offset="95%"
-                    stopColor={chartColor}
-                    stopOpacity={0.15}
-                  />
+                  <stop offset="0%" stopColor="hsl(155 70% 58%)" stopOpacity={1} />
+                  <stop offset="100%" stopColor="hsl(155 55% 38%)" stopOpacity={0.3} />
+                </linearGradient>
+                <linearGradient
+                  id={`colorValue-negative-${metric.name}`}
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
+                  <stop offset="0%" stopColor="hsl(6 55% 38%)" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="hsl(6 80% 62%)" stopOpacity={1} />
+                </linearGradient>
+                <linearGradient
+                  id={`colorValue-neutral-${metric.name}`}
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
+                  <stop offset="0%" stopColor="hsl(220 10% 60%)" stopOpacity={0.45} />
+                  <stop offset="100%" stopColor="hsl(220 10% 60%)" stopOpacity={0.2} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
@@ -374,35 +454,43 @@ export default function ChartModal({
                 stroke={axisColor}
                 tick={{ fontSize: 12 }}
                 tickMargin={8}
+                domain={chartDomain}
+                allowDataOverflow={false}
+                tickCount={5}
                 tickFormatter={(val) => formatMetricValue(val, metric.unit, 0)}
               />
               <Tooltip content={<CustomTooltip />} cursor={false} />
-              {/* Render ghost bars first so they sit properly on the axis. stackId aligns them precisely over the tick */}
-              <Bar
-                stackId="a"
-                dataKey="ghostValue"
-                fill="url(#lockedPattern)"
-                stroke="rgba(255,255,255,0.1)"
-                strokeWidth={1}
-                radius={[2, 2, 0, 0]}
-                isAnimationActive={false}
-              />
               <Bar
                 stackId="a"
                 dataKey="value"
-                fill={`url(#colorValue-bar-${metric.name})`}
-                stroke={chartColor}
                 strokeWidth={1}
-                radius={[2, 2, 0, 0]}
+                radius={[2, 2, 2, 2]}
                 isAnimationActive={true}
                 animationDuration={1000}
+              >
+                {filteredData.map((entry, index) => (
+                  <Cell
+                    key={`bar-cell-${index}`}
+                    fill={`url(#${barGradientId(metric.name, entry.value)})`}
+                    stroke={barStroke(entry.value)}
+                  />
+                ))}
+              </Bar>
+              <ReferenceLine
+                y={0}
+                stroke="hsl(220 18% 82%)"
+                strokeOpacity={0.9}
+                strokeWidth={2}
               />
             </BarChart>
-          </ResponsiveContainer>
+            </ResponsiveContainer>
+            {quarterlyMask}
+          </div>
         );
       case "area":
         return (
-          <ResponsiveContainer width="100%" height={400}>
+          <div className="relative h-[400px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
             <AreaChart {...commonProps}>
               <defs>
                 <linearGradient
@@ -428,19 +516,12 @@ export default function ChartModal({
                 stroke={axisColor}
                 tick={{ fontSize: 12 }}
                 tickMargin={8}
+                domain={chartDomain}
+                allowDataOverflow={false}
+                tickCount={5}
                 tickFormatter={(val) => formatMetricValue(val, metric.unit, 0)}
               />
               <Tooltip content={<CustomTooltip />} cursor={false} />
-              <Area
-                type="monotone"
-                dataKey="ghostValue"
-                stroke="rgba(255,255,255,0.1)"
-                strokeWidth={1.5}
-                strokeDasharray="4 4"
-                fill="url(#lockedPattern)"
-                fillOpacity={1}
-                isAnimationActive={false}
-              />
               <Area
                 type="monotone"
                 dataKey="value"
@@ -452,13 +533,22 @@ export default function ChartModal({
                 isAnimationActive={true}
                 animationDuration={1000}
               />
+              <ReferenceLine
+                y={0}
+                stroke="hsl(220 18% 82%)"
+                strokeOpacity={0.9}
+                strokeWidth={2}
+              />
             </AreaChart>
-          </ResponsiveContainer>
+            </ResponsiveContainer>
+            {quarterlyMask}
+          </div>
         );
       case "line":
       default:
         return (
-          <ResponsiveContainer width="100%" height={400}>
+          <div className="relative h-[400px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
             <LineChart {...commonProps}>
               <defs>
                 <GlowFilter />
@@ -474,18 +564,12 @@ export default function ChartModal({
                 stroke={axisColor}
                 tick={{ fontSize: 12 }}
                 tickMargin={8}
+                domain={chartDomain}
+                allowDataOverflow={false}
+                tickCount={5}
                 tickFormatter={(val) => formatMetricValue(val, metric.unit, 0)}
               />
               <Tooltip content={<CustomTooltip />} cursor={false} />
-              <Line
-                type="monotone"
-                dataKey="ghostValue"
-                stroke="rgba(255,255,255,0.1)"
-                strokeWidth={1.5}
-                strokeDasharray="4 4"
-                dot={false}
-                isAnimationActive={false}
-              />
               <Line
                 type="monotone"
                 dataKey="value"
@@ -496,8 +580,16 @@ export default function ChartModal({
                 isAnimationActive={true}
                 animationDuration={1000}
               />
+              <ReferenceLine
+                y={0}
+                stroke="hsl(220 18% 82%)"
+                strokeOpacity={0.9}
+                strokeWidth={2}
+              />
             </LineChart>
-          </ResponsiveContainer>
+            </ResponsiveContainer>
+            {quarterlyMask}
+          </div>
         );
     }
   };
@@ -545,7 +637,7 @@ export default function ChartModal({
                 role="tablist"
                 aria-label={t("chart.timeframe")}
               >
-                {["1Y", "3Y", "5Y"].map((tf) => (
+                {["1Y", "3Y"].map((tf) => (
                   <button
                     key={tf}
                     onClick={() => setTimeframe(tf as TimeframeType)}
@@ -611,21 +703,20 @@ export default function ChartModal({
           </div>
 
           {/* Chart */}
-          <div className="p-6 shrink-0">{renderChart()}</div>
+          <div className="p-6 shrink-0">
+            {granularity === "quarter" && quarterlySource === null && quarterlyStatements && (
+              <div className="mb-3 rounded-lg border border-chart-amber/30 bg-chart-amber/5 px-3 py-2 text-xs text-chart-amber">
+                Quarterly statements are unavailable from both providers for this symbol.
+              </div>
+            )}
+            {renderChart()}
+          </div>
 
           {/* Growth Metrics */}
           {showGrowthMetrics && (
             <div className="border-t border-border bg-background/40 shrink-0">
-              <div className="grid grid-cols-3 gap-4 p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-6">
                 {[
-                  {
-                    label: t("chart.yoy1Y"),
-                    value: liveGrowth.yoy,
-                    description:
-                      granularity === "quarter"
-                        ? t("chart.descYoYQuarter")
-                        : t("chart.descYoY"),
-                  },
                   {
                     label: t("chart.cagr3Y"),
                     value: liveGrowth.cagr3Y,
@@ -635,12 +726,12 @@ export default function ChartModal({
                         : t("chart.descCagr3Y"),
                   },
                   {
-                    label: t("chart.cagr5Y"),
-                    value: liveGrowth.cagr5Y,
+                    label: t("chart.yoy1Y"),
+                    value: liveGrowth.yoy,
                     description:
                       granularity === "quarter"
-                        ? t("chart.descCagr5YQuarter")
-                        : t("chart.descCagr5Y"),
+                        ? t("chart.descYoYQuarter")
+                        : t("chart.descYoY"),
                   },
                 ].map((item, idx) => {
                   const hasValue =

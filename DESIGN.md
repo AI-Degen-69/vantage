@@ -138,3 +138,25 @@ Two-tier corner language. Structural panels (cards, chart containers, category g
 - **Don't** default to a saturated neon accent on near-black; the calibration this world explicitly avoids is generic "AI dark mode" glow-on-black.
 - **Don't** carry over the old hardcoded `slate-*`/`blue-600` chrome colors from the retired Bloomberg-terminal look — every surface uses the tokens above.
 - **Don't** apply drop shadows to panels as a default; depth comes from the Deep Field/Graticule step and earned glow only.
+
+## Component Architecture: Tables & Data Surfaces
+
+Tables are a **display surface**, not a data-management layer. The observatory reads fundamentals; it does not edit them in a grid.
+
+### Stack
+- **shadcn/ui `Table` primitive** (`client/components/ui/table.tsx`) is the only table component. It inherits the design tokens above (Deep Field ground, Graticule borders, Readout mono for figures) — one consistent system.
+- **Tailwind** for layout/styling; **Radix UI** for interactive primitives. No Material Design / MUI in the project.
+- Charts via **Recharts**; dates via **react-day-picker**. Both already cover what MUI X Charts / Pickers would duplicate.
+
+### Data flow (server-driven)
+- Sorting, filtering, and pagination happen at the **API layer**, not the client grid. `Screener.tsx` holds `sortBy` / `sortDir` / `page` state and passes it into `useScreenerFilter({ sort_by, sort_dir, ... }, limit, offset)`; the `<table>` only renders the returned page.
+- This is the correct architecture for a fundamentals screener: data is large and server-paginated, so client-side grid state would re-fetch or hold stale slices.
+
+### Decision: no client-side grid library
+- **MUI X Data Grid** — rejected. It ships Material Design, a second design system that fights the custom "observatory" tokens, and would re-implement the existing `useScreenerFilter` server flow. Regressive.
+- **TanStack Table** — not adopted. It earns its place only for *in-memory* interactivity (column resize/pin/reorder, row grouping, inline edit) on data already in the browser. vantage's tables are server-paginated, so TanStack buys nothing the API doesn't already provide.
+- **Trigger to revisit:** a feature that manipulates fetched data *in-memory* after load (e.g. an editable/reorderable/resizable Watchlist, or a client-side comparison grid across already-loaded tickers). Until then, shadcn `Table` + server-driven state stands.
+
+### Named Rules
+**The Server Grid Rule.** Table sorting/filtering/pagination is delegated to the API (`useScreenerFilter` and siblings); the `<table>` renders the returned page. Do not introduce a client-side grid state manager for server-paginated data.
+**The One System Rule.** All tables use the shadcn `Table` primitive styled by these tokens. Do not import a second UI kit (MUI, Ant, Chakra) for tables or any other surface — it fractures the design system and the build.

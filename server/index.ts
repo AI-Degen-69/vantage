@@ -21,7 +21,6 @@ import {
   handleFxRates,
   handleProviderHealth,
   handleStockYahooFallbackFinancials,
-  handleProviderUsage,
   handleSectorHeatmap,
 } from "./routes/stock-data";
 import {
@@ -131,7 +130,6 @@ export function createServer() {
   app.get("/api/provider-health", handleProviderHealth);
   app.get("/api/sector-heatmap", handleSectorHeatmap);
   app.get("/api/stock-yahoo-fallback-financials", handleStockYahooFallbackFinancials);
-  app.get("/api/provider-usage", handleProviderUsage);
 
   // Screener routes
   app.get("/api/screener/search", handleScreenerSearch);

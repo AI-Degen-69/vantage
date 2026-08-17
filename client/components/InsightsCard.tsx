@@ -3,7 +3,8 @@ import { Maximize2 } from "lucide-react";
 import ChartModal from "./ChartModal";
 import { FinancialMetric } from "@/lib/mockData";
 import { useI18n } from "@/lib/i18n";
-import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { splitSparklineValues } from "@/lib/chartStyles";
 
 interface InsightsCardProps {
   title: string;
@@ -68,7 +69,7 @@ export default function InsightsCard({
   };
 
   // Extract a small sparkline dataset (last 20 items)
-  const sparklineData = metricData.data.slice(-20);
+  const sparklineData = splitSparklineValues(metricData.data.slice(-20));
 
   // Compute the real visible window for the footer strip — first / last date
   // labels from the underlying series, NOT a hardcoded "1D/5D/1M/…/All"
@@ -133,25 +134,66 @@ export default function InsightsCard({
             <AreaChart data={sparklineData}>
               <defs>
                 <linearGradient
-                  id={`gradient-${metricId}`}
+                  id={`gradient-positive-${metricId}`}
                   x1="0"
                   y1="0"
                   x2="0"
                   y2="1"
                 >
-                  <stop offset="5%" stopColor={lineColor} stopOpacity={0.18} />
-                  <stop offset="95%" stopColor={lineColor} stopOpacity={0} />
+                  <stop offset="0%" stopColor="hsl(155 75% 58%)" stopOpacity={0.62} />
+                  <stop offset="100%" stopColor="hsl(155 55% 35%)" stopOpacity={0.06} />
+                </linearGradient>
+                <linearGradient
+                  id={`gradient-negative-${metricId}`}
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="1"
+                >
+                  <stop offset="0%" stopColor="hsl(6 55% 35%)" stopOpacity={0.06} />
+                  <stop offset="100%" stopColor="hsl(6 78% 58%)" stopOpacity={0.62} />
                 </linearGradient>
               </defs>
               <Area
                 type="monotone"
-                dataKey="value"
+                dataKey="positiveValue"
                 stroke={lineColor}
                 fillOpacity={1}
-                fill={`url(#gradient-${metricId})`}
+                fill={`url(#gradient-positive-${metricId})`}
+                strokeWidth={0}
+                isAnimationActive={true}
+                animationDuration={1000}
+                connectNulls={false}
+                baseValue={0}
+              />
+              <Area
+                type="monotone"
+                dataKey="negativeValue"
+                stroke={lineColor}
+                fillOpacity={1}
+                fill={`url(#gradient-negative-${metricId})`}
+                strokeWidth={0}
+                isAnimationActive={true}
+                animationDuration={1000}
+                connectNulls={false}
+                baseValue={0}
+              />
+              <Area
+                type="monotone"
+                dataKey="value"
+                stroke={lineColor}
+                fill="none"
                 strokeWidth={1.5}
                 isAnimationActive={true}
                 animationDuration={1000}
+                connectNulls={false}
+              />
+              <ReferenceLine
+                y={0}
+                stroke="hsl(220 18% 82%)"
+                strokeOpacity={0.8}
+                strokeWidth={1.5}
+                ifOverflow="extendDomain"
               />
             </AreaChart>
           </ResponsiveContainer>

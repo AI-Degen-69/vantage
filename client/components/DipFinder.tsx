@@ -3,6 +3,7 @@ import { defaultWatchlist } from "@/lib/mockData";
 import { ChevronDown } from "lucide-react";
 import { useSmaDistances, useYahooChartDown } from "@/hooks/useStockData";
 import { useMemo, useState } from "react";
+import DataStatusBadge from "@/components/DataStatusBadge";
 
 type SmaWindow = "20day" | "50day" | "100day" | "150day" | "200day";
 
@@ -85,22 +86,11 @@ export default function DipFinder() {
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-3">
           <h3 className="text-xl font-bold">{t("dipFinder.title")}</h3>
-          <span
-            className={`text-xs font-medium uppercase tracking-wide px-2 py-0.5 rounded ${
-              badgeKind === "live"
-                ? "text-emerald-300 bg-emerald-500/10"
-                : badgeKind === "partial"
-                ? "text-amber-300 bg-amber-500/10"
-                : "text-yellow-400 bg-yellow-500/10"
-            }`}
-            title={yahooChartDown ? t("providerHealth.chartDownHint") : undefined}
-          >
-            {badgeKind === "live"
-              ? t("dipFinder.liveBadge")
-              : badgeKind === "partial"
-              ? t("dipFinder.partialBadge")
-              : t("dipFinder.mockBadge")}
-          </span>
+          <DataStatusBadge
+            status={badgeKind === "live" ? "live" : badgeKind === "partial" ? "estimate" : "mock"}
+            source={badgeKind === "live" ? "Yahoo chart history" : badgeKind === "partial" ? "Partial sample" : "Local demo series"}
+            compact
+          />
         </div>
         <div className="relative">
           <select

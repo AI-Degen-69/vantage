@@ -13,7 +13,6 @@ import { WatchlistsProvider } from "@/hooks/useWatchlists";
 import { EarningsAlertEngine } from "@/hooks/useEarningsAlerts";
 import TopBar from "@/components/TopBar";
 import ProviderHealthIndicator from "@/components/ProviderHealthIndicator";
-import ProviderUsageFooter from "@/components/ProviderUsageFooter";
 import { RouteFallback } from "@/components/Skeleton";
 import NotFound from "./pages/NotFound";
 
@@ -99,7 +98,6 @@ const AppLayout = () => (
           <main className="flex-1 overflow-auto">
             <Outlet />
           </main>
-          <ProviderUsageFooter />
         </div>
       </div>
     </EarningsAlertEngine>

@@ -1,6 +1,7 @@
 import type { SectorHeatmapCell, SectorHeatmapResponse } from "@shared/api";
 import { useI18n, translateSector } from "@/lib/i18n";
 import { useYahooChartDown } from "@/hooks/useStockData";
+import DataStatusBadge from "@/components/DataStatusBadge";
 
 interface SectorHeatsheetProps {
   heatmap: SectorHeatmapResponse | null | undefined;
@@ -20,7 +21,7 @@ interface SectorHeatsheetProps {
 function cellColor(pct: number | null): string {
   if (pct === null || !Number.isFinite(pct)) return "hsl(240 5% 15% / 0.3)"; // softer graticule
   const intensity = Math.min(1, Math.abs(pct) / 3);
-  
+
   // Modern slightly muted colors (Green & Red)
   const alpha = 0.2 + intensity * 0.6;
   return pct >= 0
@@ -78,10 +79,9 @@ function dayHeader(date: string, lang: string, isPartial: boolean): string {
 }
 
 /**
- * Bloomberg-style sector × 5-day columnar heatmap. Renders nothing when the
- * server returned zero rows AND there's nothing loading — letting callers
- * hide the strip entirely (avoids an empty placeholder stealing vertical
- * space inside the Insights page chrome).
+ * Bloomberg-style sector × 5-day columnar heatmap. The shell remains visible
+ * when data is unavailable so a provider outage is explicit rather than a
+ * mysterious blank panel inside the Insights page chrome.
  *
  * Layout:
  *   ┌─────────────┬──────┬──────┬──────┬──────┬──────┬──────┐
@@ -106,11 +106,10 @@ export function SectorHeatsheet({
   const yahooChartDown = useYahooChartDown();
   const hasRows = !!heatmap && heatmap.rows.length > 0;
   const showSkeleton = isLoading && !hasRows;
-
-  if (!hasRows && !showSkeleton) return null;
+  const showUnavailable = !hasRows && !showSkeleton;
 
   return (
-    <div className="bg-transparent px-6 py-5 h-full flex flex-col justify-center">
+    <div className="bg-transparent px-6 py-5 min-h-[220px] flex flex-col justify-center">
       {/* Header row: title, footer caption, partial-day badge */}
       <div className="flex items-center gap-3 mb-3">
         <h2 className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">
@@ -124,13 +123,15 @@ export function SectorHeatsheet({
             {t("insights.heatsheet.foot", { rows: heatmap!.rows.length, days })}
           </span>
         )}
-        {yahooChartDown && hasRows && (
-          <span
-            className="text-xs font-medium uppercase tracking-wide px-2 py-0.5 rounded text-yellow-400 bg-yellow-500/10 ms-auto"
-            title={t("providerHealth.chartDownHint")}
-          >
-            [MOCK]
-          </span>
+        {hasRows && (
+          <DataStatusBadge
+            status={yahooChartDown ? "mock" : "live"}
+            source={
+              yahooChartDown ? "Cached chart aggregates" : "Yahoo chart history"
+            }
+            compact
+            className="ms-auto"
+          />
         )}
         {isLoading && hasRows && (
           <span className="text-xs text-primary ms-auto">
@@ -139,7 +140,17 @@ export function SectorHeatsheet({
         )}
       </div>
 
-      {showSkeleton ? (
+      {showUnavailable ? (
+        <div className="flex min-h-[132px] flex-col items-center justify-center rounded-lg border border-dashed border-border/70 bg-background/30 px-6 text-center">
+          {" "}
+          <p className="text-sm font-medium text-foreground">
+            {t("insights.heatsheet.unavailableTitle")}
+          </p>
+          <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">
+            {t("insights.heatsheet.unavailableBody")}
+          </p>
+        </div>
+      ) : showSkeleton ? (
         // Match the loaded state's row count + grid template to prevent
         // layout-jump when the data lands. ~6 placeholder rows × 7 columns
         // keeps the shimmer block at the same vertical cadence as a
@@ -159,66 +170,65 @@ export function SectorHeatsheet({
           ))}
         </div>
       ) : (
-        <div
-          className="grid gap-1.5"
-          style={{
-            gridTemplateColumns: `1fr repeat(${days}, minmax(0, 1fr)) 88px`,
-          }}
-        >
-          {/* Day header row */}
-          <div className="text-xs uppercase tracking-wider text-muted-foreground px-1 self-end">
-            {/* leftmost column header — empty for the sector-label column */}
-          </div>
-          {heatmap!.days.map((date, idx, arr) => {
-            // Derive isPartial from the first row's cell for this column index,
-            // preserving the server's suppression of partial status for weekend landings.
-            const isPartial =
-              heatmap!.rows.length > 0 &&
-              heatmap!.rows[0].cells[idx]?.isPartial === true;
-            const isToday = idx === arr.length - 1;
-            return (
-              <div
-                key={date}
-                className={`text-xs uppercase tracking-wider text-muted-foreground font-semibold px-1 text-end ${!isToday ? 'opacity-60' : ''}`}
-                title={
-                  isPartial ? t("insights.heatsheet.partialTitle") : undefined
-                }
-                dir="ltr"
-              >
-                <span>{dayHeader(date, lang, isPartial)}</span>
-                {isPartial && (
-                  <span className="block text-xs text-primary/80 normal-case tracking-normal">
-                    {t("insights.heatsheet.partialHit")}
-                  </span>
-                )}
-              </div>
-            );
-          })}
+        <div className="overflow-x-auto">
           <div
-            className="text-xs uppercase tracking-wider text-muted-foreground font-semibold px-1 text-end"
-            dir="ltr"
+            className="grid min-w-[720px] gap-1.5"
+            style={{
+              gridTemplateColumns: `minmax(140px, 1.4fr) repeat(${days}, minmax(0, 1fr)) 88px`,
+            }}
           >
-            {t("insights.heatsheet.weekNetLabel")}
-          </div>
+            {/* Day header row */}
+            <div className="text-xs uppercase tracking-wider text-muted-foreground px-1 self-end">
+              {/* leftmost column header — empty for the sector-label column */}
+            </div>
+            {heatmap!.days.map((date, idx, arr) => {
+              // Derive isPartial from the first row's cell for this column index,
+              // preserving the server's suppression of partial status for weekend landings.
+              const isPartial =
+                heatmap!.rows.length > 0 &&
+                heatmap!.rows[0].cells[idx]?.isPartial === true;
+              const isToday = idx === arr.length - 1;
+              return (
+                <div
+                  key={date}
+                  className={`text-xs uppercase tracking-wider text-muted-foreground font-semibold px-1 text-end ${!isToday ? "opacity-60" : ""}`}
+                  title={
+                    isPartial ? t("insights.heatsheet.partialTitle") : undefined
+                  }
+                  dir="ltr"
+                >
+                  <span>{dayHeader(date, lang, isPartial)}</span>
+                  {isPartial && (
+                    <span className="block text-xs text-primary/80 normal-case tracking-normal">
+                      {t("insights.heatsheet.partialHit")}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+            <div
+              className="text-xs uppercase tracking-wider text-muted-foreground font-semibold px-1 text-end"
+              dir="ltr"
+            >
+              {t("insights.heatsheet.weekNetLabel")}
+            </div>
 
-          {/* Sector rows */}
-          {heatmap!.rows.map((row) => {
-            const week = fmtPct(row.weekNet);
-            // Sector label resolves through the active language's dictionary
-            // (HE locale gets strings like "טכנולוגי", EN gets "Technology").
-            // Falls back to raw English on unrecognized FMP sectors so a
-            // brand-new sector never goes blank in the heatmap.
-            const sectorLabel = translateSector(t, row.sector);
-            return (
-              <HeatsheetRow
-                key={row.sector}
-                row={row}
-                week={week}
-                t={t}
-                sectorLabel={sectorLabel}
-              />
-            );
-          })}
+            {/* Sector rows */}
+            {heatmap!.rows.map((row) => {
+              const week = fmtPct(row.weekNet);
+              // Sector label resolves through the active language's dictionary.
+              const sectorLabel = translateSector(t, row.sector);
+              return (
+                <HeatsheetRow
+                  key={row.sector}
+                  row={row}
+                  week={week}
+                  t={t}
+                  sectorLabel={sectorLabel}
+                />
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -331,7 +341,7 @@ function HeatsheetCell({
         });
   return (
     <div
-      className={`text-xs font-mono font-bold flex items-center justify-center text-center px-2 py-2 rounded-md transition-all cursor-default drop-shadow-sm ${cellTextClass(cell.movePct)} ${!isToday ? 'opacity-60 hover:opacity-100' : 'hover:brightness-125'}`}
+      className={`text-xs font-mono font-bold flex items-center justify-center text-center px-2 py-2 rounded-md transition-all cursor-default drop-shadow-sm ${cellTextClass(cell.movePct)} ${!isToday ? "opacity-60 hover:opacity-100" : "hover:brightness-125"}`}
       style={{ backgroundColor: cellColor(cell.movePct) }}
       title={`${sectorLabel} · ${cell.date}\n${tooltip}`}
       dir="ltr"

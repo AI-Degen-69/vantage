@@ -67,7 +67,18 @@ export function handleScreenerFilter(req: Request, res: Response) {
 
     addMulti('sector', sector as string | undefined);
     addMulti('industry', industry as string | undefined);
-    addMulti('country', country as string | undefined);
+    
+    // For countries, include assets with NULL country (ETFs, Crypto, Indices) 
+    // so they aren't completely filtered out when a country is selected.
+    if (country) {
+      const vals = (country as string).split(',').map(v => v.trim()).filter(Boolean);
+      if (vals.length > 0) {
+        const placeholders = vals.map(() => '?').join(',');
+        conditions.push(`(country IN (${placeholders}) OR country IS NULL)`);
+        params.push(...vals);
+      }
+    }
+
     addMulti('asset_type', asset_type as string | undefined);
 
     // Optionally exclude symbols with dots (foreign exchange duplicates like AAPL.BA)

@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+} from "react";
 import { solveTemplate } from "./icu";
 
 // ── Translations ──────────────────────────────────────────────────────────────
@@ -6,7 +12,7 @@ import { solveTemplate } from "./icu";
 const en = {
   // Common
   "app.name": "Vantage",
-  "loading": "Loading...",
+  loading: "Loading...",
   "error.generic": "Something went wrong",
   "source.yahoo": "Yahoo Finance",
   "source.fmp": "FMP",
@@ -34,11 +40,21 @@ const en = {
   "common.date": "Date",
   "common.name": "Name",
   "common.price": "Price",
+  "common.pricePerShare": "Price/share",
+  "common.marketClose": "Market close",
+  "common.shares": "Shares",
+  "common.sharesUnit": "shares",
   "common.search": "Search",
   "common.symbol": "Symbol",
   "common.transacted": "Transacted",
   "common.type": "Type",
   "common.value": "Value",
+  "insider.administrative": "Administrative",
+  "insider.reportedPrice": "Reported transaction price",
+  "insider.priceUnavailable": "Price not reported by provider",
+  "insider.derivedValue": "Value derived from reported price × shares",
+  "insider.marketCloseContext":
+    "Market closing price on the transaction date; not the execution price",
   "common.usd": "US Dollar",
   "common.ils": "Israeli Shekel",
   "common.eur": "Euro",
@@ -72,10 +88,13 @@ const en = {
   "index.metricsYahooFallbackTitle":
     "Live Yahoo estimate — FMP free-tier daily quota exhausted, single-point TTM/estimate values shown in place of the 8-card YoY/CAGR grid.",
   "index.qualityInBrief": "Quality in Brief",
-  "index.unavailableApi": "Market data is currently unavailable. Please try again in a moment.",
+  "index.unavailableApi":
+    "Market data is currently unavailable. Please try again in a moment.",
   "index.viewMore": "View More",
-  "index.news1": "Quarterly revenue beat consensus expectations, driven by <strong>Services</strong> growth.",
-  "index.news2": "Management raised <strong>full-year guidance</strong> on the back of stronger-than-expected demand.",
+  "index.news1":
+    "Quarterly revenue beat consensus expectations, driven by <strong>Services</strong> growth.",
+  "index.news2":
+    "Management raised <strong>full-year guidance</strong> on the back of stronger-than-expected demand.",
 
   // ChartModal
   "chart.download": "Download CSV",
@@ -92,10 +111,13 @@ const en = {
   "chart.granularity": "Granularity",
   "chart.timeframe": "Timeframe",
   "chart.annualHint": "Show one bar per fiscal year (default).",
-  "chart.quarterlyHint": "Show one bar per quarter (Q1–Q4); CAGR windows widen to 4 / 12 / 20 quarters.",
+  "chart.quarterlyHint":
+    "Show one bar per quarter (Q1–Q4); CAGR windows widen to 4 / 12 / 20 quarters.",
   "chart.descYoYQuarter": "Latest quarter vs the same quarter last year.",
-  "chart.descCagr3YQuarter": "Quarterly CAGR over the last 12 quarters (annualized).",
-  "chart.descCagr5YQuarter": "Quarterly CAGR over the last 20 quarters (annualized).",
+  "chart.descCagr3YQuarter":
+    "Quarterly CAGR over the last 12 quarters (annualized).",
+  "chart.descCagr5YQuarter":
+    "Quarterly CAGR over the last 20 quarters (annualized).",
   "chart.period": "Period",
   "chart.value": "Value",
   "chart.yoy": "YoY Growth",
@@ -118,7 +140,8 @@ const en = {
   "charts.weekRange": "52-Week Range",
   "charts.aboveMidpoint": "Above midpoint · +${{amount}}",
   "charts.belowMidpoint": "Below midpoint · −${{amount}}",
-  "charts.dcfGuidance": "Adjust the income / growth / multiple inputs to model scenarios. Forward return assumes reinvestment and the multiple stays constant — a real DCF discounts future cash-flows at WACC, not multiples, so treat this widget as a back-of-the-envelope.",
+  "charts.dcfGuidance":
+    "Adjust the income / growth / multiple inputs to model scenarios. Forward return assumes reinvestment and the multiple stays constant — a real DCF discounts future cash-flows at WACC, not multiples, so treat this widget as a back-of-the-envelope.",
 
   // DipFinder
   "dipFinder.title": "Dip Finder (SMA Distance)",
@@ -179,7 +202,8 @@ const en = {
   "insights.spotlight.title": "SECTOR SPOTLIGHT",
   "insights.loading": "Loading real-time quotes from Yahoo Finance...",
   "insights.error.title": "Failed to load stock data",
-  "insights.error.desc": "The Yahoo Finance API may be rate-limited. Try again in a moment.",
+  "insights.error.desc":
+    "The Yahoo Finance API may be rate-limited. Try again in a moment.",
   "insights.empty.title": "No stocks match your filters",
   "insights.empty.desc": "Try adjusting your search or filter criteria",
   "insights.empty.clear": "Clear all filters",
@@ -225,7 +249,8 @@ const en = {
   "insights.search": "Search",
   "insights.tabBadgeLive": "● LIVE",
   "insights.tabBadgeMock": "○ MOCK",
-  "insights.noMatch": "No stocks match \"{{query}}\"",
+  "insights.noMatch": 'No stocks match "{{query}}"',
+  "insights.piotroskiScore": "Piotroski Score",
   "insights.activeStatus": "Active Status",
   "insights.analystEstimates": "Analyst Estimates",
   "insights.avg": "Avg",
@@ -233,13 +258,16 @@ const en = {
   "insights.ceo": "CEO",
   "insights.cik": "CIK",
   "insights.companyProfile": "Company Profile",
+  "insights.showMore": "Show more",
+  "insights.showLess": "Show less",
   "insights.currentQtr": "Current Qtr",
   "insights.currentYear": "Current Year",
   "insights.cusip": "CUSIP",
   "insights.employeeCount": "Employee Count",
   "insights.employees": "Employees",
   "insights.unavailable": "\u2014",
-  "insights.chartLiveSingleYear": "Only the latest year is live; historical years unavailable from the free-tier provider.",
+  "insights.chartLiveSingleYear":
+    "Only the latest year is live; historical years unavailable from the free-tier provider.",
   "insights.exchangeDescription": "Exchange",
   "insights.high": "High",
   "insights.idChips": "Identifiers",
@@ -277,9 +305,11 @@ const en = {
   "earnings.title": "Earnings Calendar",
   "earnings.loading": "Loading earnings calendar from Finnhub...",
   "earnings.error.title": "Failed to load earnings calendar",
-  "earnings.error.desc": "Finnhub API may be rate-limited. Try again in a moment.",
+  "earnings.error.desc":
+    "Finnhub API may be rate-limited. Try again in a moment.",
   "earnings.empty.title": "No earnings reports this week",
-  "earnings.empty.desc": "Try a different week or check back closer to the date",
+  "earnings.empty.desc":
+    "Try a different week or check back closer to the date",
   "earnings.today": "Today",
   "earnings.week": "Week",
   "earnings.total_reports": "Total Reports",
@@ -308,16 +338,20 @@ const en = {
   "watchlists.nameLabel": "Name",
   "watchlists.namePlaceholder": "My Watchlist",
   "watchlists.symbolsLabel": "Symbols",
-  "watchlists.symbolsPlaceholder": "Paste tickers — one per line, comma-separated, or as CSV",
-  "watchlists.csvHint": "We validate each ticker against /api/stock-overview before adding.",
+  "watchlists.symbolsPlaceholder":
+    "Paste tickers — one per line, comma-separated, or as CSV",
+  "watchlists.csvHint":
+    "We validate each ticker against /api/stock-overview before adding.",
   "watchlists.validatingLabel": "Validating…",
   "watchlists.validCount_one": "1 valid",
   "watchlists.validCount_other": "{{count}} valid",
   "watchlists.invalidCount_one": "1 invalid",
   "watchlists.invalidCount_other": "{{count}} invalid",
   "watchlists.invalidChip": "Invalid",
-  "watchlists.tooManySymbols": "Please use no more than {{max}} symbols per watchlist.",
-  "watchlists.validationUnavailable": "Symbol validation is temporarily unavailable. Please try again.",
+  "watchlists.tooManySymbols":
+    "Please use no more than {{max}} symbols per watchlist.",
+  "watchlists.validationUnavailable":
+    "Symbol validation is temporarily unavailable. Please try again.",
   "watchlists.createButton": "Create",
   "watchlists.cancelButton": "Cancel",
   "watchlists.deleteButton": "Delete",
@@ -326,14 +360,15 @@ const en = {
   "watchlists.cannotDeleteSystem": "The default list can't be deleted.",
   "watchlists.cannotRenameSystem": "The default list can't be renamed.",
   "watchlists.emptyNameError": "Please enter a name.",
-  "watchlists.duplicateNameError": "A list named \"{{name}}\" already exists.",
+  "watchlists.duplicateNameError": 'A list named "{{name}}" already exists.',
   "watchlists.empty": "Add symbols to get started.",
   "watchlists.dropToReorder": "Drag rows to reorder.",
-  "watchlists.confirmDelete": "Delete \"{{name}}\"?",
+  "watchlists.confirmDelete": 'Delete "{{name}}"?',
 
   // NotFound
   "notfound.title": "404 — Page Not Found",
-  "notfound.description": "The page you're looking for doesn't exist or has moved.",
+  "notfound.description":
+    "The page you're looking for doesn't exist or has moved.",
   "notfound.returnHome": "Return to home",
 
   // Portfolio
@@ -346,19 +381,22 @@ const en = {
   "portfolio.divOverlay": "Dividend overlay",
   "portfolio.dividendYield": "Dividend Yield",
   "portfolio.downsideOnly": "Downside only",
-  "portfolio.fxBannerBody": "Showing USD values because live FX rates are unavailable.",
+  "portfolio.fxBannerBody":
+    "Showing USD values because live FX rates are unavailable.",
   "portfolio.fxStale": "FX STALE",
   "portfolio.gainLoss": "Gain / Loss",
   "portfolio.gainLossPct": "Gain / Loss %",
   "portfolio.holdings": "Holdings",
   "portfolio.irr": "IRR",
-  "portfolio.irrExplainBody": "Annualized return on invested cashflows assuming reinvestment over the trailing 12 months. Calculated: {{rate}}.",
+  "portfolio.irrExplainBody":
+    "Annualized return on invested cashflows assuming reinvestment over the trailing 12 months. Calculated: {{rate}}.",
   "portfolio.irrExplainTitle": "How IRR is calculated",
   "portfolio.nextEvent": "Next Event",
   "portfolio.noPrice": "no price",
   "portfolio.oneYearBasis": "1-year basis",
   "portfolio.partial": "PARTIAL",
-  "portfolio.reviewReminder": "Re-run flows weekly; market moves shift risk classifications.",
+  "portfolio.reviewReminder":
+    "Re-run flows weekly; market moves shift risk classifications.",
   "portfolio.sharpe": "Sharpe",
   "portfolio.sortBy": "Sort by",
   "portfolio.sortino": "Sortino",
@@ -400,15 +438,21 @@ const en = {
   "insights.heatsheet.title": "SECTOR HEATMAP",
   "insights.heatsheet.foot": "{{rows}} sectors · {{days}} days · cached 15 min",
   "insights.heatsheet.partialHit": "today (partial)",
-  "insights.heatsheet.partialTitle": "Last column is today's intraday move — settles at close.",
+  "insights.heatsheet.partialTitle":
+    "Last column is today's intraday move — settles at close.",
   "insights.heatsheet.cellMeta_one": "1 of {{total}} priced · avg {{pct}}",
-  "insights.heatsheet.cellMeta_other": "{{priced}} of {{total}} priced · avg {{pct}}",
+  "insights.heatsheet.cellMeta_other":
+    "{{priced}} of {{total}} priced · avg {{pct}}",
   "insights.heatsheet.cellEmpty": "—",
   "insights.heatsheet.weekNetLabel": "5-day Σ",
   "insights.heatsheet.weekNetNoData": "no bookend",
-  "insights.heatsheet.loading": "Computing sector heatmap from {{days}}-day closes…",
+  "insights.heatsheet.loading":
+    "Computing sector heatmap from {{days}}-day closes…",
   "insights.heatsheet.untaggedSymbols_one": "untagged symbol",
   "insights.heatsheet.untaggedSymbols_other": "untagged symbols",
+  "insights.heatsheet.unavailableTitle": "Sector data temporarily unavailable",
+  "insights.heatsheet.unavailableBody":
+    "The US market heatmap uses recent Yahoo chart history for the curated S&P 500 universe. No sector rows were returned, so no values are being estimated or filled with mock data.",
   "insights.heatsheet.symbolCount_one": "1 symbol",
   "insights.heatsheet.symbolCount_other": "{{count}} symbols",
 
@@ -432,7 +476,8 @@ const en = {
   "splash.email": "Email address",
   "splash.password": "Password",
   "splash.login": "Log In / 7-Day Trial",
-  "splash.subtitle": "Your personalized Bloomberg terminal for long-term investors.",
+  "splash.subtitle":
+    "Your personalized Bloomberg terminal for long-term investors.",
 
   // Slide-over
   "slideover.loading": "Loading data...",
@@ -478,9 +523,11 @@ const en = {
   "providerHealth.feature.quote": "Quote",
   "providerHealth.feature.batchQuote": "Batch quotes",
   "providerHealth.feature.chart": "Chart",
-  "providerHealth.chartDownHint": "Yahoo chart history is down — this data may be stale",
+  "providerHealth.chartDownHint":
+    "Yahoo chart history is down — this data may be stale",
   "providerHealth.batchFallback": "Yahoo fallback",
-  "providerHealth.batchFallbackTooltip": "Batch quotes are paid-gated on this plan — each price is fetched per-symbol via Yahoo",
+  "providerHealth.batchFallbackTooltip":
+    "Batch quotes are paid-gated on this plan — each price is fetched per-symbol via Yahoo",
 
   // Footer usage pills (live API-call counts vs free-tier limits)
   "usage.footerLabel": "API usage",
@@ -499,13 +546,17 @@ const en = {
   "usage.resetOver24h": "resets >24h",
   "usage.rateLimited": "rate-limited right now",
   "usage.heuristic": "approx.",
-  "usage.heuristicTooltip": "Yahoo's documented rate limit doesn't exist on the keyless path — this is an approximate budget (≈200/hr).",
-  "usage.singleInstanceNote": "Per-process counter — may differ from the provider's dashboard across restarts.",
-  "usage.crossInstanceNote": "Counter tracks this Vantage process only; long-running deployments may diverge.",
+  "usage.heuristicTooltip":
+    "Yahoo's documented rate limit doesn't exist on the keyless path — this is an approximate budget (≈200/hr).",
+  "usage.singleInstanceNote":
+    "Per-process counter — may differ from the provider's dashboard across restarts.",
+  "usage.crossInstanceNote":
+    "Counter tracks this Vantage process only; long-running deployments may diverge.",
 
   // Third-party attribution links (free-tier requirement)
   "attribution.logoDev": "Logos by Logo.dev",
-  "attribution.logoDevAria": "Company logos provided by Logo.dev (opens in new tab)",
+  "attribution.logoDevAria":
+    "Company logos provided by Logo.dev (opens in new tab)",
 };
 
 // Re-exported so tests can verify the dictionary snapshots without a second import.
@@ -514,7 +565,7 @@ export const enDict = en;
 const he: Record<string, string> = {
   // Common
   "app.name": "Vantage",
-  "loading": "טוען...",
+  loading: "טוען...",
   "error.generic": "משהו השתבש",
   "source.yahoo": "Yahoo Finance",
   "source.fmp": "FMP",
@@ -531,7 +582,6 @@ const he: Record<string, string> = {
   "nav.earnings": "דוחות",
   "nav.portfolios": "תיקים",
 
-
   "topBar.indicesDow": "Dow",
   "topBar.indicesSp500": "S&P 500",
   "topBar.indicesNasdaq": "נאסדק",
@@ -540,11 +590,20 @@ const he: Record<string, string> = {
   "common.date": "תאריך",
   "common.name": "שם",
   "common.price": "מחיר",
+  "common.pricePerShare": "מחיר למניה",
+  "common.marketClose": "נעילה",
+  "common.shares": "מניות",
+  "common.sharesUnit": "מניות",
   "common.search": "חיפוש",
   "common.symbol": "סימבול",
   "common.transacted": "בוצע",
   "common.type": "סוג",
   "common.value": "ערך",
+  "insider.administrative": "מנהלי",
+  "insider.reportedPrice": "מחיר העסקה המדווח",
+  "insider.priceUnavailable": "המחיר לא דווח על ידי הספק",
+  "insider.derivedValue": "הערך חושב לפי מחיר מדווח × מספר מניות",
+  "insider.marketCloseContext": "מחיר הנעילה ביום העסקה; אינו מחיר הביצוע",
   "common.usd": "דולר אמריקאי",
   "common.ils": "שקל חדש",
   "common.eur": "אירו",
@@ -563,7 +622,7 @@ const he: Record<string, string> = {
   // sits inside LTR-safe braces for the number so dir="ltr" alignment
   // survives the RTL page.
   "index.metricsRateLimited":
-    "מכסת ה-FMP היומית בתוכנית החינמית הסתיימה — רענון המדדים יחודש בעוד כ-{{hours}} שעות. לחיצה על \"נסה שוב\" כנראה לא תעזור עד אז.",
+    'מכסת ה-FMP היומית בתוכנית החינמית הסתיימה — רענון המדדים יחודש בעוד כ-{{hours}} שעות. לחיצה על "נסה שוב" כנראה לא תעזור עד אז.',
   // Variant shown when the probe hasn't ticked yet (e.g. first paint).
   "index.metricsRateLimitedUnknownReset":
     "מכסת ה-FMP היומית בתוכנית החינמית אולי הסתיימה — נסה שוב מאוחר יותר. שערים וגרפים חיים אינם מושפעים.",
@@ -578,8 +637,10 @@ const he: Record<string, string> = {
   "index.qualityInBrief": "איכות בקצרה",
   "index.unavailableApi": "נתוני השוק אינם זמינים כרגע. נסה שוב בעוד רגע.",
   "index.viewMore": "הצג עוד",
-  "index.news1": "הכנסות הרבעון עלו על ציפיות האנליסטים, בהובלת צמיחה ב-<strong>שירותים</strong>.",
-  "index.news2": "ההנהלה העלתה את <strong>התחזית לשנה המלאה</strong> בעקבות ביקוש חזק מהצפוי.",
+  "index.news1":
+    "הכנסות הרבעון עלו על ציפיות האנליסטים, בהובלת צמיחה ב-<strong>שירותים</strong>.",
+  "index.news2":
+    "ההנהלה העלתה את <strong>התחזית לשנה המלאה</strong> בעקבות ביקוש חזק מהצפוי.",
 
   "chart.download": "הורד CSV",
   "chart.yoy1Y": "שנה אחרונה YoY",
@@ -595,10 +656,13 @@ const he: Record<string, string> = {
   "chart.granularity": "רמת פירוט",
   "chart.timeframe": "חלון זמן",
   "chart.annualHint": "עמודה אחת לשנת כספים (ברירת מחדל).",
-  "chart.quarterlyHint": "עמודה אחת לרבעון (Q1–Q4); חלונות CAGR מתרחבים ל-4/12/20 רבעונים.",
+  "chart.quarterlyHint":
+    "עמודה אחת לרבעון (Q1–Q4); חלונות CAGR מתרחבים ל-4/12/20 רבעונים.",
   "chart.descYoYQuarter": "הרבעון האחרון לעומת אותו רבעון בשנה הקודמת.",
-  "chart.descCagr3YQuarter": "CAGR רבעוני על פני 12 הרבעונים האחרונים (מתועל לשנה).",
-  "chart.descCagr5YQuarter": "CAGR רבעוני על פני 20 הרבעונים האחרונים (מתועל לשנה).",
+  "chart.descCagr3YQuarter":
+    "CAGR רבעוני על פני 12 הרבעונים האחרונים (מתועל לשנה).",
+  "chart.descCagr5YQuarter":
+    "CAGR רבעוני על פני 20 הרבעונים האחרונים (מתועל לשנה).",
   "chart.period": "תקופה",
   "chart.value": "ערך",
   "chart.yoy": "צמיחה שנתית",
@@ -620,7 +684,8 @@ const he: Record<string, string> = {
   "charts.weekRange": "טווח 52 שבועות",
   "charts.aboveMidpoint": "מעל נקודת האמצע · +${{amount}}",
   "charts.belowMidpoint": "מתחת לנקודת האמצע · −${{amount}}",
-  "charts.dcfGuidance": "התאם את תשומות ההכנסה / צמיחה / מכפיל כדי לדמות תרחישים. תשואה צפויה מניחה השקעה חוזרת והמכפיל נשאר קבוע — DCF אמיתי מנכה תזרימי מזומנים עתידיים ב-WACC, לא במכפילים, אז התייחס לווידג'ט הזה כחישוב גס.",
+  "charts.dcfGuidance":
+    "התאם את תשומות ההכנסה / צמיחה / מכפיל כדי לדמות תרחישים. תשואה צפויה מניחה השקעה חוזרת והמכפיל נשאר קבוע — DCF אמיתי מנכה תזרימי מזומנים עתידיים ב-WACC, לא במכפילים, אז התייחס לווידג'ט הזה כחישוב גס.",
 
   "dipFinder.title": "מחפש הנחות (מרחק מ-SMA)",
   "dipFinder.liveBadge": "חי",
@@ -680,7 +745,8 @@ const he: Record<string, string> = {
   "insights.spotlight.title": "תמונה ענפית",
   "insights.loading": "טוען נתונים חיים מ-Yahoo Finance...",
   "insights.error.title": "טעינת נתוני המניות נכשלה",
-  "insights.error.desc": "ייתכן ש-API של Yahoo Finance הוגבל. נסה שוב בעוד רגע.",
+  "insights.error.desc":
+    "ייתכן ש-API של Yahoo Finance הוגבל. נסה שוב בעוד רגע.",
   "insights.empty.title": "אין מניות שתואמות לסינון",
   "insights.empty.desc": "נסה לשנות את מונחי החיפוש או הסינון",
   "insights.empty.clear": "נקה את כל הסינונים",
@@ -724,21 +790,25 @@ const he: Record<string, string> = {
   "insights.search": "חיפוש",
   "insights.tabBadgeLive": "● חי",
   "insights.tabBadgeMock": "○ לדוגמה",
-  "insights.noMatch": "אין מניות שתואמות ל-\"{{query}}\"",
+  "insights.noMatch": 'אין מניות שתואמות ל-"{{query}}"',
+  "insights.piotroskiScore": "ניקוד Piotroski",
   "insights.activeStatus": "סטטוס פעילות",
   "insights.analystEstimates": "הערכות אנליסטים",
   "insights.avg": "ממוצע",
   "insights.beta": "בטא",
-  "insights.ceo": "מנכ\"ל",
+  "insights.ceo": 'מנכ"ל',
   "insights.cik": "CIK",
   "insights.companyProfile": "פרופיל חברה",
+  "insights.showMore": "הצג עוד",
+  "insights.showLess": "הצג פחות",
   "insights.currentQtr": "רבעון נוכחי",
   "insights.currentYear": "שנה נוכחית",
   "insights.cusip": "CUSIP",
   "insights.employeeCount": "מספר עובדים",
   "insights.employees": "עובדים",
   "insights.unavailable": "\u2014",
-  "insights.chartLiveSingleYear": "רק השנה האחרונה זמינה; שנים היסטוריות לא זמינות מהספק בתוכנית החינמית.",
+  "insights.chartLiveSingleYear":
+    "רק השנה האחרונה זמינה; שנים היסטוריות לא זמינות מהספק בתוכנית החינמית.",
   "insights.exchangeDescription": "בורסה",
   "insights.high": "גבוה",
   "insights.idChips": "מזהים",
@@ -805,7 +875,8 @@ const he: Record<string, string> = {
   "watchlists.nameLabel": "שם",
   "watchlists.namePlaceholder": "רשימת המעקב שלי",
   "watchlists.symbolsLabel": "סמלים",
-  "watchlists.symbolsPlaceholder": "הדבק סמלים — אחד בשורה, מופרדים בפסיק, או CSV",
+  "watchlists.symbolsPlaceholder":
+    "הדבק סמלים — אחד בשורה, מופרדים בפסיק, או CSV",
   "watchlists.csvHint": "כל סמל מאומת מול /api/stock-overview לפני ההוספה.",
   "watchlists.validatingLabel": "מאמת…",
   "watchlists.validCount_one": "1 תקין",
@@ -823,10 +894,10 @@ const he: Record<string, string> = {
   "watchlists.cannotDeleteSystem": "רשימת ברירת המחדל אינה ניתנת למחיקה.",
   "watchlists.cannotRenameSystem": "רשימת ברירת המחדל אינה ניתנת לשינוי שם.",
   "watchlists.emptyNameError": "נא להזין שם.",
-  "watchlists.duplicateNameError": "כבר קיימת רשימה בשם \"{{name}}\".",
+  "watchlists.duplicateNameError": 'כבר קיימת רשימה בשם "{{name}}".',
   "watchlists.empty": "הוסף סמלים כדי להתחיל.",
   "watchlists.dropToReorder": "גרור שורות כדי לסדר מחדש.",
-  "watchlists.confirmDelete": "למחוק את \"{{name}}\"?",
+  "watchlists.confirmDelete": 'למחוק את "{{name}}"?',
 
   "notfound.title": "404 — דף לא נמצא",
   "notfound.description": "הדף שחיפשת לא קיים או שהועבר.",
@@ -847,13 +918,15 @@ const he: Record<string, string> = {
   "portfolio.gainLossPct": "רווח / הפסד %",
   "portfolio.holdings": "אחזקות",
   "portfolio.irr": "IRR",
-  "portfolio.irrExplainBody": "תשואה שנתית על תזרים מזומנים שהושקע, בהנחת השקעה חוזרת, ב-12 החודשים האחרונים. חישוב: {{rate}}.",
+  "portfolio.irrExplainBody":
+    "תשואה שנתית על תזרים מזומנים שהושקע, בהנחת השקעה חוזרת, ב-12 החודשים האחרונים. חישוב: {{rate}}.",
   "portfolio.irrExplainTitle": "כיצד מחושב IRR",
   "portfolio.nextEvent": "אירוע הבא",
   "portfolio.noPrice": "אין מחיר",
   "portfolio.oneYearBasis": "בסיס שנתי",
   "portfolio.partial": "חלקי",
-  "portfolio.reviewReminder": "הרץ מחדש מדי שבוע; תנועות שוק משנות את סיווגי הסיכון.",
+  "portfolio.reviewReminder":
+    "הרץ מחדש מדי שבוע; תנועות שוק משנות את סיווגי הסיכון.",
   "portfolio.sharpe": "שארפ",
   "portfolio.sortBy": "מיין לפי",
   "portfolio.sortino": "סורטינו",
@@ -863,7 +936,7 @@ const he: Record<string, string> = {
   "portfolio.weight": "משקל",
   "portfolio.weightedAvg": "ממוצע משוקלל",
 
-  "splash.email": "כתובת דוא\"ל",
+  "splash.email": 'כתובת דוא"ל',
   "splash.password": "סיסמה",
   "splash.login": "התחבר / ניסיון 7 ימים",
   "splash.subtitle": "טרמינל בלומברג מותאם אישית למשקיעים לטווח ארוך.",
@@ -913,10 +986,13 @@ const he: Record<string, string> = {
   "insights.heatsheet.title": "מפת חום ענפית",
   "insights.heatsheet.foot": "{{rows}} ענפים · {{days}} ימים · במטמון 15 דקות",
   "insights.heatsheet.partialHit": "היום (חלקי)",
-  "insights.heatsheet.partialTitle": "העמודה האחרונה היא תנועת היום בתוך-יומית — נסגרת עם סגירת השוק.",
+  "insights.heatsheet.partialTitle":
+    "העמודה האחרונה היא תנועת היום בתוך-יומית — נסגרת עם סגירת השוק.",
   "insights.heatsheet.cellMeta_one": "1 מתוך {{total}} עם מחיר · ממוצע {{pct}}",
-  "insights.heatsheet.cellMeta_two": "{{priced}} מתוך {{total}} עם מחיר · ממוצע {{pct}}",
-  "insights.heatsheet.cellMeta_other": "{{priced}} מתוך {{total}} עם מחיר · ממוצע {{pct}}",
+  "insights.heatsheet.cellMeta_two":
+    "{{priced}} מתוך {{total}} עם מחיר · ממוצע {{pct}}",
+  "insights.heatsheet.cellMeta_other":
+    "{{priced}} מתוך {{total}} עם מחיר · ממוצע {{pct}}",
   "insights.heatsheet.cellEmpty": "—",
   "insights.heatsheet.weekNetLabel": "סיכום 5 ימים",
   "insights.heatsheet.weekNetNoData": "אין קצוות",
@@ -924,6 +1000,9 @@ const he: Record<string, string> = {
   "insights.heatsheet.untaggedSymbols_one": "סמל ללא ענף",
   "insights.heatsheet.untaggedSymbols_two": "שני סמלים ללא ענף",
   "insights.heatsheet.untaggedSymbols_other": "סמלים ללא ענף",
+  "insights.heatsheet.unavailableTitle": "נתוני הסקטורים אינם זמינים זמנית",
+  "insights.heatsheet.unavailableBody":
+    "מפת החום של השוק האמריקאי משתמשת בהיסטוריית מחירים עדכנית מ-Yahoo עבור יקום S&P 500. לא התקבלו שורות סקטור, ולכן לא מוצגים נתונים משוערים או מדומים.",
   "insights.heatsheet.symbolCount_one": "סמל אחד",
   "insights.heatsheet.symbolCount_two": "שני סמלים",
   "insights.heatsheet.symbolCount_other": "{{count}} סמלים",
@@ -944,7 +1023,7 @@ const he: Record<string, string> = {
   "sector.communicationServices": "שירותי תקשורת",
   "sector.industrials": "תעשיות",
   "sector.energy": "אנרגיה",
-  "sector.realEstate": "נדל\"ן",
+  "sector.realEstate": 'נדל"ן',
   "sector.utilities": "שירותים ציבוריים",
   "sector.basicMaterials": "חומרי גלם",
 
@@ -981,9 +1060,11 @@ const he: Record<string, string> = {
   "providerHealth.feature.quote": "שער",
   "providerHealth.feature.batchQuote": "שערים מרובים",
   "providerHealth.feature.chart": "גרף",
-  "providerHealth.chartDownHint": "היסטוריית הגרפים של Yahoo מושבתת — הנתונים עלולים להיות לא מעודכנים",
+  "providerHealth.chartDownHint":
+    "היסטוריית הגרפים של Yahoo מושבתת — הנתונים עלולים להיות לא מעודכנים",
   "providerHealth.batchFallback": "גיבוי Yahoo",
-  "providerHealth.batchFallbackTooltip": "שערים מרובים אינם זמינים בתוכנית הנוכחית — כל שער נטען בנפרד דרך Yahoo",
+  "providerHealth.batchFallbackTooltip":
+    "שערים מרובים אינם זמינים בתוכנית הנוכחית — כל שער נטען בנפרד דרך Yahoo",
 
   // Footer usage pills (live API-call counts vs free-tier limits). Numbers
   // stay inside `dir="ltr"` on the page side, so the Hebrew string can sit
@@ -1004,9 +1085,12 @@ const he: Record<string, string> = {
   "usage.resetOver24h": "מתאפס בעוד יותר מ-24 שעות",
   "usage.rateLimited": "מוגבל כרגע",
   "usage.heuristic": "משוער",
-  "usage.heuristicTooltip": "ל-Yahoo אין תיעוד רשמי למגבלת קצב במסלול החינמי — זה תקציב מוערך (≈200 לשעה).",
-  "usage.singleInstanceNote": "מונה לכל תהליך — עשוי להיות שונה מלוח המחוונים של הספק לאחר הפעלה מחדש.",
-  "usage.crossInstanceNote": "המונה מתעד את תהליך Vantage בלבד; פריסות ארוכות-טווח עלולות לסטות.",
+  "usage.heuristicTooltip":
+    "ל-Yahoo אין תיעוד רשמי למגבלת קצב במסלול החינמי — זה תקציב מוערך (≈200 לשעה).",
+  "usage.singleInstanceNote":
+    "מונה לכל תהליך — עשוי להיות שונה מלוח המחוונים של הספק לאחר הפעלה מחדש.",
+  "usage.crossInstanceNote":
+    "המונה מתעד את תהליך Vantage בלבד; פריסות ארוכות-טווח עלולות לסטות.",
 
   // Third-party attribution links (free-tier requirement)
   "attribution.logoDev": "לוגואים מ־Logo.dev",
@@ -1073,7 +1157,13 @@ const pluralRules: Record<string, (n: number) => PluralCategory> = {
 };
 
 /** Suffixes that mark a dictionary entry as a plural form of a base key. */
-const PLURAL_SUFFIXES: PluralCategory[] = ["one", "two", "few", "many", "other"];
+const PLURAL_SUFFIXES: PluralCategory[] = [
+  "one",
+  "two",
+  "few",
+  "many",
+  "other",
+];
 
 /**
  * Resolves the active language's plural category for a numeric count.
@@ -1097,7 +1187,9 @@ export function getPluralCategory(lang: string, count: number): PluralCategory {
 export function getDictionaryForLang(
   lang: string,
 ): Readonly<Record<string, string>> {
-  return Object.freeze(lang === "he" ? he : en) as Readonly<Record<string, string>>;
+  return Object.freeze(lang === "he" ? he : en) as Readonly<
+    Record<string, string>
+  >;
 }
 
 /**
@@ -1185,16 +1277,16 @@ export function resolvePluralKey(
  * dictionaries above.
  */
 const SECTOR_I18N_KEYS: Readonly<Record<string, string>> = {
-  "Technology": "sector.technology",
-  "Healthcare": "sector.healthcare",
+  Technology: "sector.technology",
+  Healthcare: "sector.healthcare",
   "Financial Services": "sector.financialServices",
   "Consumer Cyclical": "sector.consumerCyclical",
   "Consumer Defensive": "sector.consumerDefensive",
   "Communication Services": "sector.communicationServices",
-  "Industrials": "sector.industrials",
-  "Energy": "sector.energy",
+  Industrials: "sector.industrials",
+  Energy: "sector.energy",
   "Real Estate": "sector.realEstate",
-  "Utilities": "sector.utilities",
+  Utilities: "sector.utilities",
   "Basic Materials": "sector.basicMaterials",
 };
 
@@ -1272,17 +1364,17 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
       // ICU plural patterns through the tiny inline parser. `pluralRule` is
       // bound to the active language so selectors inside case-bodies use the
       // correct CLDR plural categories.
-      return solveTemplate(
-        value,
-        vars ?? {},
-        (n) => getPluralCategory(lang, n),
+      return solveTemplate(value, vars ?? {}, (n) =>
+        getPluralCategory(lang, n),
       );
     },
-    [lang]
+    [lang],
   );
 
   return (
-    <I18nContext.Provider value={{ lang, t, setLang, dir: lang === "he" ? "rtl" : "ltr" }}>
+    <I18nContext.Provider
+      value={{ lang, t, setLang, dir: lang === "he" ? "rtl" : "ltr" }}
+    >
       {children}
     </I18nContext.Provider>
   );
