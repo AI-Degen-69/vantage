@@ -35,7 +35,9 @@ function formatMoney(value: unknown, digits = 2): string | null {
   const abs = Math.abs(n);
   const suffix = abs >= 1e12 ? "T" : abs >= 1e9 ? "B" : abs >= 1e6 ? "M" : "";
   const divisor = abs >= 1e12 ? 1e12 : abs >= 1e9 ? 1e9 : abs >= 1e6 ? 1e6 : 1;
-  return `$${(n / divisor).toFixed(suffix ? digits : 2)}${suffix}`;
+  // Keep the minus sign before the currency symbol (-$4.80B, not $-4.80B).
+  const sign = n < 0 ? "-" : "";
+  return `${sign}$${(abs / divisor).toFixed(suffix ? digits : 2)}${suffix}`;
 }
 
 function formatNumber(value: unknown, digits = 2): string | null {
