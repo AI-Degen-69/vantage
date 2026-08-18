@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Maximize2 } from "lucide-react";
 import ChartModal from "./ChartModal";
 import { FinancialMetric } from "@/lib/mockData";
+import type { RevenueSegmentRow } from "@shared/api";
 import { useI18n } from "@/lib/i18n";
 import { Area, AreaChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { splitSparklineValues } from "@/lib/chartStyles";
@@ -14,6 +15,20 @@ interface InsightsCardProps {
   metricId: string; // Refers to the financialMetric name to pull historical data
   metricData: FinancialMetric; // The actual metric data with historical series
   ticker?: string;
+  /**
+   * Optional node rendered between the metric header and the sparkline
+   * (e.g. RevenueSegmentsCard's segment-filter chips). Keeps the card
+   * chrome identical for every metric while letting one card inject
+   * its own interactive strip.
+   */
+  filterBar?: React.ReactNode;
+  /**
+   * Revenue-segment rows forwarded to the chart modal so it can render the
+   * stacked per-year segment chart instead of the single metric series.
+   */
+  segmentRows?: RevenueSegmentRow[];
+  /** Segment the card had focused when the modal was opened (snapshots into the modal's filter chips). */
+  selectedSegment?: string | null;
 }
 
 /**
@@ -25,6 +40,7 @@ interface InsightsCardProps {
  * @param badgeType - The badge style indicating a positive, negative, or neutral trend
  * @param metricId - Identifies the metric whose historical data is displayed
  * @param metricData - The metric's historical data for sparkline and chart modal
+ * @param filterBar - Optional interactive strip between header and sparkline
  */
 export default function InsightsCard({
   title,
@@ -34,6 +50,9 @@ export default function InsightsCard({
   metricId,
   metricData,
   ticker,
+  filterBar,
+  segmentRows,
+  selectedSegment, // forwarded to the chart modal so it can mirror the card's focus
 }: InsightsCardProps) {
   const { t } = useI18n();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -102,26 +121,25 @@ export default function InsightsCard({
           }}
         >
           <Maximize2 className="h-4 w-4" />
-        </button>
-
-        <div className="flex flex-col mb-4">
-          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">
-            {title}
-          </span>
-          <div className="flex items-end gap-3">
-            <span className="text-2xl font-semibold text-foreground font-mono tabular-nums tracking-tight">
-              {value}
+        </button>          <div className="flex flex-col mb-4">
+            <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">
+              {title}
             </span>
-            {badgeText && (
-              <span
-                className={`text-xs font-semibold font-mono tabular-nums px-2 py-0.5 rounded border whitespace-nowrap ${getBadgeColor()} mb-1`}
-                dir="ltr"
-              >
-                {badgeText}
+            <div className="flex items-end gap-3">
+              <span className="text-2xl font-semibold text-foreground font-mono tabular-nums tracking-tight">
+                {value}
               </span>
-            )}
+              {badgeText && (
+                <span
+                  className={`text-xs font-semibold font-mono tabular-nums px-2 py-0.5 rounded border whitespace-nowrap ${getBadgeColor()} mb-1`}
+                  dir="ltr"
+                >
+                  {badgeText}
+                </span>
+              )}
+            </div>
+            {filterBar}
           </div>
-        </div>
 
         {/* Light-curve sparkline — a thin traced line against the panel's
             own graticule, not a filled gradient blob. Glow is earned by
@@ -217,6 +235,8 @@ export default function InsightsCard({
         onClose={() => setIsModalOpen(false)}
         metric={metricData}
         ticker={ticker}
+        segmentRows={segmentRows}
+        selectedSegment={selectedSegment ?? null}
       />
     </>
   );

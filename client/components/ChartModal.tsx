@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { X, Download, TrendingUp, TrendingDown, Lock, Table as TableIcon } from "lucide-react";
 import TickerLogo from "@/components/TickerLogo";
 import { useI18n } from "@/lib/i18n";
@@ -13,11 +13,14 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
   Cell,
   ReferenceLine,
+  LabelList,
 } from "recharts";
 import { FinancialMetric } from "@/lib/mockData";
+import type { RevenueSegmentRow } from "@shared/api";
 import { cn } from "@/lib/utils";
 import {
   cagrAtYearsBack,
@@ -25,7 +28,10 @@ import {
   metricStatementKey,
   projectMetricSeries,
 } from "@/lib/finance";
-import { useStockFinancials } from "@/hooks/useStockData";
+import {
+  useStockFinancials,
+  useStockRevenueSegmentation,
+} from "@/hooks/useStockData";
 import {
   barGradientId,
   barStroke,
@@ -38,6 +44,22 @@ interface ChartModalProps {
   isOpen: boolean;
   onClose: () => void;
   ticker?: string;
+  /**
+   * When non-empty, the modal renders a stacked per-year segment bar chart
+   * (FMP revenue-product-segmentation rows) instead of the single metric
+   * series — every segment stacked per fiscal year, with a legend, segment
+   * breakdown tooltip, and a per-segment table/CSV. Supplied by
+   * `RevenueSegmentsCard`; absent for every other metric.
+   */
+  segmentRows?: RevenueSegmentRow[];
+  /**
+   * Segment the revenue card had focused when the user clicked Expand.
+   * The modal snapshots this on the open transition and pre-applies it to
+   * the filter chips so the stacked chart mirrors the card's focus
+   * (every other segment hidden). `null` / undefined opens with every
+   * segment visible. Ignored in the single-series (non-segment) path.
+   */
+  selectedSegment?: string | null;
 }
 
 type TimeframeType = "1Y" | "3Y" | "5Y";
@@ -95,21 +117,52 @@ function formatMetricValue(value: number, unit: string, maxDecimals: number = 2)
   return `${prefix}${formattedNum}${suffix}`;
 }
 
+/**
+ * Distinct hue ladder for the stacked segment bars. Rotates across segments;
+ * the same index → color mapping is used by the legend, tooltip, and table so
+ * a segment never changes color between surfaces.
+ */
+const SEGMENT_PALETTE = [
+  "hsl(200 60% 60%)", // Nebula Blue
+  "hsl(155 55% 50%)", // Aurora Green
+  "hsl(32 85% 58%)", // Ember Orange
+  "hsl(265 45% 62%)", // Deep Space Violet
+  "hsl(190 65% 58%)", // Glacier Cyan
+  "hsl(340 55% 62%)", // Rose Pink
+  "hsl(42 65% 70%)", // Starlight Gold
+  "hsl(6 70% 58%)", // Ember Red
+];
+
 export default function ChartModal({
   metric,
   isOpen,
   onClose,
   ticker = "AAPL",
+  segmentRows = [],
+  selectedSegment = null,
 }: ChartModalProps) {
   const { t } = useI18n();
   const [timeframe, setTimeframe] = useState<TimeframeType>("1Y");
   const [granularity, setGranularity] = useState<Granularity>("annual");
   const [showTable, setShowTable] = useState(false);
+  // Segments the user has toggled off via the modal's filter chips. Stored
+  // as names so the chart, legend, tooltip, table, and CSV all share one
+  // source of truth; cleared when the modal closes.
+  const [hiddenSegments, setHiddenSegments] = useState<string[]>([]);
+
+  // The revenue card supplies annual segment rows; when non-empty the modal
+  // is in segment mode regardless of the granularity toggle (quarterly rows
+  // arrive from a separate fetch below). Gates both quarterly fetches so the
+  // single-series path and the segment path never request data they don't
+  // render.
+  const hasSegmentData = segmentRows.some((r) => r.products.length > 0);
 
   // Quarterly fetch only kicks in when needed; the hook is still safe to
   // call unconditionally because it disables on `!ticker`, but skipping
   // the request on the default annual render keeps the FMP budget lower
-  // (the free tier is already at 5-statement-rows max).
+  // (the free tier is already at 5-statement-rows max). In segment mode the
+  // statement fetch is skipped entirely — segment quarters come from
+  // `revenue-product-segmentation` instead.
   const {
     data: quarterlyStatements,
     dataUpdatedAt: quarterlyUpdatedAt,
@@ -117,9 +170,29 @@ export default function ChartModal({
     isError: quarterlyError,
   } = useStockFinancials(ticker, {
     period: "quarter",
-    enabled: isOpen && granularity === "quarter",
+    enabled: isOpen && granularity === "quarter" && !hasSegmentData,
   });
   const quarterlySource = quarterlyStatements?.sources?.income ?? quarterlyStatements?.sources?.balance ?? quarterlyStatements?.sources?.cash ?? null;
+
+  // Quarterly segment rows (FMP `revenue-product-segmentation?period=quarter`),
+  // fetched only when the modal is open, segment mode is active, and the
+  // user switched the granularity toggle to quarterly. Each row is one 10-Q
+  // filing's product breakdown.
+  const {
+    data: quarterlySegmentation,
+    isLoading: quarterlySegLoading,
+  } = useStockRevenueSegmentation(ticker, {
+    period: "quarter",
+    enabled: isOpen && granularity === "quarter" && hasSegmentData,
+  });
+  const quarterlySegmentRows = quarterlySegmentation?.rows ?? [];
+  const segmentQuarterlyUnavailable =
+    hasSegmentData &&
+    granularity === "quarter" &&
+    !quarterlySegLoading &&
+    quarterlySegmentation != null &&
+    quarterlySegmentRows.length === 0 &&
+    !quarterlySegmentation.rateLimited;
 
   // Series used by the chart. Annual = pre-built points from Index.tsx.
   // Quarterly = freshly projected from the Q-fetch. Recomputed only when
@@ -251,28 +324,236 @@ export default function ChartModal({
     });
   }, [filteredData, granularity, metric, quarterlyStatements]);
 
-  // Reset toggle + timeframe when the modal closes / reopens so the next
-  // open starts at the default annual 1Y. The 5Y control remains available
-  // for the chart window, but no 5Y CAGR card is shown without six annual
-  // or twenty-one quarterly endpoints.
-  useEffect(() => {
-    if (!isOpen) {      setGranularity("annual");
-      setTimeframe("1Y");
+  // ── Segment stacked-bar mode (FMP revenue-product-segmentation) ─────────
+  // When the revenue card supplies segment rows, the modal swaps its single-
+  // series chart for a per-period stacked bar chart. All derived data lives
+  // in one memo so the chart, legend, tooltip, table, and CSV share a single
+  // source of truth. Segment display order is the card's convention: the
+  // most recent period's products first, then earlier periods' products.
+  //
+  // Granularity picks the row source: annual rows come from the card prop
+  // (no extra fetch), quarterly rows from the modal's own `period=quarter`
+  // fetch. While quarterly rows are still loading — or when a symbol has no
+  // quarterly segment data — the source falls back to the annual rows so the
+  // chart never goes blank mid-toggle.
+  const segmentSource =
+    granularity === "quarter" && quarterlySegmentRows.length > 0
+      ? quarterlySegmentRows
+      : segmentRows;
+
+  /** Fiscal-period label for a segment row's x-axis / table / CSV slot. */
+  const segmentPeriodLabel = (
+    row: RevenueSegmentRow,
+    granularity: Granularity,
+  ): string => {
+    if (granularity === "quarter") {
+      const m = /^(\d{4})-(\d{2})/.exec(row.date);
+      if (m) {
+        return `Q${Math.floor((Number(m[2]) - 1) / 3) + 1} ${m[1]}`;
+      }
+      const q = /^Q([1-4])/i.exec(row.period);
+      if (q) return `Q${q[1]} ${row.fiscalYear}`.trim();
     }
-  }, [isOpen]);
+    return row.fiscalYear || row.date.slice(0, 4) || row.period;
+  };
+
+  const segmentModel = useMemo(() => {
+    const rowsWithProducts = segmentSource.filter((r) => r.products.length > 0);
+    const asc = [...rowsWithProducts].sort((a, b) =>
+      granularity === "quarter"
+        ? a.date < b.date
+          ? -1
+          : 1
+        : a.fiscalYear < b.fiscalYear
+          ? -1
+          : 1,
+    );
+    const names: string[] = [];
+    const seen = new Set<string>();
+    for (const row of [...asc].reverse()) {
+      for (const p of row.products) {
+        if (!seen.has(p.name)) {
+          seen.add(p.name);
+          names.push(p.name);
+        }
+      }
+    }
+    const rows = asc.map((row) => {
+      const point: Record<string, number | string | null> = {
+        date: segmentPeriodLabel(row, granularity),
+      };
+      let total = 0;
+      for (const name of names) {
+        const product = row.products.find((p) => p.name === name);
+        const value = product ? product.revenue / 1e9 : null;
+        point[name] = value;
+        if (value !== null) total += value;
+      }
+      point.total = total;
+      return point;
+    });
+    return { names, rows };
+  }, [segmentSource, granularity]);
+
+  const isSegmentMode = segmentModel.rows.length > 0 && segmentModel.names.length > 0;
+  const segmentColor = (name: string) =>
+    SEGMENT_PALETTE[
+      Math.max(0, segmentModel.names.indexOf(name)) % SEGMENT_PALETTE.length
+    ];
+
+  // Filtered view: segments not in `hiddenSegments`. Every surface (bars,
+  // legend, tooltip, table, CSV) renders only the visible subset, so the
+  // modal's chip row produces one coherent "compare these segments" view.
+  const visibleNames = segmentModel.names.filter(
+    (n) => !hiddenSegments.includes(n),
+  );
+  const toggleSegment = (name: string) =>
+    setHiddenSegments((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name],
+    );
+  // Sum of the visible segments for a given point — the "Total" the tooltip
+  // and axis domain read, so hiding a layer rescales the remaining stack.
+  const visibleTotal = (d: Record<string, number | string | null>) =>
+    visibleNames.reduce((acc, name) => {
+      const v = d[name];
+      return typeof v === "number" && Number.isFinite(v) ? acc + v : acc;
+    }, 0);
+
+  // Timeframe slices the stacked bars the same way the single-series path
+  // slices `metric.data` (1Y = latest period, 3Y = latest three). Annual
+  // counts years, quarterly counts quarters (4 / 12). FMP caps the payloads
+  // at 5 annual / 8 quarterly rows, so no locked-period padding is needed
+  // here — a 3Y quarterly window simply shows every fetched quarter.
+  const segmentWindow = useMemo(
+    () =>
+      segmentModel.rows.slice(
+        -(granularity === "quarter"
+          ? timeframe === "1Y"
+            ? 4
+            : 12
+          : timeframe === "1Y"
+            ? 1
+            : 3),
+      ),
+    [segmentModel.rows, timeframe, granularity],
+  );
+
+  // YoY / 3Y CAGR off the summed period totals, so the growth badges stay
+  // meaningful while the bars show the mix. Annual compares consecutive
+  // years; quarterly compares the same quarter one / three years back, so
+  // seasonality never masquerades as growth. Null when the window is too
+  // short → "-" like the other paths.
+  const segmentGrowth = useMemo(() => {
+    const totals = segmentModel.rows
+      .map((r) => r.total)
+      .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+    const last = totals[totals.length - 1];
+    const lookback = granularity === "quarter" ? 4 : 1;
+    const prev = totals[totals.length - 1 - lookback];
+    const yoy =
+      last != null && prev != null && prev !== 0
+        ? ((last - prev) / Math.abs(prev)) * 100
+        : null;
+    const yearsBack = granularity === "quarter" ? 12 : 3;
+    const windowBack = totals[totals.length - 1 - yearsBack];
+    const cagr3Y =
+      last != null &&
+      windowBack != null &&
+      windowBack !== 0 &&
+      totals.length > yearsBack
+        ? (Math.pow(Math.abs(last) / Math.abs(windowBack), 1 / 3) - 1) * 100
+        : null;
+    return { yoy, cagr3Y };
+  }, [segmentModel.rows, granularity]);
+
+  // Segment table rows: newest period first, each segment column + a summed
+  // Total, plus a YoY on the total — against the prior year in annual mode,
+  // against the same quarter last year in quarterly mode.
+  const segmentTableRows = useMemo(() => {
+    const asc = segmentModel.rows;
+    const lookback = granularity === "quarter" ? 4 : 1;
+    return [...asc]
+      .reverse()
+      // Explicit return type: spreading a `Record<string, …>` into a fresh
+      // object literal makes TS drop the index signature, so `row.date` /
+      // `row.total` would otherwise fail below. Pin the type at the map.
+      .map<Record<string, number | string | null> & { yoy: number | null }>(
+        (point, i) => {
+          const ascIdx = asc.length - 1 - i;
+          const cur = point.total;
+          const prev =
+            ascIdx >= lookback ? asc[ascIdx - lookback].total : null;
+          let yoy: number | null = null;
+          if (
+            typeof cur === "number" &&
+            typeof prev === "number" &&
+            prev !== 0
+          ) {
+            yoy = ((cur - prev) / Math.abs(prev)) * 100;
+          }
+          return { ...point, yoy };
+        },
+      );
+  }, [segmentModel.rows, granularity]);
+
+  // Reset toggle + timeframe + segment filters when the modal closes /
+  // reopens so the next open starts at the default annual 1Y with every
+  // segment visible. The 5Y control remains available for the chart window,
+  // but no 5Y CAGR card is shown without six annual or twenty-one quarterly
+  // endpoints.
+  // Tracks the previous `isOpen` value so we can detect the closed → open
+  // transition and snapshot the card's segment selection exactly once per
+  // open (subsequent in-modal chip toggles, granularity switches, and
+  // card chip changes while open must NOT clobber the user's filter).
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    const justOpened = isOpen && !wasOpenRef.current;
+    if (justOpened) {
+      setHiddenSegments(
+        selectedSegment && segmentModel.names.length > 0
+          ? segmentModel.names.filter((n) => n !== selectedSegment)
+          : [],
+      );
+    } else if (!isOpen) {
+      setGranularity("annual");
+      setTimeframe("1Y");
+      setHiddenSegments([]);
+    }
+    wasOpenRef.current = isOpen;
+  }, [isOpen, selectedSegment, segmentModel.names]);
 
   if (!isOpen) return null;
 
   const handleDownload = () => {
-    const csv = [
-      "Date,Value",
-      ...filteredData.map((d) => `${d.date},${d.value}`),
-    ].join("\n");
+    // Segment mode exports one column per segment plus the summed total;
+    // values are in B units (matching the chart axis) so the CSV reads
+    // the same as the bars.
+    const csv = isSegmentMode
+      ? [
+          [
+            granularity === "quarter" ? "Period" : "Year",
+            ...visibleNames,
+            "Total",
+          ].join(","),
+          ...segmentWindow.map((d) =>
+            [
+              d.date,
+              ...visibleNames.map((name) => d[name] ?? ""),
+              visibleTotal(d) || "",
+            ].join(","),
+          ),
+        ].join("\n")
+      : [
+          "Date,Value",
+          ...filteredData.map((d) => `${d.date},${d.value}`),
+        ].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${metric.name}${granularity === "quarter" ? "_quarterly" : "_annual"}.csv`;
+    a.download = isSegmentMode
+      ? "revenue_by_segment_annual.csv"
+      : `${metric.name}${granularity === "quarter" ? "_quarterly" : "_annual"}.csv`;
     a.click();
   };
 
@@ -400,6 +681,195 @@ export default function ChartModal({
         </filter>
       </defs>
     );
+
+    // Segment stacked mode — the modal's raison d'être for the revenue card.
+    // One bar per fiscal period (year, or quarter when the granularity
+    // toggle is on) with every visible segment stacked (legend + per-
+    // segment tooltip), so opening the modal from the segment card shows
+    // the full product mix regardless of which chip is selected on the
+    // card. The modal's own filter chips can hide segments from the stack;
+    // the axis rescales to the visible total.
+    if (isSegmentMode) {
+      const maxTotal = Math.max(
+        1,
+        ...segmentWindow.map((d) => visibleTotal(d)),
+      );
+      const SegmentTooltip = ({ active, payload, label }: any) => {
+        if (!active || !payload || payload.length === 0) return null;
+        const point = payload[0].payload;
+        const total = visibleTotal(point);
+        return (
+          <div className="bg-card border border-border p-3 rounded-panel text-xs text-foreground shadow-lg text-left rtl:text-right min-w-[11rem]">
+            <p className="text-muted-foreground mb-2 font-mono" dir="ltr">
+              {label}
+            </p>
+            {visibleNames.map((name) => {
+              const value = point[name];
+              if (typeof value !== "number" || !Number.isFinite(value)) {
+                return null;
+              }
+              return (
+                <div
+                  key={name}
+                  className="flex items-center justify-between gap-4 py-0.5"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ background: segmentColor(name) }}
+                    />
+                    {name}
+                  </span>
+                  <span className="font-mono tabular-nums" dir="ltr">
+                    {formatMetricValue(value, "B", 2)}
+                  </span>
+                </div>
+              );
+            })}
+            {total > 0 && (
+              <div className="flex items-center justify-between gap-4 mt-2 pt-2 border-t border-border">
+                <span className="font-medium">{t("chart.total")}</span>
+                <span
+                  className="font-mono tabular-nums font-bold"
+                  dir="ltr"
+                >
+                  {formatMetricValue(total, "B", 2)}
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      // Every segment hidden — show a nudge instead of an empty plot.
+      if (visibleNames.length === 0) {
+        return (
+          <div className="h-[400px] w-full flex items-center justify-center text-sm text-muted-foreground">
+            {t("chart.segmentNoSelection")}
+          </div>
+        );
+      }
+
+      // In-bar percentage labels: each visible segment gets a small white
+      // `NN%` centered inside its layer of the stack. We skip labels that
+      // would be unreadable — sub-4% shares, segments shorter than 14px, and
+      // bars narrower than 28px (the 3Y quarterly case packs 12 columns into
+      // the chart). The share is computed off `visibleTotal`, so when the
+      // modal's filter chips hide a layer the remaining labels always sum to
+      // 100% against the new total.
+      //
+      // NOTE — recharts passes `<Bar>` LabelLists the *cumulative* stack
+      // value at that layer, not the layer's own slice; the share is
+      // therefore read off `point[segmentName]` rather than the raw `value`
+      // prop. The segment name is captured per-bar via the closure factory
+      // below, so each `<Bar>`'s LabelList content correctly identifies
+      // which slice it is labelling.
+      const renderSegmentLabel = (segmentName: string) => {
+        const SegmentShareLabel = (props: {
+          x?: number;
+          y?: number;
+          width?: number;
+          height?: number;
+          value?: number;
+          index?: number;
+        }) => {
+          const { x, y, width, height, index } = props;
+          if (
+            typeof index !== "number" ||
+            typeof width !== "number" ||
+            typeof height !== "number" ||
+            typeof x !== "number" ||
+            typeof y !== "number"
+          ) {
+            return null;
+          }
+          const point = segmentWindow[index] as
+            | Record<string, number | string | null>
+            | undefined;
+          if (!point) return null;
+          const total = visibleTotal(point);
+          if (total <= 0) return null;
+          const slice = point[segmentName];
+          if (typeof slice !== "number" || !Number.isFinite(slice)) {
+            return null;
+          }
+          const share = (slice / total) * 100;
+          if (share < 4 || height < 14 || width < 28) return null;
+          const fontSize = width < 50 ? 9 : 11;
+          return (
+            <text
+              x={x + width / 2}
+              y={y + height / 2}
+              fill="white"
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontSize={fontSize}
+              fontWeight={600}
+              style={{
+                pointerEvents: "none",
+                paintOrder: "stroke",
+                stroke: "rgba(20, 18, 32, 0.55)",
+                strokeWidth: 2,
+                strokeLinejoin: "round",
+              }}
+            >
+              {`${Math.round(share)}%`}
+            </text>
+          );
+        };
+        return <SegmentShareLabel />;
+      };
+
+      return (
+        <div className="relative h-[400px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={segmentWindow}
+              margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <XAxis
+                dataKey="date"
+                stroke={axisColor}
+                tick={{ fontSize: 12 }}
+                tickMargin={8}
+              />
+              <YAxis
+                stroke={axisColor}
+                tick={{ fontSize: 12 }}
+                tickMargin={8}
+                domain={[0, maxTotal * 1.15]}
+                tickCount={5}
+                tickFormatter={(val) => formatMetricValue(val, "B", 0)}
+              />
+              <Tooltip
+                content={<SegmentTooltip />}
+                cursor={{ fill: "hsl(250 20% 16% / 0.35)" }}
+              />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              {visibleNames.map((name) => (
+                <Bar
+                  key={name}
+                  dataKey={name}
+                  stackId="seg"
+                  fill={segmentColor(name)}
+                  stroke="hsl(250 20% 14%)"
+                  strokeWidth={1}
+                  // No entrance animation: stacked bars render at their final
+                  // geometry immediately (rAF-throttled views can otherwise
+                  // freeze the grow-in at ~0%). The single-series charts keep
+                  // their animation since they render fine everywhere.
+                  isAnimationActive={false}
+                  maxBarSize={72}
+                >
+                  <LabelList content={renderSegmentLabel(name)} />
+                </Bar>
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      );
+    }
 
     switch (metric.type) {
       case "bar":
@@ -614,7 +1084,11 @@ export default function ChartModal({
               <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
                 <span className="font-mono text-muted-foreground uppercase">{ticker}</span>
                 <span className="text-muted-foreground/50">-</span>
-                <span>{t(metric.name)}</span>
+                <span>
+                  {isSegmentMode
+                    ? t("metrics.revenueBySegment")
+                    : t(metric.name)}
+                </span>
               </h2>
             </div>
             <button
@@ -652,6 +1126,11 @@ export default function ChartModal({
                   </button>
                 ))}
               </div>
+              {/* Yearly / Quarterly toggle — available for the single-series
+                  charts and for the segment view alike. In segment mode the
+                  quarterly rows come from `revenue-product-segmentation?
+                  period=quarter` (each bar is one 10-Q filing's product
+                  breakdown). */}
               <div className="flex border border-border rounded-lg overflow-hidden ms-2">
                 <button
                   onClick={() => setGranularity("annual")}
@@ -709,6 +1188,56 @@ export default function ChartModal({
                 Quarterly statements are unavailable from both providers for this symbol.
               </div>
             )}
+            {segmentQuarterlyUnavailable && (
+              <div className="mb-3 rounded-lg border border-chart-amber/30 bg-chart-amber/5 px-3 py-2 text-xs text-chart-amber">
+                {t("chart.segmentQuarterlyUnavailable")}
+              </div>
+            )}
+            {/* Segment filter chips — hide / reveal individual layers in
+                the stacked chart (and the tooltip, table, and CSV below).
+                Independent of the card's chips: opening the modal always
+                starts with every segment visible. */}
+            {isSegmentMode && (
+              <div
+                className="flex flex-wrap items-center gap-1.5 mb-4"
+                aria-label={t("metrics.revenueBySegment")}
+              >
+                <button
+                  type="button"
+                  onClick={() => setHiddenSegments([])}
+                  className={cn(
+                    "px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors",
+                    hiddenSegments.length === 0
+                      ? "bg-blue-500/15 text-blue-400 border-blue-500/30"
+                      : "bg-muted/40 text-muted-foreground border-border/40 hover:text-foreground",
+                  )}
+                >
+                  {t("revenueSegments.all")}
+                </button>
+                {segmentModel.names.map((name) => {
+                  const hidden = hiddenSegments.includes(name);
+                  return (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => toggleSegment(name)}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors",
+                        hidden
+                          ? "bg-muted/40 text-muted-foreground/50 border-border/40 line-through decoration-muted-foreground/40"
+                          : "bg-muted/40 text-foreground border-border/40 hover:text-foreground",
+                      )}
+                    >
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ background: segmentColor(name) }}
+                      />
+                      {name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
             {renderChart()}
           </div>
 
@@ -719,7 +1248,9 @@ export default function ChartModal({
                 {[
                   {
                     label: t("chart.cagr3Y"),
-                    value: liveGrowth.cagr3Y,
+                    value: isSegmentMode
+                      ? segmentGrowth.cagr3Y
+                      : liveGrowth.cagr3Y,
                     description:
                       granularity === "quarter"
                         ? t("chart.descCagr3YQuarter")
@@ -727,7 +1258,7 @@ export default function ChartModal({
                   },
                   {
                     label: t("chart.yoy1Y"),
-                    value: liveGrowth.yoy,
+                    value: isSegmentMode ? segmentGrowth.yoy : liveGrowth.yoy,
                     description:
                       granularity === "quarter"
                         ? t("chart.descYoYQuarter")
@@ -777,6 +1308,76 @@ export default function ChartModal({
             </div>
             
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
+              {isSegmentMode ? (
+                <div className="rounded-xl border border-border/50 overflow-x-auto bg-card/40 backdrop-blur-md shadow-sm">
+                  <table className="w-full text-sm text-left rtl:text-right border-collapse">
+                    <thead className="sticky top-0 bg-muted/80 backdrop-blur-md z-10 border-b border-border/50">
+                      <tr>
+                        <th className="py-3 px-4 text-muted-foreground font-medium whitespace-nowrap">
+                          {t("chart.period") || "Period"}
+                        </th>
+                        {visibleNames.map((name) => (
+                          <th
+                            key={name}
+                            className="py-3 px-4 text-muted-foreground font-medium text-right whitespace-nowrap"
+                          >
+                            {name}
+                          </th>
+                        ))}
+                        <th className="py-3 px-4 text-muted-foreground font-medium text-right whitespace-nowrap">
+                          {t("chart.total")}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/30">
+                      {segmentTableRows.map((row) => (
+                        <tr
+                          key={String(row.date)}
+                          className="hover:bg-white/5 transition-colors"
+                        >
+                          <td
+                            className="py-3 px-4 font-mono text-foreground/80 whitespace-nowrap"
+                            dir="ltr"
+                          >
+                            {String(row.date)}
+                          </td>
+                          {visibleNames.map((name) => {
+                            const value = row[name];
+                            const hasValue =
+                              typeof value === "number" &&
+                              Number.isFinite(value);
+                            return (
+                              <td
+                                key={name}
+                                className="py-3 px-4 text-right font-mono tabular-nums whitespace-nowrap"
+                                dir="ltr"
+                              >
+                                {hasValue
+                                  ? formatMetricValue(
+                                      value as number,
+                                      "B",
+                                      2,
+                                    )
+                                  : "-"}
+                              </td>
+                            );
+                          })}
+                          <td
+                            className="py-3 px-4 text-right font-mono tabular-nums font-semibold whitespace-nowrap"
+                            dir="ltr"
+                          >
+                            {formatMetricValue(
+                              visibleTotal(row) || 0,
+                              "B",
+                              2,
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
               <div className="rounded-xl border border-border/50 overflow-hidden bg-card/40 backdrop-blur-md shadow-sm">
                 <table className="w-full text-sm text-left rtl:text-right border-collapse">
                   <thead className="sticky top-0 bg-muted/80 backdrop-blur-md z-10 border-b border-border/50">
@@ -829,6 +1430,7 @@ export default function ChartModal({
                   </tbody>
                 </table>
               </div>
+              )}
             </div>
           </div>
         )}

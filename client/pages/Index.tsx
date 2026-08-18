@@ -4,6 +4,7 @@ import { useI18n } from "@/lib/i18n";
 import AnimatedNumber from "@/components/AnimatedNumber";
 import ChartModal from "@/components/ChartModal";
 import InsightsCard from "@/components/InsightsCard";
+import RevenueSegmentsCard from "@/components/RevenueSegmentsCard";
 import CompanyProfile from "@/components/CompanyProfile";
 import StockFundamentalsStrip from "@/components/StockFundamentalsStrip";
 import TickerLogo from "@/components/TickerLogo";
@@ -780,6 +781,20 @@ export default function Index() {
             </div>
           ) : (
             displayMetrics.map((metric, idx) => {
+              // Revenue is the one card that can show a product-segment
+              // breakdown (FMP revenue-product-segmentation) with segment
+              // filters. When the free-tier quota is exhausted the card falls
+              // back to this exact total-revenue render but keeps the segment
+              // filters visible as a locked premium feature.
+              if (metric.name === "insights.revenue") {
+                return (
+                  <RevenueSegmentsCard
+                    key={idx}
+                    metric={metric}
+                    ticker={ticker}
+                  />
+                );
+              }
               const latestVal = metric.data[metric.data.length - 1]?.value;
               const yoyChange = metric.yoy;
               return (
