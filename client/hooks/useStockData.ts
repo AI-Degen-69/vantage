@@ -16,6 +16,7 @@ import type {
   InsiderTransaction,
   NewsItem,
   ProviderHealthResponse,
+  RevenueSegmentation,
   SmaDistanceResponse,
   SectorHeatmapMetadata,
   SectorHeatmapResponse,
@@ -329,6 +330,41 @@ export function useStockMetrics(ticker: string) {
     queryKey: ["stockMetrics", ticker],
     queryFn: () => fetchJSON<StockMetrics>(`/api/stock-metrics?symbol=${encodeURIComponent(ticker)}`),
     enabled: !!ticker,
+  });
+}
+
+/**
+ * Fetches revenue broken down by product segment for a stock ticker.
+ *
+ * The response carries `rateLimited` (free-tier FMP quota exhausted) and
+ * `unavailable` (no FMP key), letting the revenue card fall back to the
+ * plain total-revenue series while keeping the segment filters visible as
+ * a locked premium feature. `retry: false` + a server-side 5-min backoff
+ * cache means a quota hit doesn't hammer the endpoint on every mount.
+ *
+ * @param ticker - The stock ticker symbol
+ * @param opts - Optional granularity: `'annual'` (default) or `'quarter'`.
+ *   Annual and quarterly requests use separate cache keys and FMP calls, so
+ *   the chart modal's granularity toggle can run both without colliding.
+ *   `enabled` gates the query — the modal only fetches quarterly rows once
+ *   the user switches the segment view to quarterly.
+ * @returns The query result containing the revenue segmentation response
+ */
+export function useStockRevenueSegmentation(
+  ticker: string,
+  opts?: { period?: "annual" | "quarter"; enabled?: boolean },
+) {
+  const period = opts?.period ?? "annual";
+  const enabled = opts?.enabled ?? true;
+  return useQuery({
+    queryKey: ["stockRevenueSegmentation", ticker, period],
+    queryFn: () =>
+      fetchJSON<RevenueSegmentation>(
+        `/api/stock-revenue-segmentation?symbol=${encodeURIComponent(ticker)}&period=${period}`,
+      ),
+    enabled: !!ticker && enabled,
+    staleTime: 5 * 60_000,
+    retry: false,
   });
 }
 

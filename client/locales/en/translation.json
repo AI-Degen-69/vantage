@@ -95,7 +95,10 @@
     "cagr3Y": "3Y (CAGR)",
     "descCagr3Y": "Compound annual growth rate: annualized average growth over 3 years",
     "cagr5Y": "5Y (CAGR)",
-    "descCagr5Y": "Compound annual growth rate: annualized average growth over 5 years"
+    "descCagr5Y": "Compound annual growth rate: annualized average growth over 5 years",
+    "total": "Total",
+    "segmentQuarterlyUnavailable": "Quarterly segment data is unavailable for this symbol — showing annual.",
+    "segmentNoSelection": "Select at least one segment to display."
   },
   "notfound": {
     "title": "404",
@@ -148,6 +151,12 @@
     "freeCashFlow": "Free Cash Flow",
     "shareholdersEquity": "Shareholders Equity",
     "eps": "EPS"
+  },
+  "revenueSegments": {
+    "all": "All",
+    "locked": "Segments",
+    "rateLimitedTooltip": "Segment breakdown is a premium feature — the free-tier FMP quota is exhausted, so revenue is shown as a total.",
+    "unavailableTooltip": "Segment breakdown is a premium feature — no FMP data source is configured, so revenue is shown as a total."
   },
   "dcf": {
     "title": "DCF Calculator",

@@ -121,6 +121,12 @@ const en = {
   "chart.period": "Period",
   "chart.value": "Value",
   "chart.yoy": "YoY Growth",
+  // Segment stacked-chart tooltip / table footer total (Revenue by Segment).
+  "chart.total": "Total",
+  "chart.segmentQuarterlyUnavailable":
+    "Quarterly segment data is unavailable for this symbol — showing annual.",
+  "chart.segmentNoSelection":
+    "Select at least one segment to display.",
 
   // DCFWidget
   "dcf.title": "DCF Valuation",
@@ -244,6 +250,16 @@ const en = {
   "metrics.totalAssets": "Total Assets",
   "metrics.marketCap": "Market Cap",
   "metrics.eps": "EPS",
+
+  // Revenue by segment card (FMP revenue-product-segmentation). `locked` is
+  // the visible chip label when the free-tier quota is exhausted; the tooltip
+  // explains why the segment filters are visible but unselectable.
+  "revenueSegments.all": "All",
+  "revenueSegments.locked": "Segments",
+  "revenueSegments.rateLimitedTooltip":
+    "Segment breakdown is a premium feature — the free-tier FMP quota is exhausted, so revenue is shown as a total.",
+  "revenueSegments.unavailableTooltip":
+    "Segment breakdown is a premium feature — no FMP data source is configured, so revenue is shown as a total.",
 
   // Insights — Company Profile / Detail page
   "insights.search": "Search",
@@ -667,6 +683,12 @@ const he: Record<string, string> = {
   "chart.period": "תקופה",
   "chart.value": "ערך",
   "chart.yoy": "צמיחה שנתית",
+  "chart.segmentQuarterlyUnavailable":
+    "נתוני מגזרים רבעוניים אינם זמינים עבור סמל זה — מציג שנתי.",
+  "chart.segmentNoSelection":
+    "בחר לפחות מגזר אחד להצגה.",
+  // סה"כ בגרף המגזרים הערוך (הכנסות לפי מגזר).
+  "chart.total": "סה\"כ",
 
   "dcf.title": "הערכת שווי DCF",
   "dcf.earningsMode": "מצב רווחים",
@@ -787,6 +809,16 @@ const he: Record<string, string> = {
   "metrics.totalAssets": "סך נכסים",
   "metrics.marketCap": "שווי שוק",
   "metrics.eps": "EPS",
+
+  // פילוח הכנסות לפי מגזר (FMP revenue-product-segmentation). `locked` הוא
+  // תווית השבב המוצגת כשמכסת התוכנית החינמית הסתיימה; הטקסט המוקפץ מסביר
+  // מדוע מסנני המגזרים נראים אך לא ניתנים לבחירה.
+  "revenueSegments.all": "הכל",
+  "revenueSegments.locked": "מגזרים",
+  "revenueSegments.rateLimitedTooltip":
+    "פילוח לפי מגזר הוא תכונת פרימיום — מכסת ה-FMP היומית בתוכנית החינמית הסתיימה, לכן ההכנסות מוצגות כסכום כולל.",
+  "revenueSegments.unavailableTooltip":
+    "פילוח לפי מגזר הוא תכונת פרימיום — לא הוגדר מקור נתונים של FMP, לכן ההכנסות מוצגות כסכום כולל.",
 
   "insights.search": "חיפוש",
   "insights.tabBadgeLive": "● חי",

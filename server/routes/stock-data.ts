@@ -10,6 +10,7 @@ import type {
   FxRatesResponse,
   IndexQuote,
   InsightsTabResponse,
+  RevenueSegmentation,
   SmaDistanceResponse,
   StockMetrics,
   StockQuote,
@@ -149,6 +150,25 @@ export const handleStockMetrics: RequestHandler = async (req, res) => {
   const symbol = parseTicker(req.query.symbol);
   if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
   const data: StockMetrics = await stockService.getMetrics(symbol);
+  res.json(data);
+};
+
+/**
+ * Revenue broken down by product segment (FMP `revenue-product-segmentation`).
+ * The response carries `rateLimited` (free-tier quota hit) so the client
+ * falls back to the plain total-revenue card while keeping the segment
+ * filters visible as a locked premium feature. `period` (annual|quarter)
+ * selects the reporting granularity served to the chart modal's toggle.
+ */
+export const handleRevenueSegmentation: RequestHandler = async (req, res) => {
+  const symbol = parseTicker(req.query.symbol);
+  if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
+  const period: "annual" | "quarter" =
+    req.query.period === "quarter" ? "quarter" : "annual";
+  const data: RevenueSegmentation = await stockService.getRevenueSegmentation(
+    symbol,
+    period,
+  );
   res.json(data);
 };
 
