@@ -12,19 +12,25 @@ Legend:
 
 ---
 
-## A. Already in Vantage's data layer — just never surfaced
-
-These need **UI work only**; the field is already fetched by an existing Vantage route.
+## ✅ Done — now shipping in Vantage
 
 | Metric | Provider & call (Alpha Scope) | FMP plan (free vs premium) | Where in Alpha Scope | Suggested location in Vantage | Implemented? |
 |---|---|---|---|---|---|
-| Company website | FMP `/stable/profile` → `website` (server-rendered) | ✅ **Free (Basic)** — US symbols only | Company page → "Latest Insights" block, under Market Cap — `https://alphascope.trade/dashboard/company/AAPL` | `client/components/CompanyProfile.tsx` id-chips row (beside exchange/CIK/ISIN). Field already mapped in `server/services/stockService.ts` (`website`), just unused client-side — `http://localhost:3000/stock/MSFT` | ❌ No — field fetched, not surfaced |
-| Net Debt | FMP `balance-sheet-statement` → `netDebt` (server-rendered) | ✅ **Free (Basic)** — max 5 responses/call (`L`) | Company page → "Statistics (TTM)" → Financial Health — `https://alphascope.trade/dashboard/company/AAPL` | `client/components/StockFundamentalsStrip.tsx` → "Balance" group (next to Cash / Debt). Field already on `BalanceSheetRow.netDebt` (`stockService.ts`) — `http://localhost:3000/stock/MSFT` | ❌ No — field fetched, not surfaced |
-| Dividend payout frequency | Derived from FMP `/stable/dividends` dates ("Quarterly" = 4 payments/yr) | ✅ **Free (Basic)** — max 5 responses/call (`L`) | Company page → "Statistics (TTM)" → Dividend — `https://alphascope.trade/dashboard/company/AAPL` | `client/components/StockFundamentalsStrip.tsx` → "Dividend" group (beside the existing "Payout Date" stub). Dividends already pulled via the aggregator — `http://localhost:3000/stock/MSFT` | ❌ No — field fetched, not surfaced |
+| Company website | FMP `/stable/profile` → `website` (server-rendered) | ✅ **Free (Basic)** — US symbols only | Company page → "Latest Insights" block, under Market Cap — `https://alphascope.trade/dashboard/company/AAPL` | Clickable chip in `client/components/CompanyProfile.tsx` id-chips row, from `overviewData.website` — `http://localhost:3000/stock/MSFT` | ✅ Yes |
+| Net Debt | FMP `balance-sheet-statement` → `netDebt` (server-rendered) | ✅ **Free (Basic)** — max 5 responses/call (`L`) | Company page → "Statistics (TTM)" → Financial Health — `https://alphascope.trade/dashboard/company/AAPL` | Row in the Balance group of `client/components/StockFundamentalsStrip.tsx`, from `balance.netDebt` — `http://localhost:3000/stock/MSFT` | ✅ Yes |
+| Trending browse | FMP market-movers: `/stable/biggest-gainers`, `/stable/biggest-losers`, `/stable/most-actives` (server-rendered, no client route) | ✅ **Free (Basic)** — full access, no limit | Dashboard home → "Trending" tab — `https://alphascope.trade/dashboard?category=trending` | `client/pages/Insights.tsx` "Trending" filter. Live movers via `stockService.getTrendingUniverse()` + `fetchTrendingMovers()` (`server/services/stockService.ts`), ranked by \|% move\|, with the curated list as fallback + 5-min 429 backoff — `http://localhost:3000/insights` | ✅ Yes |
 
 ---
 
-## B. Missing data — needs new FMP fields or endpoints
+## ❌ Not done — remaining gaps
+
+### UI only (field already fetched, just needs surfacing)
+
+| Metric | Provider & call (Alpha Scope) | FMP plan (free vs premium) | Where in Alpha Scope | Suggested location in Vantage | Implemented? |
+|---|---|---|---|---|---|
+| Dividend payout frequency | Derived from FMP `/stable/dividends` dates ("Quarterly" = 4 payments/yr) | ✅ **Free (Basic)** — max 5 responses/call (`L`) | Company page → "Statistics (TTM)" → Dividend — `https://alphascope.trade/dashboard/company/AAPL` | `client/components/StockFundamentalsStrip.tsx` → "Dividend" group (beside the existing "Payout Date" stub). Dividends already pulled via the aggregator — `http://localhost:3000/stock/MSFT` | ❌ No |
+
+### Needs new FMP fields or endpoints
 
 | Metric | Provider & call (Alpha Scope) | FMP plan (free vs premium) | Where in Alpha Scope | Suggested location in Vantage | Implemented? |
 |---|---|---|---|---|---|
@@ -34,11 +40,8 @@ These need **UI work only**; the field is already fetched by an existing Vantage
 | Revenue by segment | FMP `revenue-product-segmentation` (Alpha Scope proxy: `/api/fmp/revenue-product-segmentation`, POST `{symbol, limit, period}`) | ✅ **Free (Basic)** — max 10 responses/call (`L`), annual-period only (`A`) | Company page → Charts section, "Revenue by Segment" card — `https://alphascope.trade/dashboard/company/AAPL` | New chart card in `client/pages/Index.tsx` charts grid + new `/api` route in `server/index.ts` — `http://localhost:3000/stock/MSFT` | ❌ No |
 | P/E and P/S charted over time | FMP `/stable/ratios` (period = quarter/annual + limit). Alpha Scope proxy: `/api/fmp/ratios` | ✅ **Free (Basic)** — max 5 responses/call (`L`), annual-period only (`A`) | Company page → Charts section, "Price to Earnings Ratio" and "Price to Sales Ratio" cards — `https://alphascope.trade/dashboard/company/AAPL` | New historical-ratio chart cards in `Index.tsx` charts grid + extend `ChartModal`. Vantage currently fetches TTM ratios only (`/api/stock-metrics`) — `http://localhost:3000/stock/MSFT` | ❌ No |
 | Peers / comparables table | FMP `/stable/stock-peers` (peer symbols) → per-peer quote + metrics (server-rendered) | ✅ **Free (Basic)** — full access, no limit | Company page → "Peers Similar to …" table (Market Cap, Revenue, Net Income, FCF, P/E, Fwd P/EG, P/B, P/S) — `https://alphascope.trade/dashboard/company/AAPL` | New section below `CompanyProfile.tsx` in `Index.tsx`, backed by a new `/api/stock-peers` route + existing batch-quote/metrics hooks — `http://localhost:3000/stock/MSFT` | ❌ No |
-| Trending browse | FMP market-movers: `/stable/biggest-gainers`, `/stable/biggest-losers`, `/stable/most-actives` (server-rendered, no client route) | ✅ **Free (Basic)** — full access, no limit | Dashboard home → "Trending" tab — `https://alphascope.trade/dashboard?category=trending` | `client/pages/Insights.tsx` "Trending" filter. Done via `stockService.getTrendingUniverse()` + `fetchTrendingMovers()` (`server/services/stockService.ts`), with the curated list as fallback — `http://localhost:3000/insights` | ✅ Yes — live movers wired, curated fallback |
 
----
-
-## C. Missing data — needs a new provider (OpenAI, not FMP)
+### Needs a new provider (OpenAI, not FMP)
 
 | Metric | Provider & call (Alpha Scope) | FMP plan (free vs premium) | Where in Alpha Scope | Suggested location in Vantage | Implemented? |
 |---|---|---|---|---|---|
@@ -53,4 +56,5 @@ These need **UI work only**; the field is already fetched by an existing Vantage
 - **The only true premium dependency is OpenAI** (Catalysts/Risks): a separate billed provider, unrelated to FMP's plan tiers.
 - **Trending was previously mislabeled as "needs a higher FMP tier"** — that's wrong. The movers endpoints are free; Vantage's 404s come from calling the old `/stable/gainers` and `/actives` paths, which FMP renamed to `/stable/biggest-gainers`, `/stable/biggest-losers`, and `/stable/most-actives`. Fix the paths, not the plan.
 - **Everything Alpha Scope shows is FMP + OpenAI.** Logos and news thumbnails come from `images.financialmodelingprep.com`; financials/ratios/peers/segment data all route through its own `/api/fmp/*` proxy routes (see the client bundle) or are server-rendered from FMP.
-- **Vantage already has the FMP plumbing** (`stockService.ts` normalizes profile/statements/ratios/metrics/dividends), so items in section A are near-free and most of section B are additive field/route work, not a new integration.
+- **Vantage already has the FMP plumbing** (`stockService.ts` normalizes profile/statements/ratios/metrics/dividends), so the "UI only" gap is near-free, the "new FMP fields" items are additive field/route work, and only Catalysts/Risks require a genuinely new integration.
+- **Status snapshot (post PR #20):** 3 of 12 gaps shipped — Company website, Net Debt, and Trending browse. 9 remain.
