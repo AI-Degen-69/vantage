@@ -270,6 +270,12 @@ export default function StockFundamentalsStrip({
             loading={loading}
             source={balanceSource ? { label: balanceSource } : undefined}
           />
+          <MetricRow
+            label="Net Debt"
+            value={formatMoney(balance?.netDebt)}
+            loading={loading}
+            source={balanceSource ? { label: balanceSource } : undefined}
+          />
         </MetricGroup>
 
         <MetricGroup title="Dividend">

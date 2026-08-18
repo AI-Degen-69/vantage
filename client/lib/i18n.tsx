@@ -266,6 +266,7 @@ const en = {
   "insights.employeeCount": "Employee Count",
   "insights.employees": "Employees",
   "insights.unavailable": "\u2014",
+  "insights.website": "Website",
   "insights.chartLiveSingleYear":
     "Only the latest year is live; historical years unavailable from the free-tier provider.",
   "insights.exchangeDescription": "Exchange",
@@ -807,6 +808,7 @@ const he: Record<string, string> = {
   "insights.employeeCount": "מספר עובדים",
   "insights.employees": "עובדים",
   "insights.unavailable": "\u2014",
+  "insights.website": "אתר",
   "insights.chartLiveSingleYear":
     "רק השנה האחרונה זמינה; שנים היסטוריות לא זמינות מהספק בתוכנית החינמית.",
   "insights.exchangeDescription": "בורסה",
