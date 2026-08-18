@@ -106,6 +106,7 @@ const QUOTE_TTL = 60; // 1 min — quotes are the only thing we ever refetch liv
 const QUOTE_NEGATIVE_TTL = 15; // Briefly suppress repeated misses without hiding recovery.
 const TRENDING_MOVERS_TTL = 60; // 1 min — movers are live-by-nature, same cadence as quotes
 const TRENDING_MOVERS_MAX = 30; // cap the Trending tab so the batch-quote fan-out stays lean
+const TRENDING_MOVERS_RATE_LIMIT_TTL = 300; // 5 min — hard backoff after an FMP 429 (quota exhausted)
 const PROFILE_NEGATIVE_TTL = 30; // Provider outages/not-found responses are retryable.
 const CHART_NEGATIVE_TTL = 30; // Avoid retry storms while preserving recovery from provider outages.
 const SECTOR_HEATMAP_TTL = 900; // 15 min — heatmap recomputation cache (day deltas are slow-moving)
@@ -212,6 +213,56 @@ function hasFmp(): boolean {
   return typeof FMP_KEY === "string" && FMP_KEY.length > 0;
 }
 
+/** Result of a status-aware fetch. */
+export interface FetchJSONResult<T> {
+  data: T | null;
+  /** HTTP status, or null when the request never completed (timeout/network). */
+  status: number | null;
+}
+
+/**
+ * Status-aware variant of `fetchJSON`. Callers that need to distinguish a
+ * transient network failure from an explicit HTTP 429 rate-limit (e.g. the
+ * Trending movers fetcher) use this to pick the right backoff.
+ */
+export async function fetchJSONStatus<T = any>(
+  url: string,
+  label: string,
+  timeoutMs = 12000,
+): Promise<FetchJSONResult<T>> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    if (!res.ok) {
+      // 404 / 403 / 429 from FMP shows up here — caller decides what to do.
+      throttledWarn(
+        `fetcher:${label}:http`,
+        `[stockService] ${label} failed: http_${res.status}`,
+      );
+      return { data: null, status: res.status };
+    }
+    try {
+      return { data: (await res.json()) as T, status: res.status };
+    } catch {
+      throttledWarn(
+        `fetcher:${label}:json`,
+        `[stockService] ${label} failed: invalid_json`,
+      );
+      return { data: null, status: res.status };
+    }
+  } catch (e: any) {
+    const kind = e?.name === "AbortError" ? "timeout" : "network_error";
+    throttledWarn(
+      `fetcher:${label}:${kind}`,
+      `[stockService] ${label} failed: ${kind}`,
+    );
+    return { data: null, status: null };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Fetches JSON data from a URL within the specified timeout.
  *
@@ -230,37 +281,7 @@ export async function fetchJSON<T = any>(
   label: string,
   timeoutMs = 12000,
 ): Promise<T | null> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { signal: ctrl.signal });
-    if (!res.ok) {
-      // 404 / 403 from FMP shows up here — caller decides what to do.
-      throttledWarn(
-        `fetcher:${label}:http`,
-        `[stockService] ${label} failed: http_${res.status}`,
-      );
-      return null;
-    }
-    try {
-      return (await res.json()) as T;
-    } catch {
-      throttledWarn(
-        `fetcher:${label}:json`,
-        `[stockService] ${label} failed: invalid_json`,
-      );
-      return null;
-    }
-  } catch (e: any) {
-    const kind = e?.name === "AbortError" ? "timeout" : "network_error";
-    throttledWarn(
-      `fetcher:${label}:${kind}`,
-      `[stockService] ${label} failed: ${kind}`,
-    );
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
+  return (await fetchJSONStatus<T>(url, label, timeoutMs)).data;
 }
 
 /**
@@ -991,6 +1012,12 @@ async function yahooQuote(symbol: string): Promise<StockQuote | null> {
   }
 }
 
+export interface TrendingMoversResult {
+  entries: InsightsTabEntry[];
+  /** True when FMP returned 429 and no rows were collected — signals a hard backoff. */
+  rateLimited: boolean;
+}
+
 /**
  * Fetches FMP's live market movers and maps them to lightweight
  * InsightsTabEntry rows for the Trending tab. Order is gainers → most-active
@@ -999,19 +1026,19 @@ async function yahooQuote(symbol: string): Promise<StockQuote | null> {
  * The `/stable/` movers paths were renamed (see MOVERS_ENDPOINTS) — the old
  * `/stable/gainers` + `/actives` paths 404 (docs/alpha-scope-missing-metrics.md).
  */
-async function fetchTrendingMovers(): Promise<InsightsTabEntry[]> {
+export async function fetchTrendingMovers(): Promise<TrendingMoversResult> {
   const [gainers, losers, actives] = await Promise.all([
-    fetchJSON<any[]>(
+    fetchJSONStatus<any[]>(
       fmpUrl(MOVERS_ENDPOINTS.gainers),
       "trending movers (gainers)",
       10000,
     ),
-    fetchJSON<any[]>(
+    fetchJSONStatus<any[]>(
       fmpUrl(MOVERS_ENDPOINTS.losers),
       "trending movers (losers)",
       10000,
     ),
-    fetchJSON<any[]>(
+    fetchJSONStatus<any[]>(
       fmpUrl(MOVERS_ENDPOINTS.actives),
       "trending movers (actives)",
       10000,
@@ -1032,10 +1059,17 @@ async function fetchTrendingMovers(): Promise<InsightsTabEntry[]> {
     }
   };
 
-  collect(gainers);
-  collect(actives);
-  collect(losers);
-  return out.slice(0, TRENDING_MOVERS_MAX);
+  collect(gainers.data);
+  collect(actives.data);
+  collect(losers.data);
+
+  // Only an empty result is treated as rate-limited: partial data is still
+  // worth serving normally, and a lone 429 beside healthy 200s shouldn't
+  // back off the whole tab.
+  const rateLimited =
+    out.length === 0 && [gainers, losers, actives].some((r) => r.status === 429);
+
+  return { entries: out.slice(0, TRENDING_MOVERS_MAX), rateLimited };
 }
 
 // ---- Public service --------------------------------------------------------
@@ -2010,16 +2044,18 @@ export const stockService = {
       const inFlightCached = cache.get<InsightsTabEntry[]>(cacheKey);
       if (inFlightCached) return inFlightCached;
 
-      const movers = await fetchTrendingMovers();
+      const { entries, rateLimited } = await fetchTrendingMovers();
       const result =
-        movers.length > 0 ? movers : insightsTabUniverses.trending;
-      // Short negative TTL on fallback so a transient FMP outage recovers
-      // quickly instead of pinning the curated list for a full minute.
-      cache.set(
-        cacheKey,
-        result,
-        movers.length > 0 ? TRENDING_MOVERS_TTL : QUOTE_NEGATIVE_TTL,
-      );
+        entries.length > 0 ? entries : insightsTabUniverses.trending;
+      // Transient failures recover quickly, but an explicit 429 means the
+      // daily quota is exhausted — back off hard so we stop re-firing the
+      // three movers calls into an already-throttled key.
+      const ttl = entries.length > 0
+        ? TRENDING_MOVERS_TTL
+        : rateLimited
+          ? TRENDING_MOVERS_RATE_LIMIT_TTL
+          : QUOTE_NEGATIVE_TTL;
+      cache.set(cacheKey, result, ttl);
       return result;
     });
   },
