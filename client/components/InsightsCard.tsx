@@ -121,25 +121,26 @@ export default function InsightsCard({
           }}
         >
           <Maximize2 className="h-4 w-4" />
-        </button>          <div className="flex flex-col mb-4">
-            <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">
-              {title}
+        </button>
+        <div className="flex flex-col mb-4">
+          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">
+            {title}
+          </span>
+          <div className="flex items-end gap-3">
+            <span className="text-2xl font-semibold text-foreground font-mono tabular-nums tracking-tight">
+              {value}
             </span>
-            <div className="flex items-end gap-3">
-              <span className="text-2xl font-semibold text-foreground font-mono tabular-nums tracking-tight">
-                {value}
+            {badgeText && (
+              <span
+                className={`text-xs font-semibold font-mono tabular-nums px-2 py-0.5 rounded border whitespace-nowrap ${getBadgeColor()} mb-1`}
+                dir="ltr"
+              >
+                {badgeText}
               </span>
-              {badgeText && (
-                <span
-                  className={`text-xs font-semibold font-mono tabular-nums px-2 py-0.5 rounded border whitespace-nowrap ${getBadgeColor()} mb-1`}
-                  dir="ltr"
-                >
-                  {badgeText}
-                </span>
-              )}
-            </div>
-            {filterBar}
+            )}
           </div>
+          {filterBar}
+        </div>
 
         {/* Light-curve sparkline — a thin traced line against the panel's
             own graticule, not a filled gradient blob. Glow is earned by
