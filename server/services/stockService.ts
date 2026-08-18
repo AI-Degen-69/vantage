@@ -104,6 +104,8 @@ export { usageTestSeam };
 const cache = new NodeCache({ stdTTL: 3600, maxKeys: 10000 });
 const QUOTE_TTL = 60; // 1 min — quotes are the only thing we ever refetch live
 const QUOTE_NEGATIVE_TTL = 15; // Briefly suppress repeated misses without hiding recovery.
+const TRENDING_MOVERS_TTL = 60; // 1 min — movers are live-by-nature, same cadence as quotes
+const TRENDING_MOVERS_MAX = 30; // cap the Trending tab so the batch-quote fan-out stays lean
 const PROFILE_NEGATIVE_TTL = 30; // Provider outages/not-found responses are retryable.
 const CHART_NEGATIVE_TTL = 30; // Avoid retry storms while preserving recovery from provider outages.
 const SECTOR_HEATMAP_TTL = 900; // 15 min — heatmap recomputation cache (day deltas are slow-moving)
@@ -131,6 +133,9 @@ const healthInFlight = createInFlightRegistry();
 // (when many requesters see FMP's 429 at once and pivot to the Yahoo
 // fallback path). Same module-scoped lifetime as the other registries.
 const yahooFallbackInFlight = createInFlightRegistry();
+// Coalesces concurrent Trending-tab mover fetches (FMP biggest-gainers /
+// biggest-losers / most-actives) behind one upstream round-trip.
+const trendingMoversInFlight = createInFlightRegistry();
 
 /** Throttle to once-per-key per minute. Logs once per (function, symbol) per minute. */
 function throttledWarn(key: string, ...args: unknown[]): void {
@@ -180,6 +185,23 @@ const CHART_ENDPOINT = FMP_USE_STABLE
  * branchless.
  */
 const QUOTE_USE_QUERY_PARAM = FMP_USE_STABLE;
+
+/**
+ * Market-movers endpoints. `/stable/` renamed `gainers`/`losers`/`actives` to
+ * `biggest-gainers`/`biggest-losers`/`most-actives`; legacy v3 keeps the
+ * `stock_market/*` family for grandfather-licensed keys.
+ */
+const MOVERS_ENDPOINTS = FMP_USE_STABLE
+  ? {
+      gainers: "biggest-gainers",
+      losers: "biggest-losers",
+      actives: "most-actives",
+    }
+  : {
+      gainers: "stock_market/gainers",
+      losers: "stock_market/losers",
+      actives: "stock_market/actives",
+    };
 
 /**
  * Determines whether an FMP API key is configured.
@@ -967,6 +989,53 @@ async function yahooQuote(symbol: string): Promise<StockQuote | null> {
     );
     return null;
   }
+}
+
+/**
+ * Fetches FMP's live market movers and maps them to lightweight
+ * InsightsTabEntry rows for the Trending tab. Order is gainers → most-active
+ * → losers so the list reads "what's moving" without a client-side re-sort.
+ *
+ * The `/stable/` movers paths were renamed (see MOVERS_ENDPOINTS) — the old
+ * `/stable/gainers` + `/actives` paths 404 (docs/alpha-scope-missing-metrics.md).
+ */
+async function fetchTrendingMovers(): Promise<InsightsTabEntry[]> {
+  const [gainers, losers, actives] = await Promise.all([
+    fetchJSON<any[]>(
+      fmpUrl(MOVERS_ENDPOINTS.gainers),
+      "trending movers (gainers)",
+      10000,
+    ),
+    fetchJSON<any[]>(
+      fmpUrl(MOVERS_ENDPOINTS.losers),
+      "trending movers (losers)",
+      10000,
+    ),
+    fetchJSON<any[]>(
+      fmpUrl(MOVERS_ENDPOINTS.actives),
+      "trending movers (actives)",
+      10000,
+    ),
+  ]);
+
+  const seen = new Set<string>();
+  const out: InsightsTabEntry[] = [];
+  const collect = (list: any[] | null) => {
+    if (!Array.isArray(list)) return;
+    for (const row of list) {
+      if (!row || typeof row !== "object") continue;
+      const symbol = String(row.symbol ?? "").trim().toUpperCase();
+      if (!symbol || seen.has(symbol)) continue;
+      const name = String(row.name ?? row.companyName ?? "").trim() || symbol;
+      seen.add(symbol);
+      out.push({ symbol, name });
+    }
+  };
+
+  collect(gainers);
+  collect(actives);
+  collect(losers);
+  return out.slice(0, TRENDING_MOVERS_MAX);
 }
 
 // ---- Public service --------------------------------------------------------
@@ -1924,22 +1993,52 @@ export const stockService = {
   },
 
   /**
-   * Curated ticker universe for a given Insights tab, surfaced via the new
-   * `/api/insights-tab` endpoint. The client overlays live prices with
-   * `useBatchQuotes(symbols)`; the universe itself is editorial.
-   *
-   * Labels here come back as **English** stable strings. The client maps
-   * them to its i18n key (`insights.tabs.<id>`) so rebrand/translation is a
-   * client-only change.
+   * Live "Trending" universe. When FMP is configured this returns the real
+   * market movers (biggest gainers → most-active → biggest losers), capped
+   * and de-duplicated; otherwise it falls back to the curated editorial
+   * list. The client overlays live prices via `useBatchQuotes`, so these
+   * rows only carry identity (symbol + name).
    */
-  getInsightsTab(tab: string): InsightsTabResponse {
+  async getTrendingUniverse(): Promise<InsightsTabEntry[]> {
+    if (!hasFmp()) return insightsTabUniverses.trending;
+
+    const cacheKey = "trending_movers";
+    const cached = cache.get<InsightsTabEntry[]>(cacheKey);
+    if (cached) return cached;
+
+    return trendingMoversInFlight.getOrCreate(cacheKey, async () => {
+      const inFlightCached = cache.get<InsightsTabEntry[]>(cacheKey);
+      if (inFlightCached) return inFlightCached;
+
+      const movers = await fetchTrendingMovers();
+      const result =
+        movers.length > 0 ? movers : insightsTabUniverses.trending;
+      // Short negative TTL on fallback so a transient FMP outage recovers
+      // quickly instead of pinning the curated list for a full minute.
+      cache.set(
+        cacheKey,
+        result,
+        movers.length > 0 ? TRENDING_MOVERS_TTL : QUOTE_NEGATIVE_TTL,
+      );
+      return result;
+    });
+  },
+
+  /**
+   * Universe for a single Insights tab. `trending` resolves to the live
+   * mover list; every other tab stays curated. Labels return as English
+   * stable strings so the client can map them to i18n keys.
+   */
+  async getInsightsTab(tab: string): Promise<InsightsTabResponse> {
     const validKey = (
       Object.keys(insightsTabUniverses) as InsightsTabId[]
     ).includes(tab as InsightsTabId)
       ? (tab as InsightsTabId)
       : "sp500";
     const entries =
-      insightsTabUniverses[validKey] ?? insightsTabUniverses.sp500;
+      validKey === "trending"
+        ? await this.getTrendingUniverse()
+        : insightsTabUniverses[validKey] ?? insightsTabUniverses.sp500;
     const labels: Record<InsightsTabId, string> = {
       sp500: "S&P 500",
       trending: "Trending",
@@ -1959,10 +2058,16 @@ export const stockService = {
   },
 
   /**
-   * Returns all curated universes at once for the client-side multi-filter.
+   * Returns all universes at once for the client-side multi-filter. The
+   * `trending` key is replaced with the live mover list when FMP responds.
    */
-  getAllInsightsTabs(): Record<InsightsTabId, InsightsTabEntry[]> {
-    return insightsTabUniverses;
+  async getAllInsightsTabs(): Promise<
+    Record<InsightsTabId, InsightsTabEntry[]>
+  > {
+    return {
+      ...insightsTabUniverses,
+      trending: await this.getTrendingUniverse(),
+    };
   },
 
   /**

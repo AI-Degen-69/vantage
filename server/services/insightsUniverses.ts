@@ -7,10 +7,11 @@ import type { InsightsTabEntry, InsightsTabId } from "../../shared/api";
  * cloud", easy to edit without rebuilding the client, and the client can fetch the
  * latest universe via /api/insights-tab?tab=… without a hard import.
  *
- * The client overlays LIVE prices via `useBatchQuotes(symbols)` so even when
- * upstream screener endpoints are dead (the FMP `/stable/gainers`, `/actives`,
- * `/sectors-performance` paths 404 on current keys) the cards still show real
- * intraday prices — the universe names just stay curated.
+ * The client overlays LIVE prices via `useBatchQuotes(symbols)`. The
+ * `trending` tab is special: `stockService.getTrendingUniverse()` replaces the
+ * curated list below with FMP's live market movers (biggest-gainers /
+ * biggest-losers / most-actives) and only falls back to this editorial list
+ * when FMP is unconfigured or the movers endpoints fail.
  */
 export const insightsTabUniverses: Record<InsightsTabId, InsightsTabEntry[]> = {
   sp500: [
