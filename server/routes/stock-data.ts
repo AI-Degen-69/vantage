@@ -295,15 +295,15 @@ export const handleSectorHeatmap: RequestHandler = async (req, res) => {
  */
 export const handleInsightsTab: RequestHandler = async (req, res) => {
   const tab = String(req.query.tab || "sp500");
-  const data: InsightsTabResponse = stockService.getInsightsTab(tab);
+  const data: InsightsTabResponse = await stockService.getInsightsTab(tab);
   res.json(data);
 };
 
 /**
  * Returns all curated ticker universes for the multi-select filter feature.
  */
-export const handleInsightsTabsAll: RequestHandler = async (req, res) => {
-  const data = stockService.getAllInsightsTabs();
+export const handleInsightsTabsAll: RequestHandler = async (_req, res) => {
+  const data = await stockService.getAllInsightsTabs();
   res.json(data);
 };
 

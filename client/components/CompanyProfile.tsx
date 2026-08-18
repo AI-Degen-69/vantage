@@ -46,6 +46,7 @@ export default function CompanyProfile({
   const ceo = overviewData?.ceo || null;
   const beta = overviewData?.beta ?? null;
   const piotroskiScore = metricsData?.scores?.piotroskiScore ?? null;
+  const website = overviewData?.website?.trim() || null;
   const translatePeriod = (period: string) => {
     if (period === "0q") return t("insights.currentQtr");
     if (period === "0y") return t("insights.currentYear");
@@ -206,6 +207,13 @@ export default function CompanyProfile({
                 <Chip
                   label={t("insights.exchangeDescription")}
                   value={overviewData.exchangeFullName}
+                />
+              )}
+              {website && (
+                <Chip
+                  label={t("insights.website")}
+                  value={website.replace(/^https?:\/\//i, "").replace(/\/+$/, "")}
+                  href={website}
                 />
               )}
               {overviewData?.lastDividend !== undefined && (
@@ -530,17 +538,15 @@ function Chip({
   label,
   value,
   tone = "normal",
+  href,
 }: {
   label: string;
   value: string;
   tone?: "success" | "normal";
+  href?: string;
 }) {
-  return (
-    <span
-      className="inline-flex max-w-full items-center gap-1.5 rounded-[6px] border border-border bg-muted px-2.5 py-1 text-xs"
-      dir="ltr"
-      title={`${label}: ${value}`}
-    >
+  const content = (
+    <>
       <span className="shrink-0 font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </span>
@@ -553,6 +559,31 @@ function Chip({
       >
         {value}
       </span>
+    </>
+  );
+
+  if (href) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex max-w-full items-center gap-1.5 rounded-[6px] border border-border bg-muted px-2.5 py-1 text-xs transition-colors hover:border-primary/40 hover:bg-primary/5"
+        dir="ltr"
+        title={`${label}: ${value}`}
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <span
+      className="inline-flex max-w-full items-center gap-1.5 rounded-[6px] border border-border bg-muted px-2.5 py-1 text-xs"
+      dir="ltr"
+      title={`${label}: ${value}`}
+    >
+      {content}
     </span>
   );
 }

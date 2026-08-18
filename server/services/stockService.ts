@@ -104,6 +104,9 @@ export { usageTestSeam };
 const cache = new NodeCache({ stdTTL: 3600, maxKeys: 10000 });
 const QUOTE_TTL = 60; // 1 min — quotes are the only thing we ever refetch live
 const QUOTE_NEGATIVE_TTL = 15; // Briefly suppress repeated misses without hiding recovery.
+const TRENDING_MOVERS_TTL = 60; // 1 min — movers are live-by-nature, same cadence as quotes
+const TRENDING_MOVERS_MAX = 30; // cap the Trending tab so the batch-quote fan-out stays lean
+const TRENDING_MOVERS_RATE_LIMIT_TTL = 300; // 5 min — hard backoff after an FMP 429 (quota exhausted)
 const PROFILE_NEGATIVE_TTL = 30; // Provider outages/not-found responses are retryable.
 const CHART_NEGATIVE_TTL = 30; // Avoid retry storms while preserving recovery from provider outages.
 const SECTOR_HEATMAP_TTL = 900; // 15 min — heatmap recomputation cache (day deltas are slow-moving)
@@ -131,6 +134,9 @@ const healthInFlight = createInFlightRegistry();
 // (when many requesters see FMP's 429 at once and pivot to the Yahoo
 // fallback path). Same module-scoped lifetime as the other registries.
 const yahooFallbackInFlight = createInFlightRegistry();
+// Coalesces concurrent Trending-tab mover fetches (FMP biggest-gainers /
+// biggest-losers / most-actives) behind one upstream round-trip.
+const trendingMoversInFlight = createInFlightRegistry();
 
 /** Throttle to once-per-key per minute. Logs once per (function, symbol) per minute. */
 function throttledWarn(key: string, ...args: unknown[]): void {
@@ -182,12 +188,79 @@ const CHART_ENDPOINT = FMP_USE_STABLE
 const QUOTE_USE_QUERY_PARAM = FMP_USE_STABLE;
 
 /**
+ * Market-movers endpoints. `/stable/` renamed `gainers`/`losers`/`actives` to
+ * `biggest-gainers`/`biggest-losers`/`most-actives`; legacy v3 keeps the
+ * `stock_market/*` family for grandfather-licensed keys.
+ */
+const MOVERS_ENDPOINTS = FMP_USE_STABLE
+  ? {
+      gainers: "biggest-gainers",
+      losers: "biggest-losers",
+      actives: "most-actives",
+    }
+  : {
+      gainers: "stock_market/gainers",
+      losers: "stock_market/losers",
+      actives: "stock_market/actives",
+    };
+
+/**
  * Determines whether an FMP API key is configured.
  *
  * @returns `true` if an FMP API key is available, `false` otherwise.
  */
 function hasFmp(): boolean {
   return typeof FMP_KEY === "string" && FMP_KEY.length > 0;
+}
+
+/** Result of a status-aware fetch. */
+export interface FetchJSONResult<T> {
+  data: T | null;
+  /** HTTP status, or null when the request never completed (timeout/network). */
+  status: number | null;
+}
+
+/**
+ * Status-aware variant of `fetchJSON`. Callers that need to distinguish a
+ * transient network failure from an explicit HTTP 429 rate-limit (e.g. the
+ * Trending movers fetcher) use this to pick the right backoff.
+ */
+export async function fetchJSONStatus<T = any>(
+  url: string,
+  label: string,
+  timeoutMs = 12000,
+): Promise<FetchJSONResult<T>> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    if (!res.ok) {
+      // 404 / 403 / 429 from FMP shows up here — caller decides what to do.
+      throttledWarn(
+        `fetcher:${label}:http`,
+        `[stockService] ${label} failed: http_${res.status}`,
+      );
+      return { data: null, status: res.status };
+    }
+    try {
+      return { data: (await res.json()) as T, status: res.status };
+    } catch {
+      throttledWarn(
+        `fetcher:${label}:json`,
+        `[stockService] ${label} failed: invalid_json`,
+      );
+      return { data: null, status: res.status };
+    }
+  } catch (e: any) {
+    const kind = e?.name === "AbortError" ? "timeout" : "network_error";
+    throttledWarn(
+      `fetcher:${label}:${kind}`,
+      `[stockService] ${label} failed: ${kind}`,
+    );
+    return { data: null, status: null };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
@@ -208,37 +281,7 @@ export async function fetchJSON<T = any>(
   label: string,
   timeoutMs = 12000,
 ): Promise<T | null> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { signal: ctrl.signal });
-    if (!res.ok) {
-      // 404 / 403 from FMP shows up here — caller decides what to do.
-      throttledWarn(
-        `fetcher:${label}:http`,
-        `[stockService] ${label} failed: http_${res.status}`,
-      );
-      return null;
-    }
-    try {
-      return (await res.json()) as T;
-    } catch {
-      throttledWarn(
-        `fetcher:${label}:json`,
-        `[stockService] ${label} failed: invalid_json`,
-      );
-      return null;
-    }
-  } catch (e: any) {
-    const kind = e?.name === "AbortError" ? "timeout" : "network_error";
-    throttledWarn(
-      `fetcher:${label}:${kind}`,
-      `[stockService] ${label} failed: ${kind}`,
-    );
-    return null;
-  } finally {
-    clearTimeout(timer);
-  }
+  return (await fetchJSONStatus<T>(url, label, timeoutMs)).data;
 }
 
 /**
@@ -967,6 +1010,66 @@ async function yahooQuote(symbol: string): Promise<StockQuote | null> {
     );
     return null;
   }
+}
+
+export interface TrendingMoversResult {
+  entries: InsightsTabEntry[];
+  /** True when FMP returned 429 and no rows were collected — signals a hard backoff. */
+  rateLimited: boolean;
+}
+
+/**
+ * Fetches FMP's live market movers and maps them to lightweight
+ * InsightsTabEntry rows for the Trending tab. Order is gainers → most-active
+ * → losers so the list reads "what's moving" without a client-side re-sort.
+ *
+ * The `/stable/` movers paths were renamed (see MOVERS_ENDPOINTS) — the old
+ * `/stable/gainers` + `/actives` paths 404 (docs/alpha-scope-missing-metrics.md).
+ */
+export async function fetchTrendingMovers(): Promise<TrendingMoversResult> {
+  const [gainers, losers, actives] = await Promise.all([
+    fetchJSONStatus<any[]>(
+      fmpUrl(MOVERS_ENDPOINTS.gainers),
+      "trending movers (gainers)",
+      10000,
+    ),
+    fetchJSONStatus<any[]>(
+      fmpUrl(MOVERS_ENDPOINTS.losers),
+      "trending movers (losers)",
+      10000,
+    ),
+    fetchJSONStatus<any[]>(
+      fmpUrl(MOVERS_ENDPOINTS.actives),
+      "trending movers (actives)",
+      10000,
+    ),
+  ]);
+
+  const seen = new Set<string>();
+  const out: InsightsTabEntry[] = [];
+  const collect = (list: any[] | null) => {
+    if (!Array.isArray(list)) return;
+    for (const row of list) {
+      if (!row || typeof row !== "object") continue;
+      const symbol = String(row.symbol ?? "").trim().toUpperCase();
+      if (!symbol || seen.has(symbol)) continue;
+      const name = String(row.name ?? row.companyName ?? "").trim() || symbol;
+      seen.add(symbol);
+      out.push({ symbol, name });
+    }
+  };
+
+  collect(gainers.data);
+  collect(actives.data);
+  collect(losers.data);
+
+  // Only an empty result is treated as rate-limited: partial data is still
+  // worth serving normally, and a lone 429 beside healthy 200s shouldn't
+  // back off the whole tab.
+  const rateLimited =
+    out.length === 0 && [gainers, losers, actives].some((r) => r.status === 429);
+
+  return { entries: out.slice(0, TRENDING_MOVERS_MAX), rateLimited };
 }
 
 // ---- Public service --------------------------------------------------------
@@ -1924,22 +2027,54 @@ export const stockService = {
   },
 
   /**
-   * Curated ticker universe for a given Insights tab, surfaced via the new
-   * `/api/insights-tab` endpoint. The client overlays live prices with
-   * `useBatchQuotes(symbols)`; the universe itself is editorial.
-   *
-   * Labels here come back as **English** stable strings. The client maps
-   * them to its i18n key (`insights.tabs.<id>`) so rebrand/translation is a
-   * client-only change.
+   * Live "Trending" universe. When FMP is configured this returns the real
+   * market movers (biggest gainers → most-active → biggest losers), capped
+   * and de-duplicated; otherwise it falls back to the curated editorial
+   * list. The client overlays live prices via `useBatchQuotes`, so these
+   * rows only carry identity (symbol + name).
    */
-  getInsightsTab(tab: string): InsightsTabResponse {
+  async getTrendingUniverse(): Promise<InsightsTabEntry[]> {
+    if (!hasFmp()) return insightsTabUniverses.trending;
+
+    const cacheKey = "trending_movers";
+    const cached = cache.get<InsightsTabEntry[]>(cacheKey);
+    if (cached) return cached;
+
+    return trendingMoversInFlight.getOrCreate(cacheKey, async () => {
+      const inFlightCached = cache.get<InsightsTabEntry[]>(cacheKey);
+      if (inFlightCached) return inFlightCached;
+
+      const { entries, rateLimited } = await fetchTrendingMovers();
+      const result =
+        entries.length > 0 ? entries : insightsTabUniverses.trending;
+      // Transient failures recover quickly, but an explicit 429 means the
+      // daily quota is exhausted — back off hard so we stop re-firing the
+      // three movers calls into an already-throttled key.
+      const ttl = entries.length > 0
+        ? TRENDING_MOVERS_TTL
+        : rateLimited
+          ? TRENDING_MOVERS_RATE_LIMIT_TTL
+          : QUOTE_NEGATIVE_TTL;
+      cache.set(cacheKey, result, ttl);
+      return result;
+    });
+  },
+
+  /**
+   * Universe for a single Insights tab. `trending` resolves to the live
+   * mover list; every other tab stays curated. Labels return as English
+   * stable strings so the client can map them to i18n keys.
+   */
+  async getInsightsTab(tab: string): Promise<InsightsTabResponse> {
     const validKey = (
       Object.keys(insightsTabUniverses) as InsightsTabId[]
     ).includes(tab as InsightsTabId)
       ? (tab as InsightsTabId)
       : "sp500";
     const entries =
-      insightsTabUniverses[validKey] ?? insightsTabUniverses.sp500;
+      validKey === "trending"
+        ? await this.getTrendingUniverse()
+        : insightsTabUniverses[validKey] ?? insightsTabUniverses.sp500;
     const labels: Record<InsightsTabId, string> = {
       sp500: "S&P 500",
       trending: "Trending",
@@ -1959,10 +2094,16 @@ export const stockService = {
   },
 
   /**
-   * Returns all curated universes at once for the client-side multi-filter.
+   * Returns all universes at once for the client-side multi-filter. The
+   * `trending` key is replaced with the live mover list when FMP responds.
    */
-  getAllInsightsTabs(): Record<InsightsTabId, InsightsTabEntry[]> {
-    return insightsTabUniverses;
+  async getAllInsightsTabs(): Promise<
+    Record<InsightsTabId, InsightsTabEntry[]>
+  > {
+    return {
+      ...insightsTabUniverses,
+      trending: await this.getTrendingUniverse(),
+    };
   },
 
   /**

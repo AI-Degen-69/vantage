@@ -147,12 +147,26 @@ export default function Insights() {
       };
     });
 
-    // Sort (matchScore desc, marketCap desc)
+    // Sort (matchScore desc, then |% move| for Trending, then marketCap desc)
     results.sort((a, b) => {
       if (activeFilters.length > 0) {
         const scoreA = activeFilters.filter((f) => a.tabs.includes(f)).length;
         const scoreB = activeFilters.filter((f) => b.tabs.includes(f)).length;
         if (scoreA !== scoreB) return scoreB - scoreA;
+        // Trending ranks by magnitude of move so the list reads as "what's
+        // actually moving" — works for both the live movers and the curated
+        // fallback, since both get live quotes overlaid above.
+        if (activeFilters.includes("trending")) {
+          const moveA =
+            a.changePercent !== undefined && Number.isFinite(a.changePercent)
+              ? Math.abs(a.changePercent)
+              : -1;
+          const moveB =
+            b.changePercent !== undefined && Number.isFinite(b.changePercent)
+              ? Math.abs(b.changePercent)
+              : -1;
+          if (moveA !== moveB) return moveB - moveA;
+        }
       }
       // fallback to market cap
       const capA = a.marketCap || 0;
