@@ -25,6 +25,8 @@ import {
   ProviderHealthFeature,
   ProviderHealthResponse,
   RatiosTTM,
+  RevenueSegmentRow,
+  RevenueSegmentation,
   SectorHeatmapMetadata,
   SectorHeatmapResponse,
   SmaDistanceResponse,
@@ -1072,6 +1074,82 @@ export async function fetchTrendingMovers(): Promise<TrendingMoversResult> {
   return { entries: out.slice(0, TRENDING_MOVERS_MAX), rateLimited };
 }
 
+/**
+ * Parses the FMP `revenue-product-segmentation` payload into the shared
+ * `RevenueSegmentRow` shape. FMP has shipped both a nested shape (each
+ * period row carries a `products: [{name, revenue}]` array) and a flatter
+ * shape (`data: [{name, revenue}]`), so the parser probes both, plus
+ * `product`/`segment` and `value`/`revenueValue` aliases for robustness
+ * against upstream field renames. Period rows without parseable products
+ * are still emitted (`products: []`, `totalRevenue: null`) so callers can
+ * tell "no segment data for this period" from "payload malformed".
+ */
+export function normalizeRevenueSegmentationRows(
+  raw: unknown,
+  symbol: string,
+): RevenueSegmentRow[] {
+  if (!Array.isArray(raw)) return [];
+  const toFinite = (v: unknown): number | null => {
+    if (v === undefined || v === null || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const rows: RevenueSegmentRow[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    const date = String(row.date ?? "");
+    const fiscalYear = String(
+      row.fiscalYear ?? row.calendarYear ?? (date ? date.slice(0, 4) : ""),
+    );
+    const period = String(row.period ?? "FY");
+    const rawProducts = Array.isArray(row.products)
+      ? row.products
+      : Array.isArray(row.data)
+        ? row.data
+        : [];
+    const products: RevenueSegmentRow["products"] = [];
+    for (const entryRaw of rawProducts) {
+      if (!entryRaw || typeof entryRaw !== "object") continue;
+      const entry = entryRaw as Record<string, unknown>;
+      const name = String(
+        entry.name ?? entry.product ?? entry.segment ?? "",
+      ).trim();
+      const revenue = toFinite(
+        entry.revenue ?? entry.value ?? entry.revenueValue,
+      );
+      if (!name || revenue === null) continue;
+      products.push({ name, revenue });
+    }
+    rows.push({
+      date,
+      symbol: String(row.symbol ?? symbol),
+      reportedCurrency: String(row.reportedCurrency ?? "USD"),
+      fiscalYear,
+      period,
+      totalRevenue: products.length > 0 ? products.reduce((acc, p) => acc + p.revenue, 0) : null,
+      products,
+    });
+  }
+  return rows;
+}
+
+/**
+ * True when an FMP payload is an error object rather than data. FMP signals
+ * quota exhaustion / bad keys with HTTP 200 + `{"Error Message": ...}` (and
+ * occasionally `{error}` / `{message}`), which the JSON fetcher would
+ * otherwise mistake for a legitimately empty response.
+ */
+export function isFmpErrorPayload(data: unknown): boolean {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return false;
+  const obj = data as Record<string, unknown>;
+  return (
+    typeof obj["Error Message"] === "string" ||
+    typeof obj.error === "string" ||
+    typeof obj.message === "string"
+  );
+}
+
 // ---- Public service --------------------------------------------------------
 export const stockService = {
   /**
@@ -1429,6 +1507,84 @@ export const stockService = {
 
     cache.set(cacheKey, result);
     return result;
+  },
+
+  /**
+   * Revenue broken down by product segment (FMP `revenue-product-segmentation`).
+   *
+   * Distinct from `getFinancialStatements` (total revenue): this endpoint
+   * splits each reporting period into per-product lines. Both annual and
+   * quarterly periods are served (the chart modal's granularity toggle
+   * requests quarters so each bar is one 10-Q segment filing). The FMP
+   * free (Basic) plan caps responses at ~10 rows per call, so annual uses
+   * `limit=5` (five fiscal years) and quarterly `limit=8` (two years of
+   * quarters) — each a single call.
+   *
+   * Free-tier fallback: an HTTP 429/403 (or an FMP error body) flips
+   * `rateLimited` instead of returning an empty payload, so the client can
+   * keep the segment filters visible as a locked premium feature while
+   * rendering the plain total-revenue card. No FMP key → `unavailable: true`
+   * and the network is never touched.
+   */
+  async getRevenueSegmentation(
+    symbol: string,
+    period: "annual" | "quarter" = "annual",
+  ): Promise<RevenueSegmentation> {
+    const normalizedSymbol = symbol.trim().toUpperCase();
+    // Annual and quarterly payloads cache under separate keys so the modal's
+    // granularity toggle never serves one period's rows as the other.
+    const cacheKey = `revenueSegmentation_${normalizedSymbol}_${period}`;
+    const cached = cache.get<RevenueSegmentation>(cacheKey);
+    if (cached) return cached;
+
+    if (!hasFmp()) {
+      const noKeyResult: RevenueSegmentation = {
+        rows: [],
+        rateLimited: false,
+        unavailable: true,
+      };
+      cache.set(cacheKey, noKeyResult);
+      return noKeyResult;
+    }
+
+    apiUsageTracker.recordCall("fmp");
+    // Status-aware fetch so a hard 429 never masquerades as "no data" —
+    // the client needs `rateLimited` to pick the fallback card view.
+    const url = tickerUrl("revenue-product-segmentation", normalizedSymbol, {
+      period,
+      limit: period === "quarter" ? 8 : 5,
+    });
+    const result = await fetchJSONStatus<any>(
+      url,
+      `revenue-segmentation/${normalizedSymbol}`,
+      12000,
+    );
+
+    let rows: RevenueSegmentRow[] = [];
+    let rateLimited = false;
+    if (result.status === 429 || result.status === 403) {
+      rateLimited = true;
+      apiUsageTracker.recordRateLimit("fmp");
+    } else if (result.data) {
+      rows = normalizeRevenueSegmentationRows(result.data, normalizedSymbol);
+      // FMP also signals quota exhaustion with HTTP 200 + an error body —
+      // that parses to a non-array object, which normalizes to zero rows.
+      // Treat it as rate-limited rather than "no segment data".
+      if (rows.length === 0 && isFmpErrorPayload(result.data)) {
+        rateLimited = true;
+        apiUsageTracker.recordRateLimit("fmp");
+      }
+    }
+
+    const payload: RevenueSegmentation = {
+      rows,
+      rateLimited,
+      unavailable: false,
+    };
+    // Rate-limited payloads back off briefly (5 min) so the page doesn't
+    // re-hit a quota FMP still refuses; real data sticks for an hour.
+    cache.set(cacheKey, payload, rateLimited ? 300 : 3600);
+    return payload;
   },
 
   async getMetrics(symbol: string): Promise<StockMetrics> {

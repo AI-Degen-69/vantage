@@ -8,6 +8,7 @@ import {
   handleBatchQuotes,
   handleStockFinancials,
   handleStockMetrics,
+  handleRevenueSegmentation,
   handleStockAnalyst,
   handleStockInsider,
   handleStockNews,
@@ -117,6 +118,7 @@ export function createServer() {
   app.get("/api/stock-overview", handleStockOverview);
   app.get("/api/stock-financials", handleStockFinancials);
   app.get("/api/stock-metrics", handleStockMetrics);
+  app.get("/api/stock-revenue-segmentation", handleRevenueSegmentation);
   app.get("/api/stock-analyst", handleStockAnalyst);
   app.get("/api/stock-insider", handleStockInsider);
   app.get("/api/stock-news", handleStockNews);

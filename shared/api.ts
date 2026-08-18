@@ -184,6 +184,44 @@ export interface FinancialStatements {
 }
 
 /* ------------------------------------------------------------------ *
+ * Revenue by segment (FMP revenue-product-segmentation)           *
+ * ------------------------------------------------------------------ */
+/** One product/segment line within a period's revenue breakdown. */
+export interface RevenueSegmentPoint {
+  name: string;
+  /** Segment revenue in raw USD (already a number, never a formatted string). */
+  revenue: number;
+}
+
+/** One reporting period's revenue broken down by product/segment. */
+export interface RevenueSegmentRow {
+  /** Report date (YYYY-MM-DD). */
+  date: string;
+  symbol: string;
+  reportedCurrency: string;
+  /** Fiscal year label (e.g. "2025") — aligns with IncomeStatementRow.calendarYear. */
+  fiscalYear: string;
+  period: string; // FY / Q1 / Q2 / ...
+  /** Sum of the parsed segment revenues (raw USD); null when no segments parsed. */
+  totalRevenue: number | null;
+  products: RevenueSegmentPoint[];
+}
+
+/**
+ * Response shape for `/api/stock-revenue-segmentation`. The client uses
+ * `rows` to render the segment-filtered revenue card, and `rateLimited` to
+ * fall back to the plain total-revenue card while still surfacing the
+ * segment filters as a locked premium feature.
+ */
+export interface RevenueSegmentation {
+  rows: RevenueSegmentRow[];
+  /** True when FMP returned HTTP 429/403 or an error body (free-tier quota). */
+  rateLimited: boolean;
+  /** True when no FMP key is configured — segments were never attempted. */
+  unavailable: boolean;
+}
+
+/* ------------------------------------------------------------------ *
  * Key Metrics + Ratios + Scores                                     *
  * ------------------------------------------------------------------ */
 export interface KeyMetricsTTM {

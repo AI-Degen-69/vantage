@@ -386,6 +386,129 @@ export async function handleStockMetrics(req, res) {
 }
 
 /**
+ * Revenue broken down by product segment (FMP `revenue-product-segmentation`).
+ * Parity mirror of `handleRevenueSegmentation` in `server/routes/stock-data.ts`
+ * so local dev and serverless return the same shape: `{ rows, rateLimited,
+ * unavailable }`. `rateLimited` (429/403 or an FMP error body) lets the
+ * client fall back to the plain total-revenue card while keeping the
+ * segment filters visible as a locked premium feature. `period` (annual|
+ * quarter) selects the reporting granularity served to the modal's toggle.
+ */
+export async function handleRevenueSegmentation(req, res) {
+  const symbol = String(req.query?.symbol || "").toUpperCase();
+  if (!symbol)
+    return res.status(400).json({ error: "symbol parameter required" });
+  const period = req.query?.period === "quarter" ? "quarter" : "annual";
+  const ck = `revSeg_${symbol}_${period}`;
+  const cached = cache.get(ck);
+  if (cached) return res.json(cached);
+
+  if (!process.env.FMP_KEY) {
+    const noKey = { rows: [], rateLimited: false, unavailable: true };
+    cache.set(ck, noKey, 300);
+    return res.json(noKey);
+  }
+
+  apiUsageTracker.recordCall && apiUsageTracker.recordCall("fmp");
+  const url =
+    `https://financialmodelingprep.com/stable/revenue-product-segmentation?symbol=${encodeURIComponent(symbol)}&period=${period}&limit=${period === "quarter" ? 8 : 5}&apikey=${process.env.FMP_KEY}`;
+  try {
+    const r = await fetch(url);
+    if (r.status === 429 || r.status === 403) {
+      apiUsageTracker.recordRateLimit && apiUsageTracker.recordRateLimit("fmp");
+      const limited = { rows: [], rateLimited: true, unavailable: false };
+      cache.set(ck, limited, 300);
+      return res.json(limited);
+    }
+    const text = await r.text();
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+    // FMP signals quota exhaustion with HTTP 200 + an error body.
+    if (
+      data &&
+      typeof data === "object" &&
+      !Array.isArray(data) &&
+      (typeof data["Error Message"] === "string" ||
+        typeof data.error === "string" ||
+        typeof data.message === "string")
+    ) {
+      apiUsageTracker.recordRateLimit && apiUsageTracker.recordRateLimit("fmp");
+      const limited = { rows: [], rateLimited: true, unavailable: false };
+      cache.set(ck, limited, 300);
+      return res.json(limited);
+    }
+
+    const rows = normalizeRevenueSegmentationRows(data, symbol);
+    const payload = { rows, rateLimited: false, unavailable: false };
+    cache.set(ck, payload, 3600);
+    return res.json(payload);
+  } catch (e) {
+    throttledWarn(
+      `revSeg:${symbol}`,
+      `revenue-product-segmentation ${symbol}:`,
+      e?.message,
+    );
+    return res.json({ rows: [], rateLimited: false, unavailable: false });
+  }
+}
+
+/**
+ * Parses FMP `revenue-product-segmentation` payloads into the shared row
+ * shape. Accepts both the nested (`products: [{name, revenue}]`) and flat
+ * (`data: [{name, revenue}]`) shapes FMP has shipped, plus
+ * `product`/`segment` and `value`/`revenueValue` aliases.
+ */
+function normalizeRevenueSegmentationRows(raw, symbol) {
+  if (!Array.isArray(raw)) return [];
+  const toFinite = (v) => {
+    if (v === undefined || v === null || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const rows = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const date = String(item.date ?? "");
+    const fiscalYear = String(
+      item.fiscalYear ?? item.calendarYear ?? (date ? date.slice(0, 4) : ""),
+    );
+    const period = String(item.period ?? "FY");
+    const rawProducts = Array.isArray(item.products)
+      ? item.products
+      : Array.isArray(item.data)
+        ? item.data
+        : [];
+    const products = [];
+    for (const entry of rawProducts) {
+      if (!entry || typeof entry !== "object") continue;
+      const name = String(
+        entry.name ?? entry.product ?? entry.segment ?? "",
+      ).trim();
+      const revenue = toFinite(entry.revenue ?? entry.value ?? entry.revenueValue);
+      if (!name || revenue === null) continue;
+      products.push({ name, revenue });
+    }
+    rows.push({
+      date,
+      symbol: String(item.symbol ?? symbol),
+      reportedCurrency: String(item.reportedCurrency ?? "USD"),
+      fiscalYear,
+      period,
+      totalRevenue:
+        products.length > 0
+          ? products.reduce((acc, p) => acc + p.revenue, 0)
+          : null,
+      products,
+    });
+  }
+  return rows;
+}
+
+/**
  * Income / balance / cash rows for the requested symbol.
  *
  * Primary path (default): yahoo-finance2 v4 `fundamentalsTimeSeries()` over
@@ -1592,6 +1715,7 @@ const routes = {
   "/api/stock-overview": handleStockOverview,
   "/api/stock-financials": handleStockFinancials,
   "/api/stock-metrics": handleStockMetrics,
+  "/api/stock-revenue-segmentation": handleRevenueSegmentation,
   "/api/stock-analyst": handleStockAnalyst,
   "/api/stock-insider": handleStockInsider,
   "/api/stock-news": handleStockNews,
