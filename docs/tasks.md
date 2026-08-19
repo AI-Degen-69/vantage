@@ -6,11 +6,17 @@
 
 ---
 
-## Next up — two features to implement (chosen)
+## Next up — chosen Alpha Scope features (tracker)
 
-Still open (from `docs/alpha-scope-missing-metrics.md`): website, net debt, payout frequency, P/CF, P/FCF, ROIC, revenue-by-segment, P/E·P/S history, peers table, catalysts, risks.
+Shipped to date (from `docs/alpha-scope-missing-metrics.md`): company website, net debt, trending browse, **revenue by segment** — 4 of 12 gaps closed.
 
-Chosen next two (both add **zero new FMP requests** — important while the 250/day quota is rate-limiting):
+Still open (8 gaps): dividend payout frequency, P/CF, P/FCF, ROIC, P/E·P/S history, peers table, catalysts, risks.
+
+Ranked by effort — P/CF·P/FCF·ROIC and payout frequency add **zero new FMP requests** (important while the 250/day quota is rate-limiting); the rest need a new route or provider:
+
+### 0. Revenue by segment — ✅ done (PR #21)
+
+FMP `revenue-product-segmentation` (annual `limit=5` / quarter `limit=8`) → `RevenueSegmentsCard` on the company-page charts grid + stacked-bar chart modal with an annual/quarter granularity toggle. Backed by `/api/stock-revenue-segmentation` (TS path in `server/services/stockService.ts` + parity mirror in `api/_router.js`), cached through Vercel KV (`server/helpers/kvJsonCache.ts`) so the locked-premium state propagates across lambda cold starts. When the free FMP quota is exhausted (or no `FMP_KEY` is set) the card falls back to the plain total-revenue chart with a locked "Segments 🔒" chip and a placeholder `PricingModal` (`client/components/PricingModal.tsx`).
 
 ### 1. Surface already-fetched fields: company website + Net Debt — ✅ done
 Pure client work — both fields are already normalized and reachable from existing hooks, they are just never rendered.
@@ -27,3 +33,5 @@ FMP already fetches `key-metrics-ttm` + `ratios-ttm` in `stockService.getMetrics
 - Verify: `pnpm exec tsc --noEmit`.
 
 **Deferred:** payout frequency needs a small server derivation (dividend payment dates are not exposed to the client yet), so it is not bundled into #1.
+
+**After #2:** P/E·P/S history (new `/api/stock-ratios` historical route + chart cards), peers table (new `/api/stock-peers` route), then Catalysts/Risks (new OpenAI provider + key).
