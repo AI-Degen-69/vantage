@@ -259,13 +259,10 @@ export default function StockFundamentalsStrip({
           />
           <MetricRow
             label="ROIC"
-            value={formatPercent(
-              // FMP reports roicTTM as a decimal fraction (0.44 = 44%);
-              // formatPercent expects percent units, so convert here.
-              metrics?.metrics?.roicTTM != null
-                ? metrics.metrics.roicTTM * 100
-                : null,
-            )}
+            // Percent units: the FMP metrics path normalizes roicTTM from
+            // FMP's decimal fraction (0.44 → 44.05) server-side, matching
+            // the Yahoo path's convention — formatPercent displays as-is.
+            value={formatPercent(metrics?.metrics?.roicTTM)}
             loading={loading}
             source={metricsSource ? { label: metricsSource } : undefined}
           />

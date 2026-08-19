@@ -29,7 +29,7 @@ FMP already fetches `key-metrics-ttm` + `ratios-ttm` in `stockService.getMetrics
 
 - `shared/api.ts`: added `priceToOperatingCashFlowRatioTTM?` (FMP's real `/stable/ratios-ttm` name) + legacy alias `priceToCashFlowRatioTTM?` and `priceToFreeCashFlowRatioTTM?` to `RatiosTTM`; added `roicTTM?` to `KeyMetricsTTM`.
 - `server/services/stockService.ts`: no change — the `(r0 || {}) as RatiosTTM` / `(m0 || {}) as KeyMetricsTTM` casts carry the new fields. Yahoo's metrics modules don't expose these, so they show "Unavailable" unless the FMP source is live.
-- `client/components/StockFundamentalsStrip.tsx`: added "P/CF" and "P/FCF" rows to the "Cash Flow" group (`formatNumber`) and "ROIC" to "Margins & Growth". ROIC converts FMP's decimal fraction (0.44 → 44%) to percent units before `formatPercent`.
+- `client/components/StockFundamentalsStrip.tsx`: added "P/CF" and "P/FCF" rows to the "Cash Flow" group (`formatNumber`) and "ROIC" to "Margins & Growth" (`formatPercent`). The FMP metrics path normalizes all percent fields (netProfitMargin, FCF Yield, Dividend Yield, Payout Ratio, ROIC, margins, ROE/ROA) to percent units at the API boundary via `fmpToPercent` (both TS + JS twins) — the strip contract is percent units.
 - Verify: `pnpm exec tsc --noEmit` + `StockFundamentalsStrip.ratioRows.spec.tsx` (3 tests) — 451 tests green.
 
 **Deferred:** payout frequency needs a small server derivation (dividend payment dates are not exposed to the client yet), so it is not bundled into #1.

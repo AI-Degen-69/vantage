@@ -482,6 +482,20 @@ export function normalizeYahooPercentage(value: unknown): number | undefined {
   return Math.abs(n) <= 1 ? n * 100 : n;
 }
 
+/**
+ * FMP's percentage metrics arrive as decimal fractions (0.269 = 26.9%)
+ * and can exceed 1 — AAPL ROE ≈ 1.52 = 152%. Convert to percent units
+ * at the API boundary so renderers (`formatPercent`) display them
+ * correctly and the payload matches the Yahoo path's percent-unit
+ * convention. Strict ×100 (unlike `normalizeYahooPercentage`) because
+ * FMP consistently reports fractions.
+ */
+export function fmpToPercent(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n * 100 : undefined;
+}
+
 function normalizeDividendYield(
   rawYield: unknown,
   dividendRate: unknown,
@@ -1735,9 +1749,36 @@ export const stockService = {
       await kvJsonCache.set(cacheKey, result, 3600);
       return result;
     }
+    // FMP reports percentage metrics as decimal fractions (0.269 =
+    // 26.9%, and values can exceed 1 — AAPL ROE ≈ 1.52 = 152%). Convert
+    // to percent units at the boundary so renderers (formatPercent)
+    // display them correctly, matching the Yahoo path's percent-unit
+    // convention. Spread the raw records first so every non-percent
+    // field flows through untouched, then override the percent fields.
+    const mRaw = (m0 || {}) as Record<string, unknown>;
+    const rRaw = (r0 || {}) as Record<string, unknown>;
+    const metrics: KeyMetricsTTM = {
+      ...(mRaw as KeyMetricsTTM),
+      dividendYielTTM: fmpToPercent(
+        mRaw.dividendYielTTM ?? mRaw.dividendYieldTTM,
+      ),
+      freeCashFlowYieldTTM: fmpToPercent(mRaw.freeCashFlowYieldTTM),
+      returnOnEquityTTM: fmpToPercent(mRaw.returnOnEquityTTM),
+      returnOnAssetsTTM: fmpToPercent(mRaw.returnOnAssetsTTM),
+      roicTTM: fmpToPercent(mRaw.roicTTM),
+    };
+    const ratios: RatiosTTM = {
+      ...(rRaw as RatiosTTM),
+      netProfitMargin: fmpToPercent(rRaw.netProfitMargin),
+      operatingProfitMarginTTM: fmpToPercent(
+        rRaw.operatingProfitMarginTTM,
+      ),
+      grossProfitMarginTTM: fmpToPercent(rRaw.grossProfitMarginTTM),
+      dividendPayoutRatioTTM: fmpToPercent(rRaw.dividendPayoutRatioTTM),
+    };
     const result: StockMetrics = {
-      metrics: (m0 || {}) as KeyMetricsTTM,
-      ratios: (r0 || {}) as RatiosTTM,
+      metrics,
+      ratios,
       scores: s0
         ? {
             symbol: String(s0.symbol ?? symbol),

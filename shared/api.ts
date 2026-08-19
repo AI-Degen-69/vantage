@@ -240,8 +240,9 @@ export interface KeyMetricsTTM {
   returnOnAssetsTTM?: number;
   /**
    * Return on invested capital TTM (FMP `key-metrics-ttm`). FMP reports
-   * it as a decimal fraction (0.44 = 44%) — renderers must convert to
-   * percent units before displaying.
+   * it as a decimal fraction (0.44 = 44%); the FMP metrics path
+   * normalizes it to percent units (44.05) at the API boundary —
+   * renderers display it directly.
    */
   roicTTM?: number;
   freeCashFlowYieldTTM?: number;
