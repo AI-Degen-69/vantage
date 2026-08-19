@@ -366,7 +366,7 @@ describe("apiUsageTracker (KV store integration)", () => {
         return {
           ok: true,
           status: 200,
-          json: async () => [null, "OK"],
+          json: async () => ({ result: "OK" }),
         };
       }),
     );

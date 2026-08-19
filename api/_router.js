@@ -67,8 +67,15 @@ const _kwExec = async (cmd, ...args) => {
       signal: controller.signal,
     });
     if (!r.ok) throw new Error(`KV ${cmd} failed: ${r.status} ${r.statusText}`);
-    const arr = await r.json();
-    return [arr?.[0] ?? null, arr?.[1] ?? null];
+    // Upstash REST returns a single `{ result: ... }` object for a
+    // one-command POST (or `{ error: "..." }` on failure) — NOT the
+    // `[err, value]` tuple. Parse the real shape so GET hits actually
+    // hydrate instead of always reading as a miss. Mirrors the TS twin
+    // in server/helpers/kvJsonCache.ts.
+    const json = await r.json();
+    if (json && typeof json === "object" && "error" in json)
+      return [json.error, null];
+    return [null, json?.result ?? null];
   } finally {
     clearTimeout(timeoutId);
   }
@@ -84,7 +91,10 @@ const kvJsonCache = {
       const [err, value] = await _kwExec("GET", key);
       if (err || value === null || value === undefined) return null;
       const parsed = typeof value === "string" ? JSON.parse(value) : value;
-      kw.local.set(key, parsed);
+      // Bounded mirror TTL (1h) so a short-TTL payload like the 5-min
+      // `rateLimited` lock can't serve stale for the process lifetime
+      // after KV expires it. Mirrors the TS twin's hydration cap.
+      kw.local.set(key, parsed, 3600);
       return parsed;
     } catch (e) {
       _kwWarn(

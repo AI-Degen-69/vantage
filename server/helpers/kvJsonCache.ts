@@ -93,8 +93,16 @@ class UpstashRestClient {
       if (!r.ok) {
         throw new Error(`KV ${cmd} failed: ${r.status} ${r.statusText}`);
       }
-      const arr = (await r.json()) as unknown[];
-      return [arr[0] ?? null, arr[1] ?? null];
+      // Upstash REST returns a single `{ result: ... }` object for a
+      // one-command POST (or `{ error: "..." }` on failure) — NOT the
+      // `[err, value]` tuple the older Vercel KV docs suggested. Parse
+      // the real shape so GET hits actually hydrate instead of always
+      // reading as a miss.
+      const body = (await r.json()) as { result?: unknown; error?: unknown };
+      if (body && typeof body === "object" && "error" in body) {
+        return [body.error, null];
+      }
+      return [null, (body?.result ?? null) as unknown];
     } finally {
       clearTimeout(timeoutId);
     }
@@ -128,6 +136,15 @@ class LocalJsonCache implements JsonCache {
 /* ── KV-backed cache with local mirror (warm reads) ──────────────────── */
 
 /**
+ * Cap on the local mirror TTL when hydrating from KV. The KV entry's
+ * own TTL is the source of truth, but the mirror needs a bound so a
+ * short-TTL payload (e.g. the 5-min `rateLimited` lock) can't keep
+ * serving stale state for the life of a long-lived process after KV
+ * has expired it.
+ */
+const KV_HYDRATE_MIRROR_TTL = 3600;
+
+/**
  * Reads: local → KV (hydrate local on hit) → null.
  * Writes: local sync, KV fire-and-forget (errors swallowed + throttled-logged).
  *
@@ -152,10 +169,11 @@ class VercelKvJsonCache implements JsonCache {
       if (err || value === null || value === undefined) return null;
       const parsed = typeof value === "string" ? JSON.parse(value) : value;
       // Hydrate the local mirror so subsequent reads in this process
-      // don't re-hit KV. TTL is intentionally not preserved — the KV
-      // entry's own TTL is the source of truth; the local copy lives
-      // until the process ends or until the next `set` overwrites it.
-      this.cache.set(key, parsed as T);
+      // don't re-hit KV. The KV entry's own TTL is the source of
+      // truth, but the mirror gets a bounded cap (1h) so a short-TTL
+      // payload like the 5-min `rateLimited` lock can't serve stale
+      // for the life of a long-lived process after KV expires it.
+      this.cache.set(key, parsed as T, KV_HYDRATE_MIRROR_TTL);
       return parsed as T;
     } catch (e) {
       throttledWarn(

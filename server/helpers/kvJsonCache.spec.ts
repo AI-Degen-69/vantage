@@ -51,9 +51,9 @@ describe("kvJsonCache (KV-backed JSON cache helper)", () => {
     const fetchSpy = vi
       .fn()
       .mockResolvedValueOnce(
-        fakeResponse(JSON.stringify([null, null])), // GET miss
+        fakeResponse(JSON.stringify({ result: null })), // GET miss
       )
-      .mockResolvedValueOnce(fakeResponse(JSON.stringify([null, "OK"]))); // SET ack
+      .mockResolvedValueOnce(fakeResponse(JSON.stringify({ result: "OK" }))); // SET ack
     vi.stubGlobal("fetch", fetchSpy);
 
     const { kvJsonCache } = await import("./kvJsonCache");
@@ -72,11 +72,40 @@ describe("kvJsonCache (KV-backed JSON cache helper)", () => {
     expect(kvJsonCache.__describeBackend()).toBe("kv");
   });
 
+  it("parses the real Upstash `{ result }` envelope on GET hits (not an [err, value] array)", async () => {
+    vi.stubEnv("KV_REST_API_URL", "https://kv.example");
+    vi.stubEnv("KV_REST_API_TOKEN", "test-token");
+    // A GET hit returns `{ result: "<json-string>" }` — the old parse
+    // treated the response as an array and read arr[0] (undefined), so
+    // every hit looked like a miss and the cross-instance cache never
+    // hydrated. Assert the value actually comes back.
+    const fetchSpy = vi.fn(async () =>
+      fakeResponse(JSON.stringify({ result: JSON.stringify({ v: 99 }) })),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const { kvJsonCache } = await import("./kvJsonCache");
+    expect(await kvJsonCache.get<{ v: number }>("demo:aapl")).toEqual({ v: 99 });
+  });
+
+  it("treats an `{ error }` response as a miss without throwing", async () => {
+    vi.stubEnv("KV_REST_API_URL", "https://kv.example");
+    vi.stubEnv("KV_REST_API_TOKEN", "test-token");
+    const fetchSpy = vi.fn(async () =>
+      fakeResponse(JSON.stringify({ error: "WRONGPASS invalid password" })),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const { kvJsonCache } = await import("./kvJsonCache");
+    expect(await kvJsonCache.get("demo:aapl")).toBeNull();
+  });
+
   it("hydrates local mirror from KV when local is empty (cold start)", async () => {
     vi.stubEnv("KV_REST_API_URL", "https://kv.example");
     vi.stubEnv("KV_REST_API_TOKEN", "test-token");
     const fetchSpy = vi.fn(async () =>
-      fakeResponse(JSON.stringify([null, JSON.stringify({ v: 7 })])),
+      // Upstash REST returns `{ result: <json-string> }` for a GET hit.
+      fakeResponse(JSON.stringify({ result: JSON.stringify({ v: 7 }) })),
     );
     vi.stubGlobal("fetch", fetchSpy);
 
@@ -125,7 +154,10 @@ describe("kvJsonCache (KV-backed JSON cache helper)", () => {
     // the write target — the TTL itself is route-level.
     vi.stubEnv("KV_REST_API_URL", "https://kv.example");
     vi.stubEnv("KV_REST_API_TOKEN", "test-token");
-    vi.stubGlobal("fetch", vi.fn(async () => fakeResponse(JSON.stringify([null, "OK"]))));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => fakeResponse(JSON.stringify({ result: "OK" }))),
+    );
 
     const { kvJsonCache } = await import("./kvJsonCache");
     await kvJsonCache.set(
@@ -145,7 +177,7 @@ describe("kvJsonCache (KV-backed JSON cache helper)", () => {
     // priming the local mirror). mock.calls[0] is the SET call body.
     const fetchSpy = vi
       .fn()
-      .mockResolvedValueOnce(fakeResponse(JSON.stringify([null, "OK"])));
+      .mockResolvedValueOnce(fakeResponse(JSON.stringify({ result: "OK" })));
     vi.stubGlobal("fetch", fetchSpy);
 
     const { kvJsonCache } = await import("./kvJsonCache");

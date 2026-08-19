@@ -1288,7 +1288,12 @@ export const stockService = {
     symbol: string,
   ): Promise<{ profile: CompanyProfile | null; unavailable: boolean }> {
     const normalizedSymbol = symbol.trim().toUpperCase();
-    const cacheKey = `profile_${normalizedSymbol}`;
+    // Namespaced from the prod twin: `api/_router.js` (the Vercel
+    // router) stores a FLAT CompanyProfile under `profile_<SYMBOL>`, while
+    // this service path stores `{ profile, unavailable }`. The prefix
+    // keeps the shapes apart so a dev instance sharing the KV store
+    // can never poison prod's reads with the wrong envelope.
+    const cacheKey = `profile_ts_${normalizedSymbol}`;
     const cached = await kvJsonCache.get<{
       profile: CompanyProfile | null;
       unavailable: boolean;
