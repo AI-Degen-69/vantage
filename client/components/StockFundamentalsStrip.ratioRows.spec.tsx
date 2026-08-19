@@ -71,4 +71,24 @@ describe("StockFundamentalsStrip — P/CF, P/FCF, ROIC rows", () => {
     expect(html).toContain("ROIC");
     expect(html).toContain("Unavailable");
   });
+
+  it("converts negative and zero ROIC decimals without sign loss", () => {
+    // Loss-making quarter: FMP still reports the fraction, now negative.
+    const loss = render({
+      metrics: { roicTTM: -0.1234 },
+      ratios: {},
+      scores: null,
+      source: "fmp",
+    } as StockMetrics);
+    expect(loss).toContain("-12.34%");
+
+    // Zero ROIC must render "0.00%", not fall through to Unavailable.
+    const breakeven = render({
+      metrics: { roicTTM: 0 },
+      ratios: {},
+      scores: null,
+      source: "fmp",
+    } as StockMetrics);
+    expect(breakeven).toContain("0.00%");
+  });
 });
