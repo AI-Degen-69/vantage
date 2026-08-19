@@ -148,6 +148,7 @@ export default function DCFWidget({ currentPrice = 150.0 }: DCFWidgetProps) {
               <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
               <ReferenceLine
                 y={0}
+                yAxisId="left"
                 stroke="#e2e8f0"
                 strokeOpacity={0.85}
                 strokeWidth={2}
