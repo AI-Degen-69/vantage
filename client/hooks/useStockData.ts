@@ -656,7 +656,7 @@ export function useStockData(ticker: string) {
                   metrics.metrics?.priceToSalesRatioTTM ??
                   undefined,
                 evToEbitda: metrics.metrics?.evToEBITDATTM ?? undefined,
-                dividendYield: metrics.metrics?.dividendYielTTM ?? undefined,
+                dividendYield: metrics.metrics?.dividendYieldTTM ?? undefined,
                 pegRatio: metrics.ratios?.priceToEarningsGrowthRatioTTM ?? undefined,
                 // Profile.beta is the canonical source (already on /stock-overview).
                 beta: profile?.beta ?? undefined,

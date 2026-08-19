@@ -446,7 +446,7 @@ export async function handleStockMetrics(req, res) {
       ),
       peRatioTTM: pick(sd.trailingPE) ?? pick(dks.forwardPE),
       // SummaryDetail yields are decimal fractions; normalize at the API boundary.
-      dividendYielTTM:
+      dividendYieldTTM:
         pick(sd.dividendYield) != null
           ? pick(sd.dividendYield) * 100
           : pick(sd.trailingAnnualDividendYield) != null
@@ -458,8 +458,11 @@ export async function handleStockMetrics(req, res) {
       evToSalesTTM: pick(dks.enterpriseToRevenue),
       evToEBITDATTM: pick(dks.enterpriseToEbitda),
       evToOperatingCashFlowTTM: undefined, // Yahoo free tier doesn't expose EV / OCF cleanly
-      returnOnEquityTTM: pick(fd.returnOnEquity),
-      returnOnAssetsTTM: pick(fd.returnOnAssets),
+      // financialData percent fields are decimal fractions (0.2639 =
+      // 26.39%); normalize to percent units so renderers display them
+      // correctly — mirrors stockService's Yahoo-path normalization.
+      returnOnEquityTTM: normalizePercentage(fd.returnOnEquity),
+      returnOnAssetsTTM: normalizePercentage(fd.returnOnAssets),
       freeCashFlowYieldTTM: undefined, // would need price + diluted shares — not derivable cheaply
     };
 
@@ -469,10 +472,13 @@ export async function handleStockMetrics(req, res) {
       priceToSalesRatioTTM:
         pick(sd.priceToSalesTrailing12Months) ?? pick(dks.enterpriseToRevenue),
       priceToEarningsGrowthRatioTTM: pick(dks.pegRatio),
-      netProfitMargin: pick(fd.profitMargins) ?? pick(dks.profitMargins),
-      operatingProfitMarginTTM: pick(fd.operatingMargins),
-      grossProfitMarginTTM: pick(fd.grossMargins),
-      dividendPayoutRatioTTM: pick(sd.payoutRatio),
+      // Same fraction→percent normalization as the metrics block above.
+      netProfitMargin:
+        normalizePercentage(fd.profitMargins) ??
+        normalizePercentage(dks.profitMargins),
+      operatingProfitMarginTTM: normalizePercentage(fd.operatingMargins),
+      grossProfitMarginTTM: normalizePercentage(fd.grossMargins),
+      dividendPayoutRatioTTM: normalizePercentage(sd.payoutRatio),
       currentRatio: pick(fd.currentRatio),
       quickRatio: pick(fd.quickRatio),
       debtToEquityRatio: pick(fd.debtToEquity),

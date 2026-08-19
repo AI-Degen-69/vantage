@@ -222,6 +222,21 @@ export default function StockFundamentalsStrip({
 
         <MetricGroup title="Cash Flow">
           <MetricRow
+            label="P/CF"
+            value={formatNumber(
+              metrics?.ratios?.priceToOperatingCashFlowRatioTTM ??
+                metrics?.ratios?.priceToCashFlowRatioTTM,
+            )}
+            loading={loading}
+            source={metricsSource ? { label: metricsSource } : undefined}
+          />
+          <MetricRow
+            label="P/FCF"
+            value={formatNumber(metrics?.ratios?.priceToFreeCashFlowRatioTTM)}
+            loading={loading}
+            source={metricsSource ? { label: metricsSource } : undefined}
+          />
+          <MetricRow
             label="FCF Yield"
             value={formatPercent(metrics?.metrics?.freeCashFlowYieldTTM)}
             loading={loading}
@@ -239,6 +254,15 @@ export default function StockFundamentalsStrip({
           <MetricRow
             label="Operating Margin"
             value={formatPercent(metrics?.ratios?.operatingProfitMarginTTM)}
+            loading={loading}
+            source={metricsSource ? { label: metricsSource } : undefined}
+          />
+          <MetricRow
+            label="ROIC"
+            // Percent units: the FMP metrics path normalizes roicTTM from
+            // FMP's decimal fraction (0.44 → 44.05) server-side, matching
+            // the Yahoo path's convention — formatPercent displays as-is.
+            value={formatPercent(metrics?.metrics?.roicTTM)}
             loading={loading}
             source={metricsSource ? { label: metricsSource } : undefined}
           />
@@ -269,7 +293,7 @@ export default function StockFundamentalsStrip({
           <MetricRow
             label="Dividend Yield"
             value={formatPercent(
-              quote?.dividendYield ?? metrics?.metrics?.dividendYielTTM,
+              quote?.dividendYield ?? metrics?.metrics?.dividendYieldTTM,
             )}
             loading={loading}
             source={

@@ -229,8 +229,7 @@ export interface KeyMetricsTTM {
   netIncomePerShareTTM?: number;
   operatingCashFlowPerShareTTM?: number;
   peRatioTTM?: number;
-  /** Common misspelling of yield — kept here to surface docs warning. */
-  dividendYielTTM?: number;
+  dividendYieldTTM?: number;
   priceToSalesRatioTTM?: number;
   priceToBookRatioTTM?: number;
   evToSalesTTM?: number;
@@ -238,6 +237,13 @@ export interface KeyMetricsTTM {
   evToOperatingCashFlowTTM?: number;
   returnOnEquityTTM?: number;
   returnOnAssetsTTM?: number;
+  /**
+   * Return on invested capital TTM (FMP `key-metrics-ttm`). FMP reports
+   * it as a decimal fraction (0.44 = 44%); the FMP metrics path
+   * normalizes it to percent units (44.05) at the API boundary —
+   * renderers display it directly.
+   */
+  roicTTM?: number;
   freeCashFlowYieldTTM?: number;
 }
 
@@ -247,6 +253,12 @@ export interface RatiosTTM {
   priceToEarningsGrowthRatioTTM?: number;
   /** Headline P/E TTM — present on /stable/ratios-ttm, used to back-fill StockQuote.pe. */
   priceEarningsRatioTTM?: number;
+  /** P/operating-cash-flow TTM — FMP's actual field name on `/stable/ratios-ttm`. */
+  priceToOperatingCashFlowRatioTTM?: number;
+  /** Legacy alias for the older `/ratios` field name; read alongside `priceToOperatingCashFlowRatioTTM`. */
+  priceToCashFlowRatioTTM?: number;
+  /** Price to free cash flow TTM (FMP `/stable/ratios-ttm`). */
+  priceToFreeCashFlowRatioTTM?: number;
   netProfitMargin?: number;
   operatingProfitMarginTTM?: number;
   grossProfitMarginTTM?: number;
