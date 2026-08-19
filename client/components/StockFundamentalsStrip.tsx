@@ -3,10 +3,12 @@ import {
   CircleDollarSign,
   ChartNoAxesCombined,
   Landmark,
+  Lock,
   Percent,
 } from "lucide-react";
 import DataStatusBadge from "@/components/DataStatusBadge";
 import { finite, formatMoney } from "@/lib/format";
+import { useI18n } from "@/lib/i18n";
 import type {
   FinancialStatements,
   StockMetrics,
@@ -56,15 +58,33 @@ function sourceLabel(
       : undefined;
 }
 
-function unavailable(label: string) {
+function unavailable({
+  label,
+  premium,
+  fullKey,
+  t,
+}: {
+  label: string;
+  premium?: boolean;
+  fullKey?: string;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+}) {
+  const badge = t("fundamentals.premiumBadge");
+  const title = premium
+    ? t("fundamentals.premiumTitle", { label })
+    : t("fundamentals.unavailableTitle", { label: fullKey ?? label });
   return (
     <span
       className="inline-flex items-center gap-1"
-      title={`${label} unavailable from the current data providers`}
+      title={title}
     >
-      <span>—</span>
+      <Lock
+        className="h-3 w-3 shrink-0 text-chart-amber"
+        strokeWidth={2.5}
+        aria-hidden="true"
+      />
       <span className="rounded-full border border-chart-amber/30 bg-chart-amber/5 px-1.5 py-0.5 text-[9px] font-sans font-medium uppercase leading-none tracking-wide text-chart-amber">
-        Unavailable
+        {badge}
       </span>
     </span>
   );
@@ -73,28 +93,40 @@ function unavailable(label: string) {
 function Value({
   value,
   label,
+  fullKey,
   loading,
+  premium,
+  t,
 }: {
   value: MetricValue;
   label: string;
+  fullKey?: string;
   loading?: boolean;
+  premium?: boolean;
+  t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
   if (loading) return <span className="text-muted-foreground/60">…</span>;
   if (value === null || value === undefined || value === "")
-    return unavailable(label);
+    return unavailable({ label, premium, fullKey, t });
   return <span dir="ltr">{value}</span>;
 }
 
 function MetricRow({
   label,
+  fullKey,
   value,
   loading,
   source,
+  premium,
+  t,
 }: {
   label: string;
+  fullKey?: string;
   value: MetricValue;
   loading?: boolean;
   source?: Source;
+  premium?: boolean;
+  t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
   const hasValue = value !== null && value !== undefined && value !== "";
   return (
@@ -106,7 +138,14 @@ function MetricRow({
         {label}
       </span>
       <span className="flex shrink-0 items-center gap-1.5 text-right font-mono font-semibold tabular-nums text-foreground">
-        <Value value={value} label={label} loading={loading} />
+        <Value
+          value={value}
+          label={label}
+          fullKey={fullKey}
+          premium={premium}
+          t={t}
+          loading={loading}
+        />
         {!loading && hasValue && source && (
           <DataStatusBadge
             status="live"
@@ -121,21 +160,23 @@ function MetricRow({
 }
 
 const GROUP_ICONS = {
-  Valuation: CircleDollarSign,
-  "Cash Flow": Banknote,
-  "Margins & Growth": ChartNoAxesCombined,
-  Balance: Landmark,
-  Dividend: Percent,
+  valuation: CircleDollarSign,
+  cashFlow: Banknote,
+  marginsGrowth: ChartNoAxesCombined,
+  balance: Landmark,
+  dividend: Percent,
 } as const;
 
 function MetricGroup({
   title,
+  groupKey,
   children,
 }: {
-  title: keyof typeof GROUP_ICONS;
+  title: string;
+  groupKey: keyof typeof GROUP_ICONS;
   children: React.ReactNode;
 }) {
-  const Icon = GROUP_ICONS[title];
+  const Icon = GROUP_ICONS[groupKey];
   return (
     <section className="min-w-0 border-border/50 px-0 sm:border-l sm:px-3 first:pl-0 first:sm:border-l-0 last:pr-0">
       <h3 className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-foreground/80">
@@ -156,6 +197,9 @@ export default function StockFundamentalsStrip({
   marketCap: marketCapProp,
   loading = false,
 }: StockFundamentalsStripProps) {
+  const { t } = useI18n();
+  const f = (key: string) => t(`fundamentals.${key}`);
+  const fGroup = (key: string) => t(`fundamentals.group.${key}`);
   const hasQuarterly = Boolean(
     quarterlyFinancials?.income?.length ||
       quarterlyFinancials?.balance?.length ||
@@ -171,15 +215,17 @@ export default function StockFundamentalsStrip({
   return (
     <div className="mt-8 w-full border-t border-border/60 pt-6 text-left">
       <div className="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2 xl:grid-cols-5">
-        <MetricGroup title="Valuation">
+        <MetricGroup title={fGroup("valuation")} groupKey="valuation">
           <MetricRow
-            label="Market Cap"
+            t={t}
+            label={f("marketCap")}
             value={formatMoney(marketCap)}
             loading={loading}
             source={quoteSource ? { label: quoteSource } : undefined}
           />
           <MetricRow
-            label="P/E (TTM)"
+            t={t}
+            label={f("pe")}
             value={formatNumber(
               quote?.pe ??
                 metrics?.ratios?.priceEarningsRatioTTM ??
@@ -195,7 +241,8 @@ export default function StockFundamentalsStrip({
             }
           />
           <MetricRow
-            label="Price to Sales"
+            t={t}
+            label={f("priceToSales")}
             value={formatNumber(
               metrics?.metrics?.priceToSalesRatioTTM ??
                 metrics?.ratios?.priceToSalesRatioTTM,
@@ -204,13 +251,15 @@ export default function StockFundamentalsStrip({
             source={metricsSource ? { label: metricsSource } : undefined}
           />
           <MetricRow
-            label="EV to EBITDA"
+            t={t}
+            label={f("evToEbitda")}
             value={formatNumber(metrics?.metrics?.evToEBITDATTM)}
             loading={loading}
             source={metricsSource ? { label: metricsSource } : undefined}
           />
           <MetricRow
-            label="Price to Book"
+            t={t}
+            label={f("priceToBook")}
             value={formatNumber(
               metrics?.metrics?.priceToBookRatioTTM ??
                 metrics?.ratios?.priceToBookRatioTTM,
@@ -220,9 +269,12 @@ export default function StockFundamentalsStrip({
           />
         </MetricGroup>
 
-        <MetricGroup title="Cash Flow">
+        <MetricGroup title={fGroup("cashFlow")} groupKey="cashFlow">
           <MetricRow
-            label="P/CF"
+            t={t}
+            label={f("pcf")}
+            fullKey={f("pcfFull")}
+            premium
             value={formatNumber(
               metrics?.ratios?.priceToOperatingCashFlowRatioTTM ??
                 metrics?.ratios?.priceToCashFlowRatioTTM,
@@ -231,34 +283,45 @@ export default function StockFundamentalsStrip({
             source={metricsSource ? { label: metricsSource } : undefined}
           />
           <MetricRow
-            label="P/FCF"
+            t={t}
+            label={f("pfcf")}
+            fullKey={f("pfcfFull")}
+            premium
             value={formatNumber(metrics?.ratios?.priceToFreeCashFlowRatioTTM)}
             loading={loading}
             source={metricsSource ? { label: metricsSource } : undefined}
           />
           <MetricRow
-            label="FCF Yield"
+            t={t}
+            label={f("fcfYield")}
+            fullKey={f("fcfFull")}
+            premium
             value={formatPercent(metrics?.metrics?.freeCashFlowYieldTTM)}
             loading={loading}
             source={metricsSource ? { label: metricsSource } : undefined}
           />
         </MetricGroup>
 
-        <MetricGroup title="Margins & Growth">
+        <MetricGroup title={fGroup("marginsGrowth")} groupKey="marginsGrowth">
           <MetricRow
-            label="Profit Margin"
+            t={t}
+            label={f("profitMargin")}
             value={formatPercent(metrics?.ratios?.netProfitMargin)}
             loading={loading}
             source={metricsSource ? { label: metricsSource } : undefined}
           />
           <MetricRow
-            label="Operating Margin"
+            t={t}
+            label={f("operatingMargin")}
             value={formatPercent(metrics?.ratios?.operatingProfitMarginTTM)}
             loading={loading}
             source={metricsSource ? { label: metricsSource } : undefined}
           />
           <MetricRow
-            label="ROIC"
+            t={t}
+            label={f("roic")}
+            fullKey={f("roic")}
+            premium
             // Percent units: the FMP metrics path normalizes roicTTM from
             // FMP's decimal fraction (0.44 → 44.05) server-side, matching
             // the Yahoo path's convention — formatPercent displays as-is.
@@ -268,30 +331,34 @@ export default function StockFundamentalsStrip({
           />
         </MetricGroup>
 
-        <MetricGroup title="Balance">
+        <MetricGroup title={fGroup("balance")} groupKey="balance">
           <MetricRow
-            label="Cash"
+            t={t}
+            label={f("cash")}
             value={formatMoney(balance?.cashAndCashEquivalents)}
             loading={loading}
             source={balanceSource ? { label: balanceSource } : undefined}
           />
           <MetricRow
-            label="Debt"
+            t={t}
+            label={f("debt")}
             value={formatMoney(balance?.totalDebt)}
             loading={loading}
             source={balanceSource ? { label: balanceSource } : undefined}
           />
           <MetricRow
-            label="Net Debt"
+            t={t}
+            label={f("netDebt")}
             value={formatMoney(balance?.netDebt)}
             loading={loading}
             source={balanceSource ? { label: balanceSource } : undefined}
           />
         </MetricGroup>
 
-        <MetricGroup title="Dividend">
+        <MetricGroup title={fGroup("dividend")} groupKey="dividend">
           <MetricRow
-            label="Dividend Yield"
+            t={t}
+            label={f("dividendYield")}
             value={formatPercent(
               quote?.dividendYield ?? metrics?.metrics?.dividendYieldTTM,
             )}
@@ -305,7 +372,8 @@ export default function StockFundamentalsStrip({
             }
           />
           <MetricRow
-            label="Payout Ratio"
+            t={t}
+            label={f("payoutRatio")}
             value={formatPercent(
               quote?.payoutRatio ?? metrics?.ratios?.dividendPayoutRatioTTM,
             )}
@@ -318,7 +386,14 @@ export default function StockFundamentalsStrip({
                   : undefined
             }
           />
-          <MetricRow label="Payout Date" value={null} loading={loading} />
+          <MetricRow
+            t={t}
+            label={f("payoutDate")}
+            fullKey={f("payoutDate")}
+            premium
+            value={null}
+            loading={loading}
+          />
         </MetricGroup>
       </div>
     </div>

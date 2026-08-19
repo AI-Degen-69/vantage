@@ -342,17 +342,26 @@ export default function Index() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Centered Header Section */}
         <div className="mb-12 text-center">
-          <PageHeader
-            eyebrow={t("nav.insights")}
-            title={`${ticker} • ${(overviewData?.companyName && overviewData.companyName.toUpperCase() !== ticker ? overviewData.companyName : undefined) ?? quoteData?.name ?? ticker}${overviewData?.exchange ? ` • ${overviewData.exchange}` : ""}`}
-            className="mb-8 text-left"
-          />
+          {/* Anchored LTR even in the Hebrew (RTL) UI so the title row +
+              logo/price/change block keep the same left-to-right order as
+              the English version (logo left, price, change to the right).
+              Title is centered (bilingual: ticker+company+exchange in EN),
+              with the selected-language label below as a secondary line. */}
+          <div dir="ltr">
+            <PageHeader
+              eyebrow={t("nav.insights")}
+              title={`${ticker} • ${(overviewData?.companyName && overviewData.companyName.toUpperCase() !== ticker ? overviewData.companyName : undefined) ?? quoteData?.name ?? ticker}${overviewData?.exchange ? ` • ${overviewData.exchange}` : ""}`}
+              description={`${ticker} • ${(overviewData?.companyName && overviewData.companyName.toUpperCase() !== ticker ? overviewData.companyName : undefined) ?? quoteData?.name ?? ticker}${overviewData?.exchange ? ` • ${overviewData.exchange}` : ""}`}
+              centered
+              className="mb-8"
+            />
+          </div>
 
           {/* Stock Price — the hero number counts up when the quote lands,
               in sync with the Analyst card below. `placeholder={null}` keeps
               the first pre-frame paint empty rather than flashing a "—" in
               the text-5xl headline. */}
-          <div className="mb-3 flex items-center justify-center gap-4">
+          <div className="mb-3 flex items-center justify-center gap-4" dir="ltr">
             <TickerLogo
               ticker={ticker}
               size="xl"

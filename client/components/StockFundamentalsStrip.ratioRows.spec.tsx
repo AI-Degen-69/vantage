@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToString } from "react-dom/server";
 import StockFundamentalsStrip from "./StockFundamentalsStrip";
+import { I18nProvider } from "@/lib/i18n";
 import type { StockMetrics } from "@shared/api";
 
 /**
@@ -46,13 +47,15 @@ describe("StockFundamentalsStrip — P/CF, P/FCF, ROIC rows", () => {
 
   const render = (metrics: StockMetrics | null | undefined) =>
     renderToString(
-      <StockFundamentalsStrip
-        quote={null}
-        metrics={metrics}
-        annualFinancials={undefined}
-        quarterlyFinancials={undefined}
-        loading={false}
-      />,
+      <I18nProvider>
+        <StockFundamentalsStrip
+          quote={null}
+          metrics={metrics}
+          annualFinancials={undefined}
+          quarterlyFinancials={undefined}
+          loading={false}
+        />
+      </I18nProvider>,
     );
 
   it("renders P/CF, P/FCF and ROIC with formatted values from FMP metrics", () => {
@@ -63,6 +66,9 @@ describe("StockFundamentalsStrip — P/CF, P/FCF, ROIC rows", () => {
     expect(html).toContain("40.67"); // P/FCF multiple
     expect(html).toContain("ROIC");
     expect(html).toContain("44.05%"); // 44.05 percent units → "44.05%"
+    // Premium-gated rows carry the lock + "Premium" badge, not a dash.
+    expect(html).toContain("Premium");
+    expect(html).not.toContain("Unavailable");
   });
 
   it("displays the normalized FMP percent rows in percent units, not fractions", () => {
@@ -90,7 +96,8 @@ describe("StockFundamentalsStrip — P/CF, P/FCF, ROIC rows", () => {
     expect(html).toContain("P/CF");
     expect(html).toContain("P/FCF");
     expect(html).toContain("ROIC");
-    expect(html).toContain("Unavailable");
+    expect(html).toContain("Premium");
+    expect(html).not.toContain("Unavailable");
   });
 
   it("keeps negative and zero ROIC percent values intact", () => {

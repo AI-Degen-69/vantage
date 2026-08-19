@@ -13,6 +13,8 @@ interface PageHeaderProps {
   titleAdornment?: ReactNode;
   /** Optional identity mark rendered before the title. */
   titleLeadingAdornment?: ReactNode;
+  /** When true, stack + center the eyebrow/title (stock hero header). */
+  centered?: boolean;
   className?: string;
 }
 
@@ -27,11 +29,12 @@ export default function PageHeader({
   actions,
   titleAdornment,
   titleLeadingAdornment,
+  centered = false,
   className = "",
 }: PageHeaderProps) {
   return (
-    <header className={`flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between ${className}`}>
-      <div className="min-w-0">
+    <header className={`flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between ${className} ${centered ? "sm:flex-col sm:items-center sm:justify-center text-center" : ""}`}>
+      <div className={`min-w-0 ${centered ? "flex flex-col items-center text-center" : ""}`}>
         {eyebrow && (
           <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/80">
             {eyebrow}
