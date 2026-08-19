@@ -446,7 +446,7 @@ export async function handleStockMetrics(req, res) {
       ),
       peRatioTTM: pick(sd.trailingPE) ?? pick(dks.forwardPE),
       // SummaryDetail yields are decimal fractions; normalize at the API boundary.
-      dividendYielTTM:
+      dividendYieldTTM:
         pick(sd.dividendYield) != null
           ? pick(sd.dividendYield) * 100
           : pick(sd.trailingAnnualDividendYield) != null

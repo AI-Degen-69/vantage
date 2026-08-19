@@ -229,8 +229,7 @@ export interface KeyMetricsTTM {
   netIncomePerShareTTM?: number;
   operatingCashFlowPerShareTTM?: number;
   peRatioTTM?: number;
-  /** Common misspelling of yield — kept here to surface docs warning. */
-  dividendYielTTM?: number;
+  dividendYieldTTM?: number;
   priceToSalesRatioTTM?: number;
   priceToBookRatioTTM?: number;
   evToSalesTTM?: number;

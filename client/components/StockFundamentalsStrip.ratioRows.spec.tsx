@@ -32,7 +32,7 @@ describe("StockFundamentalsStrip — P/CF, P/FCF, ROIC rows", () => {
     metrics: {
       roicTTM: 44.05,
       freeCashFlowYieldTTM: 7.1,
-      dividendYielTTM: 0.38,
+      dividendYieldTTM: 0.38,
     },
     ratios: {
       priceToOperatingCashFlowRatioTTM: 36.45,

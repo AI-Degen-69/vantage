@@ -293,7 +293,7 @@ export default function StockFundamentalsStrip({
           <MetricRow
             label="Dividend Yield"
             value={formatPercent(
-              quote?.dividendYield ?? metrics?.metrics?.dividendYielTTM,
+              quote?.dividendYield ?? metrics?.metrics?.dividendYieldTTM,
             )}
             loading={loading}
             source={

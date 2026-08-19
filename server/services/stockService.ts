@@ -1665,7 +1665,7 @@ export const stockService = {
           revenuePerShareTTM: extract(fd.revenuePerShare),
           netIncomePerShareTTM: extract(dks.trailingEps),
           peRatioTTM: extract(sd.trailingPE) ?? extract(dks.forwardPE),
-          dividendYielTTM: normalizeYahooPercentage(
+          dividendYieldTTM: normalizeYahooPercentage(
             extract(sd.dividendYield) ??
               extract(sd.trailingAnnualDividendYield),
           ),
@@ -1759,9 +1759,7 @@ export const stockService = {
     const rRaw = (r0 || {}) as Record<string, unknown>;
     const metrics: KeyMetricsTTM = {
       ...(mRaw as KeyMetricsTTM),
-      dividendYielTTM: fmpToPercent(
-        mRaw.dividendYielTTM ?? mRaw.dividendYieldTTM,
-      ),
+      dividendYieldTTM: fmpToPercent(mRaw.dividendYieldTTM),
       freeCashFlowYieldTTM: fmpToPercent(mRaw.freeCashFlowYieldTTM),
       returnOnEquityTTM: fmpToPercent(mRaw.returnOnEquityTTM),
       returnOnAssetsTTM: fmpToPercent(mRaw.returnOnAssetsTTM),
