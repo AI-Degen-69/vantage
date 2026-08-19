@@ -274,6 +274,41 @@ const en = {
   "metrics.marketCap": "Market Cap",
   "metrics.eps": "EPS",
 
+  // Stock fundamentals strip (Index.tsx real-data grid). Translating the
+  // group titles + metric labels so the financial block reads in the active
+  // language; numeric values stay LTR (dir="ltr" on the value span).
+  "fundamentals.group.valuation": "Valuation",
+  "fundamentals.group.cashFlow": "Cash Flow",
+  "fundamentals.group.marginsGrowth": "Margins & Growth",
+  "fundamentals.group.balance": "Balance",
+  "fundamentals.group.dividend": "Dividend",
+  "fundamentals.marketCap": "Market Cap",
+  "fundamentals.pe": "P/E (TTM)",
+  "fundamentals.priceToSales": "Price to Sales",
+  "fundamentals.evToEbitda": "EV to EBITDA",
+  "fundamentals.priceToBook": "Price to Book",
+  "fundamentals.pcf": "P/CF",
+  "fundamentals.pfcf": "P/FCF",
+  "fundamentals.fcfYield": "FCF Yield",
+  "fundamentals.profitMargin": "Profit Margin",
+  "fundamentals.operatingMargin": "Operating Margin",
+  "fundamentals.roic": "ROIC",
+  "fundamentals.cash": "Cash",
+  "fundamentals.debt": "Debt",
+  "fundamentals.netDebt": "Net Debt",
+  "fundamentals.dividendYield": "Dividend Yield",
+  "fundamentals.payoutRatio": "Payout Ratio",
+  "fundamentals.payoutDate": "Payout Date",
+  "fundamentals.pcfFull": "Price to Operating Cash Flow (TTM)",
+  "fundamentals.pfcfFull": "Price to Free Cash Flow (TTM)",
+  "fundamentals.fcfFull": "Free Cash Flow",
+  "fundamentals.unavailable": "Unavailable",
+  "fundamentals.premiumBadge": "Premium",
+  "fundamentals.unavailableTitle":
+    "{{label}} is unavailable on the free plan — provided by FMP premium endpoints (ratios-ttm / key-metrics-ttm).",
+  "fundamentals.premiumTitle":
+    "{{label}} is a Vantage Premium metric (FMP premium endpoint).",
+
   // Revenue by segment card (FMP revenue-product-segmentation). `locked` is
   // the visible chip label when the free-tier quota is exhausted; the tooltip
   // explains why the segment filters are visible but unselectable.
@@ -732,6 +767,40 @@ const he: Record<string, string> = {
     "בחר לפחות מגזר אחד להצגה.",
   // סה"כ בגרף המגזרים הערוך (הכנסות לפי מגזר).
   "chart.total": "סה\"כ",
+
+  // Stock fundamentals strip (Index.tsx real-data grid) — עברות כותרות
+  // הקבוצות ושמות המדדים; הערכים המספריים נשארים LTR (dir="ltr" על אלמנט הערך).
+  "fundamentals.group.valuation": "הערכת שווי",
+  "fundamentals.group.cashFlow": "תזרים מזומנים",
+  "fundamentals.group.marginsGrowth": "שולי רווח וצמיחה",
+  "fundamentals.group.balance": "מאזן",
+  "fundamentals.group.dividend": "דיבידנד",
+  "fundamentals.marketCap": "שווי שוק",
+  "fundamentals.pe": "מכפיל רווח (TTM)",
+  "fundamentals.priceToSales": "יחס מחיר למכירות",
+  "fundamentals.evToEbitda": "EV ל-EBITDA",
+  "fundamentals.priceToBook": "יחס מחיר לערך בספרים",
+  "fundamentals.pcf": "P/CF",
+  "fundamentals.pfcf": "P/FCF",
+  "fundamentals.fcfYield": "תשואת FCF",
+  "fundamentals.profitMargin": "שולי רווח נקי",
+  "fundamentals.operatingMargin": "שולי רווח תפעילי",
+  "fundamentals.roic": "ROIC",
+  "fundamentals.cash": "מזומנים",
+  "fundamentals.debt": "חוב",
+  "fundamentals.netDebt": "חוב נטו",
+  "fundamentals.dividendYield": "תשואת דיבידנד",
+  "fundamentals.payoutRatio": "יחס חלוקה",
+  "fundamentals.payoutDate": "תאריך חלוקה",
+  "fundamentals.pcfFull": "מחיר לתזרים מזומנים (ת\"מ)",
+  "fundamentals.pfcfFull": "מחיר לתזרים מזומנים חופשי (ת\"מ)",
+  "fundamentals.fcfFull": "תזרים מזומנים חופשי",
+  "fundamentals.unavailable": "לא זמין",
+  "fundamentals.premiumBadge": "פרימיום",
+  "fundamentals.unavailableTitle":
+    "{{label}} אינו זמין בתוכנית החינמית — מסופק על ידי נקודות קצה פרימיום של FMP (ratios-ttm / key-metrics-ttm).",
+  "fundamentals.premiumTitle":
+    "{{label}} הוא מדד Vantage פרימיום (נקודת קצה פרימיום של FMP).",
 
   // PricingModal (placeholder). Triggers from the Upgrade CTA beside
   // the locked chip / banner.
