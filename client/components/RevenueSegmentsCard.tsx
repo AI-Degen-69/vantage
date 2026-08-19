@@ -10,6 +10,14 @@ interface RevenueSegmentsCardProps {
   /** The total-revenue metric (annual series, B units) from Index.tsx. */
   metric: FinancialMetric;
   ticker: string;
+  /**
+   * Opens the placeholder /pricing modal hosted at the page root.
+   * Wired into the chip strip's small Upgrade link (rendered next to
+   * the locked `Segments 🔒 Premium` pill) AND forwarded down through
+   * `InsightsCard` so the modal's banner CTA also opens the same
+   * modal. Undefined = no CTA rendered (standalone previews).
+   */
+  onUpgradeClick?: () => void;
 }
 
 /**
@@ -29,6 +37,7 @@ interface RevenueSegmentsCardProps {
 export default function RevenueSegmentsCard({
   metric,
   ticker,
+  onUpgradeClick,
 }: RevenueSegmentsCardProps) {
   const { t } = useI18n();
   const { data: segmentation, isLoading } = useStockRevenueSegmentation(ticker);
@@ -37,6 +46,15 @@ export default function RevenueSegmentsCard({
   const rows: RevenueSegmentRow[] = segmentation?.rows ?? [];
   const rateLimited = segmentation?.rateLimited === true;
   const unavailable = segmentation?.unavailable === true;
+
+  // Surface the premium-tier reason so the modal can mirror the card's
+  // locked state instead of silently falling back to the regular
+  // total-revenue chart with no explanation.
+  const segmentLockedReason: "rateLimited" | "unavailable" | null = rateLimited
+    ? "rateLimited"
+    : unavailable
+      ? "unavailable"
+      : null;
 
   // Segment names in display order: the most recent period's products first,
   // then any earlier periods' products (a segment may be dropped mid-series).
@@ -147,13 +165,44 @@ export default function RevenueSegmentsCard({
             </button>
           ))
         : locked && (
-            <span
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border border-border/40 bg-muted/40 text-muted-foreground/70 cursor-not-allowed"
-              title={lockedTooltip}
-              aria-disabled="true"
-            >
-              <Lock className="w-3 h-3" />
-              {t("revenueSegments.locked")}
+            // Pair of lock + premium pill so the user sees the gate
+            // without hovering: the lock icon + tooltip explain WHY
+            // it's gated, and the Starlight Gold `Premium` text makes
+            // it discoverable at a glance that this is the upgrade
+            // path, not a missing data bug. The inline Upgrade link
+            // gives the gate an actual destination — clicking it opens
+            // the placeholder /pricing modal hosted at the page root.
+            <span className="inline-flex items-center gap-1.5">
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border border-border/40 bg-muted/40 text-muted-foreground/70 cursor-not-allowed"
+                title={lockedTooltip}
+                aria-disabled="true"
+              >
+                <Lock className="w-3 h-3" />
+                {t("revenueSegments.locked")}
+              </span>
+              <span
+                className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide border border-primary/40 bg-primary/15 text-primary"
+                aria-label={t("revenueSegments.premiumBadge")}
+                title={lockedTooltip}
+                data-testid="revenue-segments-premium-badge"
+              >
+                {t("revenueSegments.premiumBadge")}
+              </span>
+              {onUpgradeClick && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUpgradeClick();
+                  }}
+                  data-testid="revenue-segments-upgrade-cta"
+                  className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+                >
+                  {t("revenueSegments.upgradeCta")}
+                  <span aria-hidden="true">→</span>
+                </button>
+              )}
             </span>
           )}
     </div>
@@ -190,6 +239,14 @@ export default function RevenueSegmentsCard({
          chart opens with every other segment hidden — matching what the
          card sparkline was already focusing on. */
       selectedSegment={selectedSegment}
+      /* Forward the premium-tier reason so the modal can show the same
+         locked banner + chip row that the card already shows, instead
+         of silently rendering the regular total-revenue chart. */
+      segmentLockedReason={segmentLockedReason}
+      /* Forward the modal's CTA so the banner's Upgrade button inside
+         the expanded chart modal opens the same /pricing modal as the
+         chip-strip CTA on the card. */
+      onUpgradeClick={onUpgradeClick}
     />
   );
 }

@@ -156,7 +156,25 @@
     "all": "All",
     "locked": "Segments",
     "rateLimitedTooltip": "Segment breakdown is a premium feature — the free-tier FMP quota is exhausted, so revenue is shown as a total.",
-    "unavailableTooltip": "Segment breakdown is a premium feature — no FMP data source is configured, so revenue is shown as a total."
+    "unavailableTooltip": "Segment breakdown is a premium feature — no FMP data source is configured, so revenue is shown as a total.",
+    "modalBannerTitle": "Per-segment breakdown locked",
+    "modalBannerRateLimited": "The free-tier FMP quota is exhausted, so revenue is shown as a single total. Segment filters would be available on a paid plan.",
+    "modalBannerUnavailable": "No FMP data source is configured, so revenue is shown as a single total. Segment filters would be available on a paid plan.",
+    "premiumBadge": "Premium",
+    "upgradeCta": "Upgrade"
+  },
+  "pricing": {
+    "title": "Vantage Premium",
+    "subtitle": "Locked premium feature — placeholder sign-up",
+    "revenueSegmentsBody": "The locked chip you just clicked lives behind the Vantage Premium tier. Today, the free FMP daily quota has run out (or no FMP key is configured) — segment-level revenue data, quarterly granularity, and full historical coverage are all unlimited on Premium.",
+    "genericBody": "This feature is part of Vantage Premium. Free-tier coverage is fine for headline metrics, but unbounded history, per-product breakdowns, custom alerts, and DCF tooling are all Premium-only.",
+    "bulletSegments": "Per-product revenue breakdowns with quarterly granularity",
+    "bulletHistory": "Unbounded historical financials across every reporting period",
+    "bulletAlerts": "Custom alerts when a metric crosses a threshold you set",
+    "placeholderNote": "Pricing isn't live yet — these buttons are wireframes. We'll wire the real checkout when billing ships.",
+    "close": "Close",
+    "notifyMe": "Notify me when it ships",
+    "contactSales": "Contact sales"
   },
   "dcf": {
     "title": "DCF Calculator",

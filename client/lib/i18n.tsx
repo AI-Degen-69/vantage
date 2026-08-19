@@ -128,6 +128,29 @@ const en = {
   "chart.segmentNoSelection":
     "Select at least one segment to display.",
 
+  // PricingModal (placeholder). Triggered by the Upgrade CTA beside
+  // the locked "Segments 🔒" chip and inside the chart modal banner.
+  // Body copy branches on `context` so a future earnings-locked CTA
+  // (or any other gated feature) can re-use the same modal with
+  // feature-specific copy without another component.
+  "pricing.title": "Vantage Premium",
+  "pricing.subtitle": "Locked premium feature — placeholder sign-up",
+  "pricing.revenueSegmentsBody":
+    "The locked chip you just clicked lives behind the Vantage Premium tier. Today, the free FMP daily quota has run out (or no FMP key is configured) — segment-level revenue data, quarterly granularity, and full historical coverage are all unlimited on Premium.",
+  "pricing.genericBody":
+    "This feature is part of Vantage Premium. Free-tier coverage is fine for headline metrics, but unbounded history, per-product breakdowns, custom alerts, and DCF tooling are all Premium-only.",
+  "pricing.bulletSegments":
+    "Per-product revenue breakdowns with quarterly granularity",
+  "pricing.bulletHistory":
+    "Unbounded historical financials across every reporting period",
+  "pricing.bulletAlerts":
+    "Custom alerts when a metric crosses a threshold you set",
+  "pricing.placeholderNote":
+    "Pricing isn't live yet — these buttons are wireframes. We'll wire the real checkout when billing ships.",
+  "pricing.close": "Close",
+  "pricing.notifyMe": "Notify me when it ships",
+  "pricing.contactSales": "Contact sales",
+
   // DCFWidget
   "dcf.title": "DCF Valuation",
   "dcf.earningsMode": "Earnings Mode",
@@ -260,6 +283,26 @@ const en = {
     "Segment breakdown is a premium feature — the free-tier FMP quota is exhausted, so revenue is shown as a total.",
   "revenueSegments.unavailableTooltip":
     "Segment breakdown is a premium feature — no FMP data source is configured, so revenue is shown as a total.",
+  // Banner shown inside the expanded chart modal when the segment
+  // payload is unavailable for premium-tier reasons. The card already
+  // surfaces the locked chip with a tooltip; the modal mirrors that
+  // state with a one-line banner so the user understands why the chart
+  // is the total-revenue shape instead of the per-segment stacked bars.
+  "revenueSegments.modalBannerTitle": "Per-segment breakdown locked",
+  "revenueSegments.modalBannerRateLimited":
+    "The free-tier FMP quota is exhausted, so revenue is shown as a single total. Segment filters would be available on a paid plan.",
+  "revenueSegments.modalBannerUnavailable":
+    "No FMP data source is configured, so revenue is shown as a single total. Segment filters would be available on a paid plan.",
+  // Short label on the small Starlight Gold `Premium` badge that sits
+  // beside the locked "Segments 🔒" chip — both on the card and inside
+  // the expanded modal. Avoids relying on hover-tooltip discoverability
+  // for which feature is gated.
+  "revenueSegments.premiumBadge": "Premium",
+  // Small inline CTA rendered beside the locked premium banner body
+  // and beside the card's locked chip strip — opens the placeholder
+  // /pricing modal hosted at the page level. Compact label so it
+  // doesn't compete visually with the longer banner body.
+  "revenueSegments.upgradeCta": "Upgrade",
 
   // Insights — Company Profile / Detail page
   "insights.search": "Search",
@@ -690,6 +733,23 @@ const he: Record<string, string> = {
   // סה"כ בגרף המגזרים הערוך (הכנסות לפי מגזר).
   "chart.total": "סה\"כ",
 
+  // PricingModal (placeholder). Triggers from the Upgrade CTA beside
+  // the locked chip / banner.
+  "pricing.title": "Vantage פרימיום",
+  "pricing.subtitle": "תכונת פרימיום נעולה — טופס הרשמה זמני",
+  "pricing.revenueSegmentsBody":
+    "השבב הנעול שלחצת עליו נמצא מאחורי מסלול Vantage פרימיום. כרגע מכסת ה-FMP היומית הסתיימה (או שלא הוגדר מפתח FMP) — פילוח הכנסות לפי מגזר, רבעוניות מלאה וכיסוי היסטורי ללא הגבלה זמינים בפרימיום.",
+  "pricing.genericBody":
+    "תכונה זו היא חלק מ-Vantage פרימיום. הכיסוי בתוכנית החינמית מספיק למדדי הכותרת, אבל היסטוריה ללא הגבלה, פילוח לפי מוצר, התראות מותאמות אישית וכלי DCF זמינים רק בפרימיום.",
+  "pricing.bulletSegments": "פילוח הכנסות לפי מוצר עם רבעוניות מלאה",
+  "pricing.bulletHistory": "דוחות כספיים היסטוריים ללא הגבלה לכל תקופת דיווח",
+  "pricing.bulletAlerts": "התראות מותאמות אישית כשמדד חוצה סף שהגדרת",
+  "pricing.placeholderNote":
+    "התמחור עדיין לא פעיל — כפתורים אלה הם מסגרות. נחבר תשלום אמיתי כשהחיוב ייצא לדרך.",
+  "pricing.close": "סגור",
+  "pricing.notifyMe": "תודיעו לי כשזה יוצא",
+  "pricing.contactSales": "דברו עם מכירות",
+
   "dcf.title": "הערכת שווי DCF",
   "dcf.earningsMode": "מצב רווחים",
   "dcf.cashFlowMode": "מצב תזרים",
@@ -819,6 +879,22 @@ const he: Record<string, string> = {
     "פילוח לפי מגזר הוא תכונת פרימיום — מכסת ה-FMP היומית בתוכנית החינמית הסתיימה, לכן ההכנסות מוצגות כסכום כולל.",
   "revenueSegments.unavailableTooltip":
     "פילוח לפי מגזר הוא תכונת פרימיום — לא הוגדר מקור נתונים של FMP, לכן ההכנסות מוצגות כסכום כולל.",
+  // באנר בתוך המודל המורחב כשמטען המגזרים לא זמין מסיבות פרימיום.
+  // הכרטיס כבר מציג שבב נעול עם הסבר; המודל משקף זאת בשורה אחת כדי
+  // שהמשתמש יבין מדוע הגרף הוא סכום כולל במקום עמודות מוערמות לפי מגזר.
+  "revenueSegments.modalBannerTitle": "פילוח לפי מגזר נעול",
+  "revenueSegments.modalBannerRateLimited":
+    "מכסת ה-FMP היומית בתוכנית החינמית הסתיימה, לכן ההכנסות מוצגות כסכום כולל. מסנני מגזרים יהיו זמינים בתוכנית בתשלום.",
+  "revenueSegments.modalBannerUnavailable":
+    "לא הוגדר מקור נתונים של FMP, לכן ההכנסות מוצגות כסכום כולל. מסנני מגזרים יהיו זמינים בתוכנית בתשלום.",
+  // תווית קצרה על תג ה-Starlight Gold `Premium` שיושב ליד שבב ה-
+  // "Segments 🔒" הנעול — גם בכרטיס וגם בתוך המודל המורחב. מבטל
+  // את הצורך ב-hover כדי לגלות איזו תכונה נעולה.
+  "revenueSegments.premiumBadge": "פרימיום",
+  // קריאת CTA קצרה שמוצגת ליד גוף הבאנר הנעול וליד שבב הנעילה
+  // בכרטיס — פותחת את מודל התמחור הזמני שמתארח ברמת הדף. תווית
+  // קצרה כדי שלא תתחרה ויזואלית בגוף הבאנר הארוך.
+  "revenueSegments.upgradeCta": "שדרג",
 
   "insights.search": "חיפוש",
   "insights.tabBadgeLive": "● חי",

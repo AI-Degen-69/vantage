@@ -4,6 +4,7 @@ import { useI18n } from "@/lib/i18n";
 import AnimatedNumber from "@/components/AnimatedNumber";
 import ChartModal from "@/components/ChartModal";
 import InsightsCard from "@/components/InsightsCard";
+import PricingModal from "@/components/PricingModal";
 import RevenueSegmentsCard from "@/components/RevenueSegmentsCard";
 import CompanyProfile from "@/components/CompanyProfile";
 import StockFundamentalsStrip from "@/components/StockFundamentalsStrip";
@@ -45,6 +46,12 @@ export default function Index() {
   const [selectedMetric, setSelectedMetric] = useState<FinancialMetric | null>(
     null,
   );
+  // Page-level upgrade modal — opened by the locked-chip / banner
+  // Upgrade CTAs (rendered through `onUpgradeClick` callbacks on the
+  // RevenueSegmentsCard → InsightsCard → ChartModal chain). Keeps the
+  // modal instance single even if the user clicks Upgrade from both
+  // the card and the modal banner in one session.
+  const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
 
   const ticker = urlTicker?.toUpperCase() || "AAPL";
 
@@ -792,6 +799,7 @@ export default function Index() {
                     key={idx}
                     metric={metric}
                     ticker={ticker}
+                    onUpgradeClick={() => setIsUpgradeOpen(true)}
                   />
                 );
               }
@@ -844,6 +852,13 @@ export default function Index() {
           ticker={ticker}
         />
       )}
+
+      {/* Pricing modal — placeholder wired from the locked CTA. */}
+      <PricingModal
+        context="revenueSegments"
+        isOpen={isUpgradeOpen}
+        onClose={() => setIsUpgradeOpen(false)}
+      />
     </div>
   );
 }

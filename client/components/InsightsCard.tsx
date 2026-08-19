@@ -29,6 +29,19 @@ interface InsightsCardProps {
   segmentRows?: RevenueSegmentRow[];
   /** Segment the card had focused when the modal was opened (snapshots into the modal's filter chips). */
   selectedSegment?: string | null;
+  /**
+   * Why the segment payload is unavailable — surfaced as a locked
+   * banner inside the modal so the user sees the same premium-tier
+   * explanation in both the card AND the expanded view. Set by
+   * `RevenueSegmentsCard` when `useStockRevenueSegmentation` returned
+   * `{ rateLimited: true }` or `{ unavailable: true }`.
+   */
+  segmentLockedReason?: "rateLimited" | "unavailable" | null;
+  /**
+   * Opens the placeholder /pricing modal from the locked banner's
+   * Upgrade CTA. Undefined = no CTA rendered (standalone previews).
+   */
+  onUpgradeClick?: () => void;
 }
 
 /**
@@ -53,6 +66,8 @@ export default function InsightsCard({
   filterBar,
   segmentRows,
   selectedSegment, // forwarded to the chart modal so it can mirror the card's focus
+  segmentLockedReason,
+  onUpgradeClick,
 }: InsightsCardProps) {
   const { t } = useI18n();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -238,6 +253,8 @@ export default function InsightsCard({
         ticker={ticker}
         segmentRows={segmentRows}
         selectedSegment={selectedSegment ?? null}
+        segmentLockedReason={segmentLockedReason ?? null}
+        onUpgradeClick={onUpgradeClick}
       />
     </>
   );
