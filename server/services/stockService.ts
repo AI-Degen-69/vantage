@@ -1776,17 +1776,20 @@ export const stockService = {
       await kvJsonCache.set(cacheKey, result, 3600);
       return result;
     }
-    const [m, r, s] = await Promise.all([
-      fetchJSON<any[]>(
+    const [mRes, rRes, sRes] = await Promise.all([
+      fetchJSONStatus<any[]>(
         tickerUrl("key-metrics-ttm", symbol),
         `metrics/${symbol}`,
       ),
-      fetchJSON<any[]>(tickerUrl("ratios-ttm", symbol), `ratios/${symbol}`),
-      fetchJSON<any[]>(
+      fetchJSONStatus<any[]>(tickerUrl("ratios-ttm", symbol), `ratios/${symbol}`),
+      fetchJSONStatus<any[]>(
         tickerUrl("financial-scores", symbol),
         `scores/${symbol}`,
       ),
     ]);
+    const m = mRes.data;
+    const r = rRes.data;
+    const s = sRes.data;
     const m0 = Array.isArray(m) ? m[0] : m;
     const r0 = Array.isArray(r) ? r[0] : r;
     const s0 = Array.isArray(s) ? s[0] : s;
@@ -1796,10 +1799,36 @@ export const stockService = {
           typeof value === "object" &&
           Object.keys(value as object).length > 0,
       );
+    // Classify the FMP failure so the UI can show *why* a value is missing.
+    const classifyFmp = (
+      status: number | null,
+      hasData: boolean,
+    ): AvailabilityState | undefined => {
+      if (hasData) return undefined; // present → no badge
+      if (status === 429 || status === 403) return "rateLimited";
+      if (status === 404 || status === null) return "notFound";
+      // 200 but empty payload ⇒ premium endpoint returned nothing on free tier
+      return "pro";
+    };
+    const fmpAvailability: Partial<Record<string, AvailabilityState>> = {
+      roic: classifyFmp(mRes.status, hasObjectValues(m0)),
+      payoutDate: classifyFmp(rRes.status, hasObjectValues(r0)),
+    };
     if (!hasObjectValues(m0) && !hasObjectValues(r0) && !hasObjectValues(s0)) {
       const result = await getYahooMetrics();
-      await kvJsonCache.set(cacheKey, result, 3600);
-      return result;
+      // FMP premium endpoints (roic, payoutDate) are paid-only — Yahoo's
+      // free tier never supplies them, so mark them `pro` regardless of
+      // whether FMP 429'd (no subscription) or returned empty (free tier).
+      const merged: StockMetrics = {
+        ...result,
+        availability: {
+          ...(result.availability ?? {}),
+          roic: "pro",
+          payoutDate: "pro",
+        },
+      };
+      await kvJsonCache.set(cacheKey, merged, 3600);
+      return merged;
     }
     // FMP reports percentage metrics as decimal fractions (0.269 =
     // 26.9%, and values can exceed 1 — AAPL ROE ≈ 1.52 = 152%). Convert
@@ -1837,6 +1866,7 @@ export const stockService = {
           }
         : null,
       source: "fmp",
+      availability: fmpAvailability,
     };
     await kvJsonCache.set(cacheKey, result, 3600);
     return result;
