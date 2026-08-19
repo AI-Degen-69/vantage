@@ -224,6 +224,7 @@ export default function InsightsCard({
               />
               <ReferenceLine
                 y={0}
+                yAxisId="0"
                 stroke="hsl(220 18% 82%)"
                 strokeOpacity={0.8}
                 strokeWidth={1.5}

@@ -970,6 +970,7 @@ export default function ChartModal({
               </Bar>
               <ReferenceLine
                 y={0}
+                yAxisId="0"
                 stroke="hsl(220 18% 82%)"
                 strokeOpacity={0.9}
                 strokeWidth={2}
@@ -1027,6 +1028,7 @@ export default function ChartModal({
               />
               <ReferenceLine
                 y={0}
+                yAxisId="0"
                 stroke="hsl(220 18% 82%)"
                 strokeOpacity={0.9}
                 strokeWidth={2}
@@ -1074,6 +1076,7 @@ export default function ChartModal({
               />
               <ReferenceLine
                 y={0}
+                yAxisId="0"
                 stroke="hsl(220 18% 82%)"
                 strokeOpacity={0.9}
                 strokeWidth={2}
