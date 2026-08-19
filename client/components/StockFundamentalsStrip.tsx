@@ -5,6 +5,12 @@ import {
   Landmark,
   Lock,
   Percent,
+  Clock,
+  Sigma,
+  HelpCircle,
+  AlertTriangle,
+  CircleX,
+  Minus,
 } from "lucide-react";
 import DataStatusBadge from "@/components/DataStatusBadge";
 import { finite, formatMoney } from "@/lib/format";
@@ -58,34 +64,82 @@ function sourceLabel(
       : undefined;
 }
 
-function unavailable({
+type AvailabilityState =
+  | "available"
+  | "pro"
+  | "rateLimited"
+  | "calcBroken"
+  | "stale"
+  | "notFound"
+  | "nullByDesign";
+
+function availabilityBadge({
+  state,
   label,
-  premium,
   fullKey,
   t,
 }: {
+  state: AvailabilityState;
   label: string;
-  premium?: boolean;
   fullKey?: string;
   t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
-  const badge = t("fundamentals.premiumBadge");
-  const title = premium
-    ? t("fundamentals.premiumTitle", { label })
-    : t("fundamentals.unavailableTitle", { label: fullKey ?? label });
+  const map: Record<
+    AvailabilityState,
+    { icon: typeof Lock; cls: string; textKey: string; titleKey: string }
+  > = {
+    pro: {
+      icon: Lock,
+      cls: "border-chart-amber/30 bg-chart-amber/5 text-chart-amber",
+      textKey: "availability.pro",
+      titleKey: "availability.proTitle",
+    },
+    rateLimited: {
+      icon: Clock,
+      cls: "border-chart-amber/30 bg-chart-amber/5 text-chart-amber",
+      textKey: "availability.rateLimited",
+      titleKey: "availability.rateLimitedTitle",
+    },
+    calcBroken: {
+      icon: Sigma,
+      cls: "border-muted/30 bg-muted/5 text-muted-foreground",
+      textKey: "availability.calcBroken",
+      titleKey: "availability.calcBrokenTitle",
+    },
+    stale: {
+      icon: Clock,
+      cls: "border-muted/30 bg-muted/5 text-muted-foreground/70",
+      textKey: "availability.stale",
+      titleKey: "availability.staleTitle",
+    },
+    notFound: {
+      icon: CircleX,
+      cls: "border-red-500/30 bg-red-500/5 text-red-500",
+      textKey: "availability.notFound",
+      titleKey: "availability.notFoundTitle",
+    },
+    nullByDesign: {
+      icon: Minus,
+      cls: "border-muted/20 bg-muted/5 text-muted-foreground/60",
+      textKey: "availability.nullByDesign",
+      titleKey: "availability.nullByDesignTitle",
+    },
+    available: {
+      icon: HelpCircle,
+      cls: "border-muted/20 bg-muted/5 text-muted-foreground/60",
+      textKey: "availability.unknown",
+      titleKey: "availability.unknownTitle",
+    },
+  };
+  const cfg = map[state] ?? map.available;
+  const Icon = cfg.icon;
   return (
     <span
-      className="inline-flex items-center gap-1"
-      title={title}
+      className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] font-sans font-medium uppercase leading-none tracking-wide ${cfg.cls}`}
+      title={t(cfg.titleKey, { label: fullKey ?? label })}
     >
-      <Lock
-        className="h-3 w-3 shrink-0 text-chart-amber"
-        strokeWidth={2.5}
-        aria-hidden="true"
-      />
-      <span className="rounded-full border border-chart-amber/30 bg-chart-amber/5 px-1.5 py-0.5 text-[9px] font-sans font-medium uppercase leading-none tracking-wide text-chart-amber">
-        {badge}
-      </span>
+      <Icon className="h-3 w-3 shrink-0" strokeWidth={2.5} aria-hidden="true" />
+      <span>{t(cfg.textKey)}</span>
     </span>
   );
 }
@@ -95,19 +149,19 @@ function Value({
   label,
   fullKey,
   loading,
-  premium,
+  availability,
   t,
 }: {
   value: MetricValue;
   label: string;
   fullKey?: string;
   loading?: boolean;
-  premium?: boolean;
+  availability?: AvailabilityState;
   t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
   if (loading) return <span className="text-muted-foreground/60">…</span>;
   if (value === null || value === undefined || value === "")
-    return unavailable({ label, premium, fullKey, t });
+    return availabilityBadge({ state: availability ?? "nullByDesign", label, fullKey, t });
   return <span dir="ltr">{value}</span>;
 }
 
@@ -117,7 +171,7 @@ function MetricRow({
   value,
   loading,
   source,
-  premium,
+  availability,
   t,
 }: {
   label: string;
@@ -125,7 +179,7 @@ function MetricRow({
   value: MetricValue;
   loading?: boolean;
   source?: Source;
-  premium?: boolean;
+  availability?: AvailabilityState;
   t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
   const hasValue = value !== null && value !== undefined && value !== "";
@@ -142,7 +196,7 @@ function MetricRow({
           value={value}
           label={label}
           fullKey={fullKey}
-          premium={premium}
+          availability={availability}
           t={t}
           loading={loading}
         />
@@ -211,6 +265,7 @@ export default function StockFundamentalsStrip({
   const balanceSource = sourceLabel(statements?.sources?.balance);
   const metricsSource = sourceLabel(metrics?.source) ?? undefined;
   const quoteSource = quote ? "Yahoo Finance" : undefined;
+  const availability = metrics?.availability ?? {};
 
   return (
     <div className="mt-8 w-full border-t border-border/60 pt-6 text-left">
@@ -274,30 +329,30 @@ export default function StockFundamentalsStrip({
             t={t}
             label={f("pcf")}
             fullKey={f("pcfFull")}
-            premium
             value={formatNumber(
               metrics?.ratios?.priceToOperatingCashFlowRatioTTM ??
                 metrics?.ratios?.priceToCashFlowRatioTTM,
             )}
             loading={loading}
+            availability={availability.pcf}
             source={metricsSource ? { label: metricsSource } : undefined}
           />
           <MetricRow
             t={t}
             label={f("pfcf")}
             fullKey={f("pfcfFull")}
-            premium
             value={formatNumber(metrics?.ratios?.priceToFreeCashFlowRatioTTM)}
             loading={loading}
+            availability={availability.pfcf}
             source={metricsSource ? { label: metricsSource } : undefined}
           />
           <MetricRow
             t={t}
             label={f("fcfYield")}
             fullKey={f("fcfFull")}
-            premium
             value={formatPercent(metrics?.metrics?.freeCashFlowYieldTTM)}
             loading={loading}
+            availability={availability.fcfYield}
             source={metricsSource ? { label: metricsSource } : undefined}
           />
         </MetricGroup>
@@ -321,7 +376,7 @@ export default function StockFundamentalsStrip({
             t={t}
             label={f("roic")}
             fullKey={f("roic")}
-            premium
+            availability={availability.roic}
             // Percent units: the FMP metrics path normalizes roicTTM from
             // FMP's decimal fraction (0.44 → 44.05) server-side, matching
             // the Yahoo path's convention — formatPercent displays as-is.
@@ -390,7 +445,7 @@ export default function StockFundamentalsStrip({
             t={t}
             label={f("payoutDate")}
             fullKey={f("payoutDate")}
-            premium
+            availability={availability.payoutDate}
             value={null}
             loading={loading}
           />

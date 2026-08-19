@@ -35,6 +35,7 @@ import {
   StockMetrics,
   StockQuote,
   YahooFallbackFinancials,
+  AvailabilityState,
 } from "../../shared/api";
 import { insightsTabUniverses } from "./insightsUniverses";
 // Relative path (not `@shared/...`) so the helper resolves cleanly under Vite's
@@ -847,18 +848,45 @@ async function fetchProfileWithAvailability(
   try {
     // Yahoo is the stable identity fallback. FMP profile remains preferred
     // when configured, but a free-tier FMP miss must not erase a valid name.
-    const yahoo = (await yahooFinance.quote(symbol).catch(() => null)) as any;
+    const [yahoo, yahooSummary] = await Promise.all([
+      yahooFinance.quote(symbol).catch(() => null) as any,
+      (yahooFinance as any)
+        .quoteSummary(symbol, {
+          modules: ["assetProfile", "defaultKeyStatistics"],
+        })
+        .catch(() => null) as any,
+    ]);
+    const assetProfile = yahooSummary?.assetProfile;
+    const defaultKeyStats = yahooSummary?.defaultKeyStatistics;
     const yahooName = yahoo?.longName ?? yahoo?.shortName ?? yahoo?.displayName;
     const yahooExchange = yahoo?.fullExchangeName ?? yahoo?.exchange;
+    const officers: any[] = assetProfile?.companyOfficers ?? [];
+    const ceoOfficer =
+      officers.find((o: any) => /ceo/i.test(o?.title ?? "")) ?? officers[0];
+    const firstTradeDate = yahoo?.firstTradeDateMilliseconds
+      ? new Date(yahoo.firstTradeDateMilliseconds).toISOString().slice(0, 10)
+      : defaultKeyStats?.fundInceptionDate
+        ? new Date(defaultKeyStats.fundInceptionDate).toISOString().slice(0, 10)
+        : undefined;
+
     yahooProfile = yahooName
       ? {
           symbol,
           companyName: String(yahooName),
-          description: String(yahoo?.longBusinessSummary ?? ""),
-          sector: String(yahoo?.sector ?? ""),
-          industry: String(yahoo?.industry ?? ""),
-          ceo: "",
-          fullTimeEmployees: null,
+          description: String(
+            assetProfile?.longBusinessSummary ?? yahoo?.longBusinessSummary ?? "",
+          ),
+          sector: String(assetProfile?.sector ?? yahoo?.sector ?? ""),
+          industry: String(assetProfile?.industry ?? yahoo?.industry ?? ""),
+          ceo: String(ceoOfficer?.name ?? ""),
+          website: assetProfile?.website || undefined,
+          country: assetProfile?.country || undefined,
+          ipoDate: firstTradeDate,
+          fullTimeEmployees: Number.isFinite(
+            Number(assetProfile?.fullTimeEmployees),
+          )
+            ? Number(assetProfile.fullTimeEmployees)
+            : null,
           beta: Number.isFinite(Number(yahoo?.beta))
             ? Number(yahoo.beta)
             : null,
@@ -1656,11 +1684,23 @@ export const stockService = {
     const getYahooMetrics = async (): Promise<StockMetrics> => {
       try {
         const raw: any = await yahooFinance.quoteSummary(symbol, {
-          modules: ["defaultKeyStatistics", "financialData", "summaryDetail"],
+          modules: ["defaultKeyStatistics", "financialData", "summaryDetail", "price"],
         });
         const dks = raw?.defaultKeyStatistics ?? {};
         const fd = raw?.financialData ?? {};
         const sd = raw?.summaryDetail ?? {};
+        const price = raw?.price ?? {};
+        // Yahoo's free cash flow + market cap let us derive the
+        // price-to-cash-flow coverage ratios without FMP's premium
+        // /ratios-ttm endpoint. Falls back to null when a field is missing.
+        const marketCap = extract(price.marketCap) ?? null;
+        const operatingCashFlow = extract(fd.operatingCashflow) ?? null;
+        const freeCashFlow = extract(fd.freeCashflow) ?? null;
+        const pcf =
+          operatingCashFlow && marketCap ? marketCap / operatingCashFlow : null;
+        const pfcf = freeCashFlow && marketCap ? marketCap / freeCashFlow : null;
+        const fcfYield =
+          freeCashFlow && marketCap ? (freeCashFlow / marketCap) * 100 : null;
         const metrics: KeyMetricsTTM = {
           revenuePerShareTTM: extract(fd.revenuePerShare),
           netIncomePerShareTTM: extract(dks.trailingEps),
@@ -1677,6 +1717,7 @@ export const stockService = {
           evToEBITDATTM: extract(dks.enterpriseToEbitda),
           returnOnEquityTTM: extract(fd.returnOnEquity),
           returnOnAssetsTTM: extract(fd.returnOnAssets),
+          freeCashFlowYieldTTM: fcfYield ?? undefined,
         };
         const ratios: RatiosTTM = {
           priceEarningsRatioTTM: extract(sd.trailingPE),
@@ -1685,6 +1726,8 @@ export const stockService = {
             extract(sd.priceToSalesTrailing12Months) ??
             extract(dks.enterpriseToRevenue),
           priceToEarningsGrowthRatioTTM: extract(dks.pegRatio),
+          priceToOperatingCashFlowRatioTTM: pcf ?? undefined,
+          priceToFreeCashFlowRatioTTM: pfcf ?? undefined,
           netProfitMargin: normalizeYahooPercentage(extract(fd.profitMargins)),
           operatingProfitMarginTTM: normalizeYahooPercentage(
             extract(fd.operatingMargins),
@@ -1702,11 +1745,20 @@ export const stockService = {
         const hasValues =
           Object.values(metrics).some((v) => v !== undefined) ||
           Object.values(ratios).some((v) => v !== undefined);
+        // Availability: derived metrics that lack an input are calcBroken,
+        // roic is FMP-premium only (Yahoo never supplies it), so it's pro.
+        const availability: Partial<Record<string, AvailabilityState>> = {
+          pcf: pcf === null ? "calcBroken" : "available",
+          pfcf: pfcf === null ? "calcBroken" : "available",
+          fcfYield: fcfYield === null ? "calcBroken" : "available",
+          roic: "pro",
+        };
         return {
           metrics: hasValues ? metrics : {},
           ratios: hasValues ? ratios : {},
           scores: null,
           source: hasValues ? "yahoo" : null,
+          availability: hasValues ? availability : undefined,
         };
       } catch (error: any) {
         throttledWarn(
@@ -1724,17 +1776,20 @@ export const stockService = {
       await kvJsonCache.set(cacheKey, result, 3600);
       return result;
     }
-    const [m, r, s] = await Promise.all([
-      fetchJSON<any[]>(
+    const [mRes, rRes, sRes] = await Promise.all([
+      fetchJSONStatus<any[]>(
         tickerUrl("key-metrics-ttm", symbol),
         `metrics/${symbol}`,
       ),
-      fetchJSON<any[]>(tickerUrl("ratios-ttm", symbol), `ratios/${symbol}`),
-      fetchJSON<any[]>(
+      fetchJSONStatus<any[]>(tickerUrl("ratios-ttm", symbol), `ratios/${symbol}`),
+      fetchJSONStatus<any[]>(
         tickerUrl("financial-scores", symbol),
         `scores/${symbol}`,
       ),
     ]);
+    const m = mRes.data;
+    const r = rRes.data;
+    const s = sRes.data;
     const m0 = Array.isArray(m) ? m[0] : m;
     const r0 = Array.isArray(r) ? r[0] : r;
     const s0 = Array.isArray(s) ? s[0] : s;
@@ -1744,10 +1799,36 @@ export const stockService = {
           typeof value === "object" &&
           Object.keys(value as object).length > 0,
       );
+    // Classify the FMP failure so the UI can show *why* a value is missing.
+    const classifyFmp = (
+      status: number | null,
+      hasData: boolean,
+    ): AvailabilityState | undefined => {
+      if (hasData) return undefined; // present → no badge
+      if (status === 429 || status === 403) return "rateLimited";
+      if (status === 404 || status === null) return "notFound";
+      // 200 but empty payload ⇒ premium endpoint returned nothing on free tier
+      return "pro";
+    };
+    const fmpAvailability: Partial<Record<string, AvailabilityState>> = {
+      roic: classifyFmp(mRes.status, hasObjectValues(m0)),
+      payoutDate: classifyFmp(rRes.status, hasObjectValues(r0)),
+    };
     if (!hasObjectValues(m0) && !hasObjectValues(r0) && !hasObjectValues(s0)) {
       const result = await getYahooMetrics();
-      await kvJsonCache.set(cacheKey, result, 3600);
-      return result;
+      // FMP premium endpoints (roic, payoutDate) are paid-only — Yahoo's
+      // free tier never supplies them, so mark them `pro` regardless of
+      // whether FMP 429'd (no subscription) or returned empty (free tier).
+      const merged: StockMetrics = {
+        ...result,
+        availability: {
+          ...(result.availability ?? {}),
+          roic: "pro",
+          payoutDate: "pro",
+        },
+      };
+      await kvJsonCache.set(cacheKey, merged, 3600);
+      return merged;
     }
     // FMP reports percentage metrics as decimal fractions (0.269 =
     // 26.9%, and values can exceed 1 — AAPL ROE ≈ 1.52 = 152%). Convert
@@ -1785,6 +1866,7 @@ export const stockService = {
           }
         : null,
       source: "fmp",
+      availability: fmpAvailability,
     };
     await kvJsonCache.set(cacheKey, result, 3600);
     return result;

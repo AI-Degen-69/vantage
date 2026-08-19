@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getPluralCategory,
   resolvePluralKey,
+  translateCountry,
   translateSector,
   enDict,
   heDict,
@@ -349,8 +350,13 @@ describe("translateSector", () => {
       expect(translateSector(enT, "Communication Services")).toBe(
         "Communication Services",
       );
+      expect(translateSector(enT, "Information Technology")).toBe(
+        "Information Technology",
+      );
+      expect(translateSector(enT, "Financials")).toBe("Financials");
       expect(translateSector(enT, "Real Estate")).toBe("Real Estate");
       expect(translateSector(enT, "Basic Materials")).toBe("Basic Materials");
+      expect(translateSector(enT, "Materials")).toBe("Materials");
     });
 
     it("EN label matches the enDict value (parity sanity)", () => {
@@ -362,16 +368,19 @@ describe("translateSector", () => {
   describe("Hebrew locale", () => {
     it("returns the localized label for known FMP sectors", () => {
       expect(translateSector(heT, "Technology")).toBe("טכנולוגיה");
+      expect(translateSector(heT, "Information Technology")).toBe("טכנולוגיה");
       expect(translateSector(heT, "Healthcare")).toBe("בריאות");
       expect(translateSector(heT, "Financial Services")).toBe(
         "שירותים פיננסיים",
       );
+      expect(translateSector(heT, "Financials")).toBe("פיננסים");
       expect(translateSector(heT, "Consumer Cyclical")).toBe("צרכנות מחזורית");
       expect(translateSector(heT, "Communication Services")).toBe(
-        "שירותי תקשורת",
+        "תקשורת",
       );
       expect(translateSector(heT, "Real Estate")).toBe("נדל\"ן");
-      expect(translateSector(heT, "Utilities")).toBe("שירותים ציבוריים");
+      expect(translateSector(heT, "Utilities")).toBe("תשתיות");
+      expect(translateSector(heT, "Materials")).toBe("חומרי גלם");
     });
 
     it("HE label matches the heDict value (no hardcoded Hebrew in helper)", () => {
@@ -454,6 +463,61 @@ describe("translateSector", () => {
         expect(enDict[k].length).toBeGreaterThan(0);
         expect(heDict[k].length).toBeGreaterThan(0);
       }
+    });
+  });
+});
+
+describe("translateCountry", () => {
+  const enT = (key: string) => enDict[key] ?? key;
+  const heT = (key: string) => heDict[key] ?? key;
+
+  describe("English locale", () => {
+    it("returns canonical English label for known countries", () => {
+      expect(translateCountry(enT, "United States")).toBe("United States");
+      expect(translateCountry(enT, "USA")).toBe("United States");
+      expect(translateCountry(enT, "Israel")).toBe("Israel");
+      expect(translateCountry(enT, "China")).toBe("China");
+    });
+  });
+
+  describe("Hebrew locale", () => {
+    it("translates country names into Hebrew", () => {
+      expect(translateCountry(heT, "United States")).toBe("ארצות הברית");
+      expect(translateCountry(heT, "USA")).toBe("ארצות הברית");
+      expect(translateCountry(heT, "Israel")).toBe("ישראל");
+      expect(translateCountry(heT, "China")).toBe("סין");
+      expect(translateCountry(heT, "Japan")).toBe("יפן");
+      expect(translateCountry(heT, "Germany")).toBe("גרמניה");
+      expect(translateCountry(heT, "United Kingdom")).toBe("בריטניה");
+    });
+  });
+
+  describe("fallback & edge cases", () => {
+    it("returns empty string for nullish or blank input", () => {
+      expect(translateCountry(enT, null)).toBe("");
+      expect(translateCountry(heT, undefined)).toBe("");
+      expect(translateCountry(heT, "   ")).toBe("");
+    });
+
+    it("falls back to raw string for unrecognized countries", () => {
+      expect(translateCountry(enT, "Atlantis")).toBe("Atlantis");
+      expect(translateCountry(heT, "Atlantis")).toBe("Atlantis");
+    });
+  });
+
+  describe("dictionary parity — every country key exists in BOTH enDict and heDict", () => {
+    const allDictKeys = Object.keys(enDict).filter((k) => k.startsWith("country."));
+    const enSet = new Set(allDictKeys);
+    const heSet = new Set(Object.keys(heDict).filter((k) => k.startsWith("country.")));
+
+    it("every country.* key in enDict also exists in heDict", () => {
+      const missing = allDictKeys.filter((k) => !heSet.has(k));
+      expect(missing).toEqual([]);
+    });
+
+    it("every country.* key in heDict also exists in enDict", () => {
+      const extra = Array.from(heSet).filter((k) => !enSet.has(k));
+      expect(extra).toEqual([]);
     });
   });
 });
