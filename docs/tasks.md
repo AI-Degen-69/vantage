@@ -8,11 +8,11 @@
 
 ## Next up — chosen Alpha Scope features (tracker)
 
-Shipped to date (from `docs/alpha-scope-missing-metrics.md`): company website, net debt, trending browse, **revenue by segment** — 4 of 12 gaps closed.
+Shipped to date (from `docs/alpha-scope-missing-metrics.md`): company website, net debt, trending browse, **revenue by segment**, **P/CF · P/FCF · ROIC** — 7 of 12 gaps closed.
 
-Still open (8 gaps): dividend payout frequency, P/CF, P/FCF, ROIC, P/E·P/S history, peers table, catalysts, risks.
+Still open (5 gaps): dividend payout frequency, P/E·P/S history, peers table, catalysts, risks.
 
-Ranked by effort — P/CF·P/FCF·ROIC and payout frequency add **zero new FMP requests** (important while the 250/day quota is rate-limiting); the rest need a new route or provider:
+Ranked by effort — payout frequency adds **zero new FMP requests** (important while the 250/day quota is rate-limiting); the rest need a new route or provider:
 
 ### 0. Revenue by segment — ✅ done (PR #21)
 
@@ -24,14 +24,14 @@ Pure client work — both fields are already normalized and reachable from exist
 - **Company website** — `client/components/CompanyProfile.tsx`: in the id-chips row, render a clickable "Website" chip from `overviewData?.website` (`CompanyProfile.website`, already mapped in `stockService.normalizeProfile`). Wrap as `<a href target="_blank" rel="noopener noreferrer">` and only render when present.
 - **Net Debt** — `client/components/StockFundamentalsStrip.tsx`: add a `MetricRow` in the "Balance" group with `value={formatMoney(balance?.netDebt)}` and `source` from `balanceSource`. `BalanceSheetRow.netDebt` already exists and `normalizeBalanceRow` already maps it. Keep it provider-reported only (the component's stated contract) — no `totalDebt − cash` fallback for now.
 
-### 2. Add P/CF, P/FCF, ROIC (TTM) ratios
-FMP already fetches `key-metrics-ttm` + `ratios-ttm` in `stockService.getMetrics()` and casts the raw records straight into the shared types — so adding fields to the types makes them flow through with **no server logic change**.
+### 2. Add P/CF, P/FCF, ROIC (TTM) ratios — ✅ done
+FMP already fetches `key-metrics-ttm` + `ratios-ttm` in `stockService.getMetrics()` and casts the raw records straight into the shared types — so adding fields to the types made them flow through with **no server logic change**.
 
-- `shared/api.ts`: add `priceToCashFlowRatioTTM?` and `priceToFreeCashFlowRatioTTM?` to `RatiosTTM`; add `roicTTM?` to `KeyMetricsTTM` (FMP's exact field names).
-- `server/services/stockService.ts`: no change required — verify the `(r0 || {}) as RatiosTTM` / `(m0 || {}) as KeyMetricsTTM` casts carry the new fields (they will). Yahoo's metrics modules don't expose these, so they show "Unavailable" unless the FMP source is live.
-- `client/components/StockFundamentalsStrip.tsx`: add "P/CF" and "P/FCF" rows to the "Cash Flow" group (`metrics.ratios.priceToCashFlowRatioTTM` / `priceToFreeCashFlowRatioTTM`, `formatNumber`) and "ROIC" to "Margins & Growth" (`metrics.metrics.roicTTM`, `formatPercent`).
-- Verify: `pnpm exec tsc --noEmit`.
+- `shared/api.ts`: added `priceToOperatingCashFlowRatioTTM?` (FMP's real `/stable/ratios-ttm` name) + legacy alias `priceToCashFlowRatioTTM?` and `priceToFreeCashFlowRatioTTM?` to `RatiosTTM`; added `roicTTM?` to `KeyMetricsTTM`.
+- `server/services/stockService.ts`: no change — the `(r0 || {}) as RatiosTTM` / `(m0 || {}) as KeyMetricsTTM` casts carry the new fields. Yahoo's metrics modules don't expose these, so they show "Unavailable" unless the FMP source is live.
+- `client/components/StockFundamentalsStrip.tsx`: added "P/CF" and "P/FCF" rows to the "Cash Flow" group (`formatNumber`) and "ROIC" to "Margins & Growth". ROIC converts FMP's decimal fraction (0.44 → 44%) to percent units before `formatPercent`.
+- Verify: `pnpm exec tsc --noEmit` + `StockFundamentalsStrip.ratioRows.spec.tsx` (3 tests) — 451 tests green.
 
 **Deferred:** payout frequency needs a small server derivation (dividend payment dates are not exposed to the client yet), so it is not bundled into #1.
 
-**After #2:** P/E·P/S history (new `/api/stock-ratios` historical route + chart cards), peers table (new `/api/stock-peers` route), then Catalysts/Risks (new OpenAI provider + key).
+**Next:** payout frequency (small server derivation from dividend payment dates), then P/E·P/S history (new `/api/stock-ratios` historical route + chart cards), peers table (new `/api/stock-peers` route), then Catalysts/Risks (new OpenAI provider + key).

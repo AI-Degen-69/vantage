@@ -238,6 +238,12 @@ export interface KeyMetricsTTM {
   evToOperatingCashFlowTTM?: number;
   returnOnEquityTTM?: number;
   returnOnAssetsTTM?: number;
+  /**
+   * Return on invested capital TTM (FMP `key-metrics-ttm`). FMP reports
+   * it as a decimal fraction (0.44 = 44%) — renderers must convert to
+   * percent units before displaying.
+   */
+  roicTTM?: number;
   freeCashFlowYieldTTM?: number;
 }
 
@@ -247,6 +253,12 @@ export interface RatiosTTM {
   priceToEarningsGrowthRatioTTM?: number;
   /** Headline P/E TTM — present on /stable/ratios-ttm, used to back-fill StockQuote.pe. */
   priceEarningsRatioTTM?: number;
+  /** P/operating-cash-flow TTM — FMP's actual field name on `/stable/ratios-ttm`. */
+  priceToOperatingCashFlowRatioTTM?: number;
+  /** Legacy alias for the older `/ratios` field name; read alongside `priceToOperatingCashFlowRatioTTM`. */
+  priceToCashFlowRatioTTM?: number;
+  /** Price to free cash flow TTM (FMP `/stable/ratios-ttm`). */
+  priceToFreeCashFlowRatioTTM?: number;
   netProfitMargin?: number;
   operatingProfitMarginTTM?: number;
   grossProfitMarginTTM?: number;

@@ -222,6 +222,21 @@ export default function StockFundamentalsStrip({
 
         <MetricGroup title="Cash Flow">
           <MetricRow
+            label="P/CF"
+            value={formatNumber(
+              metrics?.ratios?.priceToOperatingCashFlowRatioTTM ??
+                metrics?.ratios?.priceToCashFlowRatioTTM,
+            )}
+            loading={loading}
+            source={metricsSource ? { label: metricsSource } : undefined}
+          />
+          <MetricRow
+            label="P/FCF"
+            value={formatNumber(metrics?.ratios?.priceToFreeCashFlowRatioTTM)}
+            loading={loading}
+            source={metricsSource ? { label: metricsSource } : undefined}
+          />
+          <MetricRow
             label="FCF Yield"
             value={formatPercent(metrics?.metrics?.freeCashFlowYieldTTM)}
             loading={loading}
@@ -239,6 +254,18 @@ export default function StockFundamentalsStrip({
           <MetricRow
             label="Operating Margin"
             value={formatPercent(metrics?.ratios?.operatingProfitMarginTTM)}
+            loading={loading}
+            source={metricsSource ? { label: metricsSource } : undefined}
+          />
+          <MetricRow
+            label="ROIC"
+            value={formatPercent(
+              // FMP reports roicTTM as a decimal fraction (0.44 = 44%);
+              // formatPercent expects percent units, so convert here.
+              metrics?.metrics?.roicTTM != null
+                ? metrics.metrics.roicTTM * 100
+                : null,
+            )}
             loading={loading}
             source={metricsSource ? { label: metricsSource } : undefined}
           />
