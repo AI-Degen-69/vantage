@@ -88,6 +88,14 @@ const en = {
   "index.metricsYahooFallbackTitle":
     "Live Yahoo estimate — FMP free-tier daily quota exhausted, single-point TTM/estimate values shown in place of the 8-card YoY/CAGR grid.",
   "index.qualityInBrief": "Quality in Brief",
+  "index.analystOutlookRange": "Analyst Outlook & Range",
+  "index.targetEps": "Target EPS",
+  "index.52wLow": "52W Low",
+  "index.52wHigh": "52W High",
+  "index.avg50Day": "50-Day Avg",
+  "index.avg200Day": "200-Day Avg",
+  "index.epsEstCurrQtr": "EPS Est. (Curr Qtr)",
+  "index.revenueEstAvg": "Revenue Est. (Avg)",
   "index.unavailableApi":
     "Market data is currently unavailable. Please try again in a moment.",
   "index.viewMore": "View More",
@@ -251,10 +259,13 @@ const en = {
   "insights.tabs.leisure": "Leisure and Entertainment",
 
   // Insight metric names (real-data path from Index.tsx)
+  "insights.stockPrice": "Stock Price",
   "insights.revenue": "Revenue",
   "insights.ebitda": "EBITDA",
   "insights.grossProfit": "Gross Profit",
+  "insights.grossProfitMargin": "Gross Profit Margin",
   "insights.operatingIncome": "Operating Income",
+  "insights.operatingCashFlow": "Cash from Operations",
   "insights.netIncome": "Net Income",
   "insights.eps": "EPS",
   "insights.cashAndEquivalents": "Cash & Equivalents",
@@ -350,6 +361,7 @@ const en = {
   "insights.avg": "Avg",
   "insights.beta": "Beta",
   "insights.ceo": "CEO",
+  "insights.country": "Country",
   "insights.cik": "CIK",
   "insights.companyProfile": "Company Profile",
   "insights.showMore": "Show more",
@@ -556,16 +568,85 @@ const en = {
   // Looked up via `translateSector(t, sector)` so the raw English falls back
   // when a new FMP sector arrives before translators can cover it.
   "sector.technology": "Technology",
+  "sector.informationTechnology": "Information Technology",
   "sector.healthcare": "Healthcare",
+  "sector.healthCare": "Health Care",
   "sector.financialServices": "Financial Services",
+  "sector.financials": "Financials",
   "sector.consumerCyclical": "Consumer Cyclical",
+  "sector.consumerDiscretionary": "Consumer Discretionary",
   "sector.consumerDefensive": "Consumer Defensive",
+  "sector.consumerStaples": "Consumer Staples",
   "sector.communicationServices": "Communication Services",
   "sector.industrials": "Industrials",
   "sector.energy": "Energy",
   "sector.realEstate": "Real Estate",
   "sector.utilities": "Utilities",
   "sector.basicMaterials": "Basic Materials",
+  "sector.materials": "Materials",
+
+  // Market Cap Tiers
+  "marketCap.megaCap": "Mega Cap",
+  "marketCap.largeCap": "Large Cap",
+  "marketCap.midCap": "Mid Cap",
+  "marketCap.smallCap": "Small Cap",
+  "marketCap.microCap": "Micro Cap",
+  "marketCap.nanoCap": "Nano Cap",
+
+  // Countries
+  "country.unitedStates": "United States",
+  "country.israel": "Israel",
+  "country.china": "China",
+  "country.unitedKingdom": "United Kingdom",
+  "country.canada": "Canada",
+  "country.japan": "Japan",
+  "country.germany": "Germany",
+  "country.india": "India",
+  "country.france": "France",
+  "country.switzerland": "Switzerland",
+  "country.netherlands": "Netherlands",
+  "country.taiwan": "Taiwan",
+  "country.southKorea": "South Korea",
+  "country.australia": "Australia",
+  "country.brazil": "Brazil",
+  "country.singapore": "Singapore",
+  "country.ireland": "Ireland",
+  "country.sweden": "Sweden",
+  "country.hongKong": "Hong Kong",
+  "country.spain": "Spain",
+  "country.italy": "Italy",
+  "country.denmark": "Denmark",
+  "country.norway": "Norway",
+  "country.finland": "Finland",
+  "country.belgium": "Belgium",
+  "country.austria": "Austria",
+  "country.mexico": "Mexico",
+  "country.southAfrica": "South Africa",
+  "country.newZealand": "New Zealand",
+  "country.caymanIslands": "Cayman Islands",
+  "country.bermuda": "Bermuda",
+  "country.luxembourg": "Luxembourg",
+  "country.saudiArabia": "Saudi Arabia",
+  "country.unitedArabEmirates": "United Arab Emirates",
+  "country.argentina": "Argentina",
+  "country.chile": "Chile",
+  "country.colombia": "Colombia",
+  "country.greece": "Greece",
+  "country.turkey": "Turkey",
+  "country.poland": "Poland",
+  "country.portugal": "Portugal",
+  "country.czechRepublic": "Czech Republic",
+  "country.hungary": "Hungary",
+  "country.indonesia": "Indonesia",
+  "country.malaysia": "Malaysia",
+  "country.philippines": "Philippines",
+  "country.thailand": "Thailand",
+  "country.vietnam": "Vietnam",
+  "country.egypt": "Egypt",
+  "country.cyprus": "Cyprus",
+
+  // Sidebar
+  "sidebar.subtitle": "Research workspace",
 
   // Splash / login
   "splash.email": "Email address",
@@ -583,6 +664,66 @@ const en = {
   "slideover.about": "About",
   "slideover.view_full": "View full stock page",
   "slideover.after_hrs": "After hrs:",
+  "slideover.peTtm": "P/E (TTM)",
+  "slideover.peFwd": "P/E (Fwd)",
+  "slideover.priceToBook": "P/B",
+  "slideover.priceToSales": "P/S",
+  "slideover.evToEbitda": "EV/EBITDA",
+  "slideover.divYield": "Div Yield",
+  "slideover.peg": "PEG",
+  "slideover.beta": "Beta",
+
+  // Command Menu (Search)
+  "commandMenu.placeholder": "Search for a company or symbol (e.g. AAPL)...",
+  "commandMenu.searching": "Searching database...",
+  "commandMenu.noResults": "No results found for \"{{query}}\".",
+  "commandMenu.heading": "Stocks & Assets",
+
+  // Screener
+  "screener.title": "Market Screener",
+  "screener.subtitle": "Discover and filter over {{total}} assets across global markets.",
+  "screener.assetType": "Asset Type",
+  "screener.sector": "Sector",
+  "screener.country": "Country",
+  "screener.moreCountries": "More Countries",
+  "screener.scope": "Scope:",
+  "screener.primaryListingsOnly": "Primary Listings Only",
+  "screener.primaryListingsTooltip": "Toggle ON to exclude secondary exchange duplicates (e.g. AAPL.BA, TSLA.MI)",
+  "screener.on": "ON",
+  "screener.off": "OFF",
+  "screener.resetFilters": "Reset Filters",
+  "screener.assetType.stocks": "Stocks",
+  "screener.assetType.etf": "ETF",
+  "screener.assetType.index": "Index",
+  "screener.assetType.crypto": "Crypto",
+  "screener.assetType.fund": "Fund",
+  "screener.assetType.currency": "Currency",
+  "screener.assetType.moneyMarket": "Money Market",
+  "screener.country.us": "US",
+  "screener.country.canada": "Canada",
+  "screener.country.japan": "Japan",
+  "screener.country.germany": "Germany",
+  "screener.country.uk": "UK",
+  "screener.country.china": "China",
+  "screener.country.india": "India",
+  "screener.country.israel": "Israel",
+  "screener.col.symbol": "Symbol",
+  "screener.col.name": "Company Name",
+  "screener.col.sector": "Sector",
+  "screener.col.industry": "Industry",
+  "screener.col.country": "Country",
+  "screener.col.exchange": "Exchange",
+  "screener.col.price": "Price",
+  "screener.col.change": "Change",
+  "screener.noResults": "No assets match the selected filters",
+  "screener.showingResults": "Showing {{start}} to {{end}} of {{total}} assets",
+  "screener.prev": "Previous",
+  "screener.next": "Next",
+  "screener.pageOf": "Page {{page}} of {{totalPages}}",
+  "screener.filterSearchPlaceholder": "Filter...",
+  "screener.selectAll": "Select All",
+  "screener.clear": "Clear",
+  "screener.selectedCount": "{{count}} selected",
 
   // Earnings alerts (topBar slide-down — global, not page-scoped)
   "earningsAlerts.open": "Open",
@@ -730,6 +871,14 @@ const he: Record<string, string> = {
   "index.metricsYahooFallbackTitle":
     "הערכת Yahoo חיה — מכסת ה-FMP היומית בתוכנית החינמית הסתיימה, מוצגים ערכי TTM/הערכה נקודתיים במקום רשת 8 הכרטיסים YoY/CAGR.",
   "index.qualityInBrief": "איכות בקצרה",
+  "index.analystOutlookRange": "תחזית אנליסטים וטווח",
+  "index.targetEps": "יעד רווח למניה",
+  "index.52wLow": "52 שבועות נמוך",
+  "index.52wHigh": "52 שבועות גבוה",
+  "index.avg50Day": "ממוצע 50 ימים",
+  "index.avg200Day": "ממוצע 200 ימים",
+  "index.epsEstCurrQtr": "הערכת רווח (רבעון נוכחי)",
+  "index.revenueEstAvg": "הערכת הכנסות (ממוצע)",
   "index.unavailableApi": "נתוני השוק אינם זמינים כרגע. נסה שוב בעוד רגע.",
   "index.viewMore": "הצג עוד",
   "index.news1":
@@ -780,12 +929,12 @@ const he: Record<string, string> = {
   "fundamentals.priceToSales": "יחס מחיר למכירות",
   "fundamentals.evToEbitda": "EV ל-EBITDA",
   "fundamentals.priceToBook": "יחס מחיר לערך בספרים",
-  "fundamentals.pcf": "P/CF",
-  "fundamentals.pfcf": "P/FCF",
+  "fundamentals.pcf": "מחיר/ת\"מ",
+  "fundamentals.pfcf": "מחיר/תמ\"ש",
   "fundamentals.fcfYield": "תשואת FCF",
   "fundamentals.profitMargin": "שולי רווח נקי",
   "fundamentals.operatingMargin": "שולי רווח תפעילי",
-  "fundamentals.roic": "ROIC",
+  "fundamentals.roic": "תשואה על ההון המושקע",
   "fundamentals.cash": "מזומנים",
   "fundamentals.debt": "חוב",
   "fundamentals.netDebt": "חוב נטו",
@@ -916,10 +1065,13 @@ const he: Record<string, string> = {
   "insights.tabs.leisure": "בידור ופנאי",
 
   // Insight metric names (real-data path from Index.tsx)
+  "insights.stockPrice": "מחיר מניה",
   "insights.revenue": "הכנסות",
   "insights.ebitda": "EBITDA",
   "insights.grossProfit": "רווח גולמי",
+  "insights.grossProfitMargin": "שולי רווח גולמי",
   "insights.operatingIncome": "רווח תפעולי",
+  "insights.operatingCashFlow": "תזרים מפעילות שוטפת",
   "insights.netIncome": "רווח נקי",
   "insights.eps": "EPS",
   "insights.cashAndEquivalents": "מזומנים ושווי מזומנים",
@@ -975,6 +1127,7 @@ const he: Record<string, string> = {
   "insights.avg": "ממוצע",
   "insights.beta": "בטא",
   "insights.ceo": 'מנכ"ל',
+  "insights.country": "מדינה",
   "insights.cik": "CIK",
   "insights.companyProfile": "פרופיל חברה",
   "insights.showMore": "הצג עוד",
@@ -1115,20 +1268,6 @@ const he: Record<string, string> = {
   "portfolio.weight": "משקל",
   "portfolio.weightedAvg": "ממוצע משוקלל",
 
-  "splash.email": 'כתובת דוא"ל',
-  "splash.password": "סיסמה",
-  "splash.login": "התחבר / ניסיון 7 ימים",
-  "splash.subtitle": "טרמינל בלומברג מותאם אישית למשקיעים לטווח ארוך.",
-
-  "slideover.loading": "טוען נתונים...",
-  "slideover.error.title": "טעינת הנתונים נכשלה",
-  "slideover.error.desc": "ייתכן שה-API הוגבל",
-  "slideover.key_ratios": "יחסים מרכזיים",
-  "slideover.quick_stats": "סטטיסטיקות מהירות",
-  "slideover.about": "אודות",
-  "slideover.view_full": "לעמוד המניה המלא",
-  "slideover.after_hrs": "אחרי שעות:",
-
   // Time-ago strings — Hebrew uses the same dual-rule set (one = exactly 1)
   // you can still see the `_two` form for "exactly two minutes" if a translator
   // wants to write it out (e.g. "שתי דקות").
@@ -1195,16 +1334,161 @@ const he: Record<string, string> = {
   // press. Looked up via `translateSector(t, sector)` so the raw English
   // falls back when a new FMP sector arrives before translators cover it.
   "sector.technology": "טכנולוגיה",
+  "sector.informationTechnology": "טכנולוגיה",
   "sector.healthcare": "בריאות",
+  "sector.healthCare": "בריאות",
   "sector.financialServices": "שירותים פיננסיים",
+  "sector.financials": "פיננסים",
   "sector.consumerCyclical": "צרכנות מחזורית",
-  "sector.consumerDefensive": "צרכנות הגנתית",
-  "sector.communicationServices": "שירותי תקשורת",
-  "sector.industrials": "תעשיות",
+  "sector.consumerDiscretionary": "צריכה מחזורית",
+  "sector.consumerDefensive": "צריכה בסיסית",
+  "sector.consumerStaples": "צריכה בסיסית",
+  "sector.communicationServices": "תקשורת",
+  "sector.industrials": "תעשייה",
   "sector.energy": "אנרגיה",
   "sector.realEstate": 'נדל"ן',
-  "sector.utilities": "שירותים ציבוריים",
+  "sector.utilities": "תשתיות",
   "sector.basicMaterials": "חומרי גלם",
+  "sector.materials": "חומרי גלם",
+
+  // Market Cap Tiers
+  "marketCap.megaCap": "שווי ענק",
+  "marketCap.largeCap": "שווי גדול",
+  "marketCap.midCap": "שווי בינוני",
+  "marketCap.smallCap": "שווי קטן",
+  "marketCap.microCap": "שווי זעיר",
+  "marketCap.nanoCap": "שווי ננו",
+
+  // Countries
+  "country.unitedStates": "ארצות הברית",
+  "country.israel": "ישראל",
+  "country.china": "סין",
+  "country.unitedKingdom": "בריטניה",
+  "country.canada": "קנדה",
+  "country.japan": "יפן",
+  "country.germany": "גרמניה",
+  "country.india": "הודו",
+  "country.france": "צרפת",
+  "country.switzerland": "שווייץ",
+  "country.netherlands": "הולנד",
+  "country.taiwan": "טייוואן",
+  "country.southKorea": "דרום קוריאה",
+  "country.australia": "אוסטרליה",
+  "country.brazil": "ברזיל",
+  "country.singapore": "סינגפור",
+  "country.ireland": "אירלנד",
+  "country.sweden": "שוודיה",
+  "country.hongKong": "הונג קונג",
+  "country.spain": "ספרד",
+  "country.italy": "איטליה",
+  "country.denmark": "דנמרק",
+  "country.norway": "נורווגיה",
+  "country.finland": "פינלנד",
+  "country.belgium": "בלגיה",
+  "country.austria": "אוסטריה",
+  "country.mexico": "מקסיקו",
+  "country.southAfrica": "דרום אפריקה",
+  "country.newZealand": "ניו זילנד",
+  "country.caymanIslands": "איי קיימן",
+  "country.bermuda": "ברמודה",
+  "country.luxembourg": "לוקסמבורג",
+  "country.saudiArabia": "ערב הסעודית",
+  "country.unitedArabEmirates": "איחוד האמירויות",
+  "country.argentina": "ארגנטינה",
+  "country.chile": "צ'ילה",
+  "country.colombia": "קולומביה",
+  "country.greece": "יוון",
+  "country.turkey": "טורקיה",
+  "country.poland": "פולין",
+  "country.portugal": "פורטוגל",
+  "country.czechRepublic": "צ'כיה",
+  "country.hungary": "הונגריה",
+  "country.indonesia": "אינדונזיה",
+  "country.malaysia": "מלזיה",
+  "country.philippines": "פיליפינים",
+  "country.thailand": "תאילנד",
+  "country.vietnam": "וייטנאם",
+  "country.egypt": "מצרים",
+  "country.cyprus": "קפריסין",
+
+  // Sidebar
+  "sidebar.subtitle": "סביבת מחקר",
+
+  // Splash / login
+  "splash.email": "כתובת אימייל",
+  "splash.password": "סיסמה",
+  "splash.login": "התחברות / ניסיון ל-7 ימים",
+  "splash.subtitle": "טרמינל ההשקעות האישי שלך למשקיעים לטווח ארוך.",
+
+  // Slide-over
+  "slideover.loading": "טוען נתונים...",
+  "slideover.error.title": "טעינת הנתונים נכשלה",
+  "slideover.error.desc": "ייתכן שמגבלת ה-API הגיעה למיצוי",
+  "slideover.key_ratios": "מכפילים ויחסים מרכזיים",
+  "slideover.quick_stats": "נתונים מהירים",
+  "slideover.about": "אודות",
+  "slideover.view_full": "צפה בעמוד המלא של המניה",
+  "slideover.after_hrs": "מסחר מאוחר:",
+  "slideover.peTtm": "מכפיל רווח (TTM)",
+  "slideover.peFwd": "מכפיל רווח עתידי",
+  "slideover.priceToBook": "מכפיל הון (P/B)",
+  "slideover.priceToSales": "מכפיל מכירות (P/S)",
+  "slideover.evToEbitda": "EV/EBITDA",
+  "slideover.divYield": "תשואת דיבידנד",
+  "slideover.peg": "מכפיל צמיחה (PEG)",
+  "slideover.beta": "בטא",
+
+  // Command Menu (Search)
+  "commandMenu.placeholder": "חיפוש חברה או סימול (לדוגמה AAPL)...",
+  "commandMenu.searching": "מחפש במסד הנתונים...",
+  "commandMenu.noResults": "לא נמצאו תוצאות עבור \"{{query}}\".",
+  "commandMenu.heading": "מניות ונכסים",
+
+  // Screener
+  "screener.title": "סורק שוק",
+  "screener.subtitle": "גלה וסנן מעל {{total}} נכסים בשווקים הגלובליים.",
+  "screener.assetType": "סוג נכס",
+  "screener.sector": "ענף",
+  "screener.country": "מדינה",
+  "screener.moreCountries": "מדינות נוספות",
+  "screener.scope": "היקף:",
+  "screener.primaryListingsOnly": "רישום ראשי בלבד",
+  "screener.primaryListingsTooltip": "הפעל כדי להחריג כפילויות מבורסות משניות (למשל AAPL.BA, TSLA.MI)",
+  "screener.on": "פעיל",
+  "screener.off": "כבוי",
+  "screener.resetFilters": "איפוס מסננים",
+  "screener.assetType.stocks": "מניות",
+  "screener.assetType.etf": "תעודות סל",
+  "screener.assetType.index": "מדדים",
+  "screener.assetType.crypto": "קריפטו",
+  "screener.assetType.fund": "קרנות נאמנות",
+  "screener.assetType.currency": "מט\"ח",
+  "screener.assetType.moneyMarket": "קרנות כספיות",
+  "screener.country.us": "ארה״ב",
+  "screener.country.canada": "קנדה",
+  "screener.country.japan": "יפן",
+  "screener.country.germany": "גרמניה",
+  "screener.country.uk": "בריטניה",
+  "screener.country.china": "סין",
+  "screener.country.india": "הודו",
+  "screener.country.israel": "ישראל",
+  "screener.col.symbol": "סימול",
+  "screener.col.name": "שם החברה",
+  "screener.col.sector": "ענף",
+  "screener.col.industry": "תעשייה",
+  "screener.col.country": "מדינה",
+  "screener.col.exchange": "בורסה",
+  "screener.col.price": "מחיר",
+  "screener.col.change": "שינוי",
+  "screener.noResults": "לא נמצאו נכסים התואמים למסננים שנבחרו",
+  "screener.showingResults": "מציג {{start}} עד {{end}} מתוך {{total}} נכסים",
+  "screener.prev": "הקודם",
+  "screener.next": "הבא",
+  "screener.pageOf": "עמוד {{page}} מתוך {{totalPages}}",
+  "screener.filterSearchPlaceholder": "סינון...",
+  "screener.selectAll": "בחר הכל",
+  "screener.clear": "נקה",
+  "screener.selectedCount": "{{count}} נבחרו",
 
   // Earnings alerts (topBar slide-down — global, not page-scoped)
   "earningsAlerts.open": "פתח",
@@ -1457,16 +1741,25 @@ export function resolvePluralKey(
  */
 const SECTOR_I18N_KEYS: Readonly<Record<string, string>> = {
   Technology: "sector.technology",
+  "Information Technology": "sector.informationTechnology",
   Healthcare: "sector.healthcare",
+  "Health Care": "sector.healthCare",
   "Financial Services": "sector.financialServices",
+  Financials: "sector.financials",
   "Consumer Cyclical": "sector.consumerCyclical",
+  "Consumer Discretionary": "sector.consumerDiscretionary",
   "Consumer Defensive": "sector.consumerDefensive",
+  "Consumer Staples": "sector.consumerStaples",
   "Communication Services": "sector.communicationServices",
+  Telecommunications: "sector.communicationServices",
+  "Telecommunication Services": "sector.communicationServices",
   Industrials: "sector.industrials",
+  "Industrial Goods": "sector.industrials",
   Energy: "sector.energy",
   "Real Estate": "sector.realEstate",
   Utilities: "sector.utilities",
   "Basic Materials": "sector.basicMaterials",
+  Materials: "sector.materials",
 };
 
 /**
@@ -1487,6 +1780,140 @@ export function translateSector(
   const i18nKey = SECTOR_I18N_KEYS[trimmed];
   if (!i18nKey) return trimmed;
   return t(i18nKey);
+}
+
+// ── Country name translation ─────────────────────────────────────────────────
+const COUNTRY_I18N_KEYS: Readonly<Record<string, string>> = {
+  "United States": "country.unitedStates",
+  USA: "country.unitedStates",
+  US: "country.unitedStates",
+  Israel: "country.israel",
+  China: "country.china",
+  "United Kingdom": "country.unitedKingdom",
+  UK: "country.unitedKingdom",
+  "Great Britain": "country.unitedKingdom",
+  Canada: "country.canada",
+  Japan: "country.japan",
+  Germany: "country.germany",
+  India: "country.india",
+  France: "country.france",
+  Switzerland: "country.switzerland",
+  Netherlands: "country.netherlands",
+  Taiwan: "country.taiwan",
+  "Taiwan, Province of China": "country.taiwan",
+  "South Korea": "country.southKorea",
+  "Korea, Republic of": "country.southKorea",
+  Korea: "country.southKorea",
+  Australia: "country.australia",
+  Brazil: "country.brazil",
+  Singapore: "country.singapore",
+  Ireland: "country.ireland",
+  Sweden: "country.sweden",
+  "Hong Kong": "country.hongKong",
+  Spain: "country.spain",
+  Italy: "country.italy",
+  Denmark: "country.denmark",
+  Norway: "country.norway",
+  Finland: "country.finland",
+  Belgium: "country.belgium",
+  Austria: "country.austria",
+  Mexico: "country.mexico",
+  "South Africa": "country.southAfrica",
+  "New Zealand": "country.newZealand",
+  "Cayman Islands": "country.caymanIslands",
+  Bermuda: "country.bermuda",
+  Luxembourg: "country.luxembourg",
+  "Saudi Arabia": "country.saudiArabia",
+  "United Arab Emirates": "country.unitedArabEmirates",
+  UAE: "country.unitedArabEmirates",
+  Argentina: "country.argentina",
+  Chile: "country.chile",
+  Colombia: "country.colombia",
+  Greece: "country.greece",
+  Turkey: "country.turkey",
+  Poland: "country.poland",
+  Portugal: "country.portugal",
+  "Czech Republic": "country.czechRepublic",
+  Hungary: "country.hungary",
+  Indonesia: "country.indonesia",
+  Malaysia: "country.malaysia",
+  Philippines: "country.philippines",
+  Thailand: "country.thailand",
+  Vietnam: "country.vietnam",
+  Egypt: "country.egypt",
+  Cyprus: "country.cyprus",
+};
+
+/**
+ * Resolve a country name to its localized label.
+ */
+export function translateCountry(
+  t: (key: string) => string,
+  country: string | null | undefined,
+): string {
+  const trimmed = (country ?? "").trim();
+  if (!trimmed) return "";
+  const i18nKey = COUNTRY_I18N_KEYS[trimmed];
+  if (!i18nKey) return trimmed;
+  return t(i18nKey);
+}
+
+// ── Asset Type translation ───────────────────────────────────────────────────
+const ASSET_TYPE_I18N_KEYS: Readonly<Record<string, string>> = {
+  Equity: "screener.assetType.stocks",
+  Stock: "screener.assetType.stocks",
+  Stocks: "screener.assetType.stocks",
+  ETF: "screener.assetType.etf",
+  Index: "screener.assetType.index",
+  Crypto: "screener.assetType.crypto",
+  Fund: "screener.assetType.fund",
+  Funds: "screener.assetType.fund",
+  Currency: "screener.assetType.currency",
+  MoneyMarket: "screener.assetType.moneyMarket",
+  "Money Market": "screener.assetType.moneyMarket",
+};
+
+export function translateAssetType(
+  t: (key: string) => string,
+  assetType: string | null | undefined,
+): string {
+  const trimmed = (assetType ?? "").trim();
+  if (!trimmed) return "";
+  const i18nKey = ASSET_TYPE_I18N_KEYS[trimmed];
+  if (!i18nKey) return trimmed;
+  return t(i18nKey);
+}
+
+// ── Market Cap tier translation ──────────────────────────────────────────────
+const MARKET_CAP_I18N_KEYS: Readonly<Record<string, string>> = {
+  "Mega Cap": "marketCap.megaCap",
+  Mega: "marketCap.megaCap",
+  "Large Cap": "marketCap.largeCap",
+  Large: "marketCap.largeCap",
+  "Mid Cap": "marketCap.midCap",
+  Mid: "marketCap.midCap",
+  "Small Cap": "marketCap.smallCap",
+  Small: "marketCap.smallCap",
+  "Micro Cap": "marketCap.microCap",
+  Micro: "marketCap.microCap",
+  "Nano Cap": "marketCap.nanoCap",
+  Nano: "marketCap.nanoCap",
+};
+
+export function translateMarketCap(
+  t: (key: string) => string,
+  marketCap: string | number | null | undefined,
+): string {
+  if (marketCap === null || marketCap === undefined || marketCap === "") return "—";
+  if (typeof marketCap === "number") {
+    if (marketCap >= 1e9) return `$${(marketCap / 1e9).toFixed(2)}B`;
+    if (marketCap >= 1e6) return `$${(marketCap / 1e6).toFixed(2)}M`;
+    return `$${marketCap.toLocaleString()}`;
+  }
+  const trimmed = String(marketCap).trim();
+  const i18nKey = MARKET_CAP_I18N_KEYS[trimmed];
+  if (i18nKey) return t(i18nKey);
+  return trimmed;
 }
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {

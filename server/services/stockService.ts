@@ -847,18 +847,45 @@ async function fetchProfileWithAvailability(
   try {
     // Yahoo is the stable identity fallback. FMP profile remains preferred
     // when configured, but a free-tier FMP miss must not erase a valid name.
-    const yahoo = (await yahooFinance.quote(symbol).catch(() => null)) as any;
+    const [yahoo, yahooSummary] = await Promise.all([
+      yahooFinance.quote(symbol).catch(() => null) as any,
+      (yahooFinance as any)
+        .quoteSummary(symbol, {
+          modules: ["assetProfile", "defaultKeyStatistics"],
+        })
+        .catch(() => null) as any,
+    ]);
+    const assetProfile = yahooSummary?.assetProfile;
+    const defaultKeyStats = yahooSummary?.defaultKeyStatistics;
     const yahooName = yahoo?.longName ?? yahoo?.shortName ?? yahoo?.displayName;
     const yahooExchange = yahoo?.fullExchangeName ?? yahoo?.exchange;
+    const officers: any[] = assetProfile?.companyOfficers ?? [];
+    const ceoOfficer =
+      officers.find((o: any) => /ceo/i.test(o?.title ?? "")) ?? officers[0];
+    const firstTradeDate = yahoo?.firstTradeDateMilliseconds
+      ? new Date(yahoo.firstTradeDateMilliseconds).toISOString().slice(0, 10)
+      : defaultKeyStats?.fundInceptionDate
+        ? new Date(defaultKeyStats.fundInceptionDate).toISOString().slice(0, 10)
+        : undefined;
+
     yahooProfile = yahooName
       ? {
           symbol,
           companyName: String(yahooName),
-          description: String(yahoo?.longBusinessSummary ?? ""),
-          sector: String(yahoo?.sector ?? ""),
-          industry: String(yahoo?.industry ?? ""),
-          ceo: "",
-          fullTimeEmployees: null,
+          description: String(
+            assetProfile?.longBusinessSummary ?? yahoo?.longBusinessSummary ?? "",
+          ),
+          sector: String(assetProfile?.sector ?? yahoo?.sector ?? ""),
+          industry: String(assetProfile?.industry ?? yahoo?.industry ?? ""),
+          ceo: String(ceoOfficer?.name ?? ""),
+          website: assetProfile?.website || undefined,
+          country: assetProfile?.country || undefined,
+          ipoDate: firstTradeDate,
+          fullTimeEmployees: Number.isFinite(
+            Number(assetProfile?.fullTimeEmployees),
+          )
+            ? Number(assetProfile.fullTimeEmployees)
+            : null,
           beta: Number.isFinite(Number(yahoo?.beta))
             ? Number(yahoo.beta)
             : null,
@@ -1656,11 +1683,23 @@ export const stockService = {
     const getYahooMetrics = async (): Promise<StockMetrics> => {
       try {
         const raw: any = await yahooFinance.quoteSummary(symbol, {
-          modules: ["defaultKeyStatistics", "financialData", "summaryDetail"],
+          modules: ["defaultKeyStatistics", "financialData", "summaryDetail", "price"],
         });
         const dks = raw?.defaultKeyStatistics ?? {};
         const fd = raw?.financialData ?? {};
         const sd = raw?.summaryDetail ?? {};
+        const price = raw?.price ?? {};
+        // Yahoo's free cash flow + market cap let us derive the
+        // price-to-cash-flow coverage ratios without FMP's premium
+        // /ratios-ttm endpoint. Falls back to null when a field is missing.
+        const marketCap = extract(price.marketCap) ?? null;
+        const operatingCashFlow = extract(fd.operatingCashflow) ?? null;
+        const freeCashFlow = extract(fd.freeCashflow) ?? null;
+        const pcf =
+          operatingCashFlow && marketCap ? marketCap / operatingCashFlow : null;
+        const pfcf = freeCashFlow && marketCap ? marketCap / freeCashFlow : null;
+        const fcfYield =
+          freeCashFlow && marketCap ? (freeCashFlow / marketCap) * 100 : null;
         const metrics: KeyMetricsTTM = {
           revenuePerShareTTM: extract(fd.revenuePerShare),
           netIncomePerShareTTM: extract(dks.trailingEps),
@@ -1677,6 +1716,7 @@ export const stockService = {
           evToEBITDATTM: extract(dks.enterpriseToEbitda),
           returnOnEquityTTM: extract(fd.returnOnEquity),
           returnOnAssetsTTM: extract(fd.returnOnAssets),
+          freeCashFlowYieldTTM: fcfYield ?? undefined,
         };
         const ratios: RatiosTTM = {
           priceEarningsRatioTTM: extract(sd.trailingPE),
@@ -1685,6 +1725,8 @@ export const stockService = {
             extract(sd.priceToSalesTrailing12Months) ??
             extract(dks.enterpriseToRevenue),
           priceToEarningsGrowthRatioTTM: extract(dks.pegRatio),
+          priceToOperatingCashFlowRatioTTM: pcf ?? undefined,
+          priceToFreeCashFlowRatioTTM: pfcf ?? undefined,
           netProfitMargin: normalizeYahooPercentage(extract(fd.profitMargins)),
           operatingProfitMarginTTM: normalizeYahooPercentage(
             extract(fd.operatingMargins),

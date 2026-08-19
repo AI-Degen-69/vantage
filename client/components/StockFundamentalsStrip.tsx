@@ -274,7 +274,6 @@ export default function StockFundamentalsStrip({
             t={t}
             label={f("pcf")}
             fullKey={f("pcfFull")}
-            premium
             value={formatNumber(
               metrics?.ratios?.priceToOperatingCashFlowRatioTTM ??
                 metrics?.ratios?.priceToCashFlowRatioTTM,
@@ -286,7 +285,6 @@ export default function StockFundamentalsStrip({
             t={t}
             label={f("pfcf")}
             fullKey={f("pfcfFull")}
-            premium
             value={formatNumber(metrics?.ratios?.priceToFreeCashFlowRatioTTM)}
             loading={loading}
             source={metricsSource ? { label: metricsSource } : undefined}
@@ -295,7 +293,6 @@ export default function StockFundamentalsStrip({
             t={t}
             label={f("fcfYield")}
             fullKey={f("fcfFull")}
-            premium
             value={formatPercent(metrics?.metrics?.freeCashFlowYieldTTM)}
             loading={loading}
             source={metricsSource ? { label: metricsSource } : undefined}
