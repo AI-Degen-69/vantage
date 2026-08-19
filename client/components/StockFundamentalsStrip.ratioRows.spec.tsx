@@ -43,6 +43,7 @@ describe("StockFundamentalsStrip — P/CF, P/FCF, ROIC rows", () => {
     },
     scores: null,
     source: "fmp",
+    availability: { roic: "pro" },
   };
 
   const render = (metrics: StockMetrics | null | undefined) =>
@@ -66,8 +67,8 @@ describe("StockFundamentalsStrip — P/CF, P/FCF, ROIC rows", () => {
     expect(html).toContain("40.67"); // P/FCF multiple
     expect(html).toContain("ROIC");
     expect(html).toContain("44.05%"); // 44.05 percent units → "44.05%"
-    // Premium-gated rows carry the lock + "Premium" badge, not a dash.
-    expect(html).toContain("Premium");
+    // Premium-gated rows carry the lock + "Pro" badge, not a dash.
+    expect(html).toContain("Pro");
     expect(html).not.toContain("Unavailable");
   });
 
@@ -91,12 +92,18 @@ describe("StockFundamentalsStrip — P/CF, P/FCF, ROIC rows", () => {
     expect(legacy).toContain("25.10");
   });
 
-  it("shows Unavailable for all three when the fields are missing (Yahoo-only source)", () => {
-    const html = render({ metrics: {}, ratios: {}, scores: null, source: "yahoo" });
+  it("shows Pro for ROIC and N/A for derived cash-flow rows when the fields are missing (Yahoo-only source)", () => {
+    const html = render({
+      metrics: {},
+      ratios: {},
+      scores: null,
+      source: "yahoo",
+      availability: { roic: "pro" },
+    });
     expect(html).toContain("P/CF");
     expect(html).toContain("P/FCF");
     expect(html).toContain("ROIC");
-    expect(html).toContain("Premium");
+    expect(html).toContain("Pro");
     expect(html).not.toContain("Unavailable");
   });
 

@@ -35,6 +35,7 @@ import {
   StockMetrics,
   StockQuote,
   YahooFallbackFinancials,
+  AvailabilityState,
 } from "../../shared/api";
 import { insightsTabUniverses } from "./insightsUniverses";
 // Relative path (not `@shared/...`) so the helper resolves cleanly under Vite's
@@ -1744,11 +1745,20 @@ export const stockService = {
         const hasValues =
           Object.values(metrics).some((v) => v !== undefined) ||
           Object.values(ratios).some((v) => v !== undefined);
+        // Availability: derived metrics that lack an input are calcBroken,
+        // roic is FMP-premium only (Yahoo never supplies it), so it's pro.
+        const availability: Partial<Record<string, AvailabilityState>> = {
+          pcf: pcf === null ? "calcBroken" : "available",
+          pfcf: pfcf === null ? "calcBroken" : "available",
+          fcfYield: fcfYield === null ? "calcBroken" : "available",
+          roic: "pro",
+        };
         return {
           metrics: hasValues ? metrics : {},
           ratios: hasValues ? ratios : {},
           scores: null,
           source: hasValues ? "yahoo" : null,
+          availability: hasValues ? availability : undefined,
         };
       } catch (error: any) {
         throttledWarn(

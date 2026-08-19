@@ -320,6 +320,28 @@ const en = {
   "fundamentals.premiumTitle":
     "{{label}} is a Vantage Premium metric (FMP premium endpoint).",
 
+  // Availability badges — distinguish WHY a metric is missing/empty.
+  "availability.pro": "Pro",
+  "availability.proTitle":
+    "{{label}} is paid-only at the provider — not reachable on any free tier.",
+  "availability.rateLimited": "Limited",
+  "availability.rateLimitedTitle":
+    "{{label}} is free but the provider quota is exhausted (rate-limited). Retry shortly.",
+  "availability.calcBroken": "Calc",
+  "availability.calcBrokenTitle":
+    "{{label}} is derived from other inputs and one of them is missing, so the calculation cannot complete.",
+  "availability.stale": "Stale",
+  "availability.staleTitle":
+    "{{label}} is served from cache and may be out of date.",
+  "availability.notFound": "Error",
+  "availability.notFoundTitle":
+    "{{label}} could not be fetched — no endpoint, 404, or upstream error.",
+  "availability.nullByDesign": "N/A",
+  "availability.nullByDesignTitle":
+    "{{label}} is not reported for this instrument.",
+  "availability.unknown": "—",
+  "availability.unknownTitle": "{{label}} is not available.",
+
   // Revenue by segment card (FMP revenue-product-segmentation). `locked` is
   // the visible chip label when the free-tier quota is exhausted; the tooltip
   // explains why the segment filters are visible but unselectable.
@@ -950,6 +972,28 @@ const he: Record<string, string> = {
     "{{label}} אינו זמין בתוכנית החינמית — מסופק על ידי נקודות קצה פרימיום של FMP (ratios-ttm / key-metrics-ttm).",
   "fundamentals.premiumTitle":
     "{{label}} הוא מדד Vantage פרימיום (נקודת קצה פרימיום של FMP).",
+
+  // Availability badges (Hebrew) — same labels as English, lock before "Pro".
+  "availability.pro": "Pro",
+  "availability.proTitle":
+    "{{label}} זמין למנויים בתשלום בלבד אצל הספק — לא נגיש בשום מסלול חינמי.",
+  "availability.rateLimited": "מוגבל",
+  "availability.rateLimitedTitle":
+    "{{label}} זמין בחינם אך מכסת הבקשות החינמית נוצלה (מוגבל קצב). נסה שוב בקרוב.",
+  "availability.calcBroken": "חישוב",
+  "availability.calcBrokenTitle":
+    "{{label}} מחושב ממספר נתונים וחסר אחד מהם, כך שהחישוב לא יכול להשלים.",
+  "availability.stale": "מיושן",
+  "availability.staleTitle":
+    "{{label}} מגיע ממטמון מטמון ועשוי להיות לא עדכני.",
+  "availability.notFound": "שגיאה",
+  "availability.notFoundTitle":
+    "{{label}} לא התקבל — אין נקודת קצה, 404, או שגיאת ספק.",
+  "availability.nullByDesign": "ללא",
+  "availability.nullByDesignTitle":
+    "{{label}} לא מדווח עבור הכלי הזה.",
+  "availability.unknown": "—",
+  "availability.unknownTitle": "{{label}} אינו זמין.",
 
   // PricingModal (placeholder). Triggers from the Upgrade CTA beside
   // the locked chip / banner.

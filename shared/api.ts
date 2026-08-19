@@ -274,12 +274,36 @@ export interface FinancialScores {
   piotroskiScore?: number; // 0–9
 }
 
+/**
+ * Why a metric value is missing / not fully available.
+ * - `available`    — value present, render it normally.
+ * - `pro`         — gated behind the provider's paid plan; not reachable on any free tier. UI: lock + "Pro".
+ * - `rateLimited` — free-tier quota exhausted (HTTP 429); populates once the window resets. UI: clock (amber).
+ * - `calcBroken`  — derived from ≥2 inputs and one input is missing. UI: sigma/"?" (neutral).
+ * - `stale`       — served from cache but older than the freshness threshold. UI: clock/slash (muted).
+ * - `notFound`    — no such endpoint / provider 404 / hard error. UI: red "✕"/"E".
+ * - `nullByDesign`— legitimately absent for this instrument (e.g. no dividend). Neutral dash, not an error.
+ */
+export type AvailabilityState =
+  | "available"
+  | "pro"
+  | "rateLimited"
+  | "calcBroken"
+  | "stale"
+  | "notFound"
+  | "nullByDesign";
+
 export interface StockMetrics {
   metrics: KeyMetricsTTM;
   ratios: RatiosTTM;
   scores: FinancialScores | null;
   /** Provider that supplied the metric snapshot; absent only for legacy payloads. */
   source?: FinancialStatementProvider;
+  /**
+   * Per-metric availability. Keys mirror the leaf metric names used by the
+   * UI (e.g. "pcf", "pfcf", "fcfYield", "roic"). Omitted key ⇒ "available".
+   */
+  availability?: Partial<Record<string, AvailabilityState>>;
 }
 
 /* ------------------------------------------------------------------ *
