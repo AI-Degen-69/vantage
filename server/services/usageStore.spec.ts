@@ -118,8 +118,8 @@ describe("VercelKvStore — happy path", () => {
         return {
           ok: true,
           status: 200,
-          json: async () => [null, "OK"],
-          text: async () => "[null,\"OK\"]",
+          json: async () => ({ result: "OK" }),
+          text: async () => '{"result":"OK"}',
         };
       }),
     );
@@ -144,8 +144,10 @@ describe("VercelKvStore — happy path", () => {
       vi.fn(async () => ({
         ok: true,
         status: 200,
-        json: async () => [null, JSON.stringify(sample)],
-        text: async () => JSON.stringify([null, JSON.stringify(sample)]),
+        // Upstash REST returns `{ result: "<json>" }` — the old
+        // `[err, value]` parse made every GET hit look like a miss.
+        json: async () => ({ result: JSON.stringify(sample) }),
+        text: async () => JSON.stringify({ result: JSON.stringify(sample) }),
       })),
     );
 
@@ -154,19 +156,35 @@ describe("VercelKvStore — happy path", () => {
     expect(loaded).toEqual(sample);
   });
 
-  it("returns an empty bucket when the key does not exist (Upstash returns `[null, null]`)", async () => {
+  it("returns an empty bucket when the key does not exist (Upstash returns `{ result: null }`)", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
         ok: true,
         status: 200,
-        json: async () => [null, null],
-        text: async () => "[null,null]",
+        json: async () => ({ result: null }),
+        text: async () => '{"result":null}',
       })),
     );
 
     const s = new VercelKvStore({ url: "https://kv.example", token: "tok" });
     const loaded = await s.load("alphavantage", "2026-08-04");
+    expect(loaded).toEqual({ timestamps: [], lastRateLimitAt: null });
+  });
+
+  it("treats an `{ error }` response as a miss (empty bucket) without throwing", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ error: "WRONGPASS invalid password" }),
+        text: async () => '{"error":"WRONGPASS invalid password"}',
+      })),
+    );
+
+    const s = new VercelKvStore({ url: "https://kv.example", token: "tok" });
+    const loaded = await s.load("fmp", "2026-08-04");
     expect(loaded).toEqual({ timestamps: [], lastRateLimitAt: null });
   });
 
@@ -176,8 +194,8 @@ describe("VercelKvStore — happy path", () => {
       vi.fn(async () => ({
         ok: true,
         status: 200,
-        json: async () => [null, "not-json{{"],
-        text: async () => JSON.stringify([null, "not-json{{"]),
+        json: async () => ({ result: "not-json{{" }),
+        text: async () => JSON.stringify({ result: "not-json{{" }),
       })),
     );
     // Should warn but not throw, and return [] / null.
@@ -196,7 +214,7 @@ describe("VercelKvStore — happy path", () => {
       vi.fn(async () => ({
         ok: true,
         status: 200,
-        json: async () => [null, JSON.stringify(real)],
+        json: async () => ({ result: JSON.stringify(real) }),
         text: async () => "",
       })),
     );
@@ -274,7 +292,12 @@ describe("VercelKvStore — pruneOlderThan", () => {
             return {
               ok: true,
               status: 200,
-              json: async () => [null, ["3", ["vantage:usage:fmp:2026-06-01", "vantage:usage:fmp:2026-06-15"]]],
+              json: async () => ({
+                result: [
+                  "3",
+                  ["vantage:usage:fmp:2026-06-01", "vantage:usage:fmp:2026-06-15"],
+                ],
+              }),
               text: async () => "",
             };
           }
@@ -282,16 +305,23 @@ describe("VercelKvStore — pruneOlderThan", () => {
           return {
             ok: true,
             status: 200,
-            json: async () => [null, ["0", ["vantage:usage:fmp:2026-07-01"]]],
+            json: async () => ({
+              result: ["0", ["vantage:usage:fmp:2026-07-01"]],
+            }),
             text: async () => "",
           };
         }
         if (cmd === "DEL") {
           const keys = body.slice(1);
           delcalls.push(...keys);
-          return { ok: true, status: 200, json: async () => [null, keys.length], text: async () => "" };
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ result: keys.length }),
+            text: async () => "",
+          };
         }
-        return { ok: true, status: 200, json: async () => [null, "OK"], text: async () => "" };
+        return { ok: true, status: 200, json: async () => ({ result: "OK" }), text: async () => "" };
       }),
     );
     const s = new VercelKvStore({ url: "https://kv.example", token: "tok" });

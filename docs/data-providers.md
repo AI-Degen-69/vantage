@@ -59,6 +59,61 @@ FMP calls/day.
 > supported — only the integration-terms acceptance is interactive; once
 > it's installed, all CRUD is via the dashboard or API.
 
+### 1b. Per-route cache → cross-instance (Vercel KV)
+
+`/api/stock-revenue-segmentation` is the first non-counter route to
+promote its cache from the in-process `NodeCache` to **Vercel KV**
+(`server/helpers/kvJsonCache.ts`, mirrored as a JS twin in
+`api/_router.js`). Rationale:
+
+- **Locked-premium state survives cold starts.** When the FMP
+  free-tier daily quota is exhausted, the first lambda to discover
+  that writes `rateLimited: true` to KV. Subsequent cold-started
+  lambdas read the same payload from KV instead of issuing another
+  429 to FMP — the revenue card's `Segments` lock chip stays stable
+  instead of flickering as users hop between lambda instances.
+- **No-config hydration.** A deployment without `KV_REST_API_URL`
+  set still works perfectly per-instance via the in-process NodeCache
+  mirror; no setup required.
+- **KV errors are swallowed + throttled-logged.** A flaky KV never
+  breaks the request path — the local mirror is always written first,
+  KV writes are fire-and-forget with a 5s timeout, and reads return
+  `null` from KV on error (the local mirror is then consulted).
+
+TTL policy:
+
+| Response | TTL | Reason |
+|---|---|---|
+| Healthy row payload | 1 h | FMP caps the endpoint at ~10 rows; re-fetching sooner is wasted quota. |
+| `rateLimited: true` (HTTP 429/403 or FMP error body) | 5 min | Hard backoff so a quota FMP still refuses is not re-banged. |
+| `unavailable: true` (no `FMP_KEY`) | 1 h | Stable config — fresh peers learn "no FMP key" from KV instead of probing every request. |
+
+Adding KV to other routes: import `kvJsonCache` from
+`server/helpers/kvJsonCache.ts` (or the JS twin in `api/_router.js`)
+and call `get<T>(key)` / `set<T>(key, value, ttlSeconds)` instead of
+the raw NodeCache. Both `api/_router.js` and `server/services/…` paths
+must keep their implementations in lock-step — the JS twin exists
+because Vercel's `@vercel/node` bundler does not allow sibling-TS
+imports in `api/*.ts`.
+
+Currently migrated (slow-changing financial routes only — quote /
+chart / news / FX stay on the in-process NodeCache because they
+are hot-path and ephemeral):
+
+| Route | Method | TTL | Why |
+|---|---|---|---|
+| `/api/stock-revenue-segmentation` (`getRevenueSegmentation`) | FMP `revenue-product-segmentation` | 1h healthy / 5min rate-limited / 1h unavailable | First non-counter migration; locked-premium state is the headline use case. |
+| `/api/stock-overview` (`getProfileValidation` + parity mirror) | FMP `profile` (TS) / Yahoo `quote()` (parity) | 1h for real profile / 30s for empty fallback | Profiles are slow-moving; company description + sector stay stable across instances. |
+| `/api/stock-metrics` (`getMetrics` + parity mirror) | FMP `key-metrics-ttm` + ratios + scores (TS) / Yahoo `quoteSummary` x3 (parity) | 1h | Ratios don't tick minute-to-minute; the cross-instance mirror saves a `quoteSummary` round-trip per cold start. |
+| `/api/stock-financials` (`getFinancialStatements` + parity mirror) | FMP income/balance/cash (TS) / Yahoo FTS (parity) | 1h (TS) / 6h FTS / 24h quoteSummary fallback | Three statement families per call; skipping three FMP fan-outs on cold start is the headline savings. |
+
+Routes deliberately NOT migrated: quote (60s TTL, fan-out is per-symbol
+and rate-limit-sensitive), chart (10min but re-fetched on mount per
+session), news (5min, content churn), FX (1h but the upstream Yahoo
+rate is already bursty and a stale rate would UX-confuse a converter),
+provider-health (probe-driven, intentionally fresh), earnings calendar
+(24h + slow-changing; rationale below).
+
 ---
 
 ## 2. Data point → source map
@@ -75,6 +130,10 @@ live route backed by `stockService`.
 | **Chart history** (periods) | `/api/chart-history` | Yahoo `chart()` (5m→1wk intervals) | daily retry | ✅ free |
 | **Company profile** | `/api/stock-overview` | FMP `/stable/profile` | — (returns 503 if unavailable) | ✅ FMP free |
 | **Financial statements** | `/api/stock-financials` | FMP income/balance/cash | — | ✅ FMP free (route requests `limit=5`, which returns 5 years of statements) |
+| **Revenue by segment** | `/api/stock-revenue-segmentation` | FMP `revenue-product-segmentation` (annual `limit=5`, quarter `limit=8`) | — (locked premium card on rate-limit miss) | ✅ FMP free; KV-backed cache (§1b) so the `rateLimited` lock state propagates across lambdas |
+| **Company profile** | `/api/stock-overview` | Yahoo `quote()` (parity mirror) / FMP `profile` (TS path via `getProfileValidation`) | — | ✅ both free; KV-backed cache (§1b, 1h for real profile / 30s for empty fallback) so a freshly-deployed peer reads company description + sector from KV |
+| **Key metrics / ratios / scores** | `/api/stock-metrics` | FMP `key-metrics-ttm`, `ratios-ttm`, `financial-scores` (TS) / Yahoo `quoteSummary` x3 (parity mirror) | — | ✅ FMP free (200s verified) / Yahoo free; KV-backed cache (§1b, 1h TTL) so a cold-started lambda reads the same ratios from KV |
+| **Financial statements** | `/api/stock-financials` | FMP income/balance/cash (TS, 5y default / 7q quarter) / Yahoo `fundamentalsTimeSeries` (parity mirror, 6h TTL) | Yahoo FTS (TS path when FMP missing) → `quoteSummary` history (parity fallback, 24h TTL) | ✅ FMP free / Yahoo free; KV-backed cache (§1b) so a freshly-deployed peer reads all three statement families from KV instead of re-fetching |
 | **Key metrics / ratios / scores** | `/api/stock-metrics` | FMP `key-metrics-ttm`, `ratios-ttm`, `financial-scores` | — | ✅ FMP free (200s verified) |
 | **Analyst estimates** | `/api/stock-analyst` | Yahoo `earningsTrend` | — | ✅ free |
 | **Insider trading** | `/api/stock-insider` | Yahoo `insiderTransactions` | — | ✅ free (FMP `insider-trades` is 404 — not on plan) |

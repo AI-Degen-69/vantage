@@ -37,6 +37,89 @@ const cache = new NodeCache({ stdTTL: 300 });
 const QUOTE_TTL = 60;
 const CHART_TTL = 600;
 
+// ── KV-backed JSON cache (parity twin of server/helpers/kvJsonCache.ts) ────────
+//
+// Why a JS twin: Vercel's bundler hates sibling-TS imports from api/*.ts,
+// so this file stays JS. The KV semantics are the same: read local first,
+// fall back to KV (hydrate local on hit), write through to both. Errors
+// are swallowed + throttled-warned so a flaky KV never breaks a request
+// path. Used by `handleRevenueSegmentation` so the locked-premium state
+// and the segment payload both persist across cold starts.
+const kw = { warned: {}, local: new NodeCache({ stdTTL: 3600, maxKeys: 10000 }) };
+const _kwWarn = (key, ...rest) => {
+  const now = Date.now();
+  if (kw.warned[key] && now - kw.warned[key] < 60000) return;
+  kw.warned[key] = now;
+  // eslint-disable-next-line no-console
+  console.warn(...rest);
+};
+const _kwExec = async (cmd, ...args) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+  try {
+    const r = await fetch(process.env.KV_REST_API_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.KV_REST_API_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify([cmd, ...args]),
+      signal: controller.signal,
+    });
+    if (!r.ok) throw new Error(`KV ${cmd} failed: ${r.status} ${r.statusText}`);
+    // Upstash REST returns a single `{ result: ... }` object for a
+    // one-command POST (or `{ error: "..." }` on failure) — NOT the
+    // `[err, value]` tuple. Parse the real shape so GET hits actually
+    // hydrate instead of always reading as a miss. Mirrors the TS twin
+    // in server/helpers/kvJsonCache.ts.
+    const json = await r.json();
+    if (json && typeof json === "object" && "error" in json)
+      return [json.error, null];
+    return [null, json?.result ?? null];
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+const _kwEnabled = () =>
+  !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+const kvJsonCache = {
+  async getJSON(key) {
+    const local = kw.local.get(key);
+    if (local !== undefined) return local;
+    if (!_kwEnabled()) return null;
+    try {
+      const [err, value] = await _kwExec("GET", key);
+      if (err || value === null || value === undefined) return null;
+      const parsed = typeof value === "string" ? JSON.parse(value) : value;
+      // Bounded mirror TTL (1h) so a short-TTL payload like the 5-min
+      // `rateLimited` lock can't serve stale for the process lifetime
+      // after KV expires it. Mirrors the TS twin's hydration cap.
+      kw.local.set(key, parsed, 3600);
+      return parsed;
+    } catch (e) {
+      _kwWarn(
+        `kvJsonCache.get:${key}`,
+        "[kvJsonCache] KV GET failed (returning null):",
+        e?.message,
+      );
+      return null;
+    }
+  },
+  async setJSON(key, value, ttlSeconds) {
+    kw.local.set(key, value, Math.max(1, ttlSeconds));
+    if (!_kwEnabled()) return;
+    try {
+      await _kwExec("SET", key, JSON.stringify(value), "EX", Math.max(1, ttlSeconds));
+    } catch (e) {
+      _kwWarn(
+        `kvJsonCache.set:${key}`,
+        "[kvJsonCache] KV SET failed (local cache still updated):",
+        e?.message,
+      );
+    }
+  },
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 let _lastWarned = {};
 function throttledWarn(key, ...args) {
@@ -229,38 +312,62 @@ export async function handleStockOverview(req, res) {
   const symbol = String(req.query?.symbol || "").toUpperCase();
   if (!symbol)
     return res.status(400).json({ error: "symbol parameter required" });
+  // KV-backed cross-instance cache (parity twin of
+  // stockService.getProfileValidation). Company profiles are
+  // slow-moving; 1h TTL keeps the description / sector stable across
+  // lambda cold starts.
+  const ck = `profile_${symbol}`;
+  const cached = await kvJsonCache.getJSON(ck);
+  if (cached) return res.json(cached);
   try {
     const q = await yf.quote(symbol);
-    if (q) {
-      return res.json({
-        symbol: q.symbol || symbol,
-        companyName: q.longName || q.shortName || q.displayName || symbol,
-        description: q.longBusinessSummary || "",
-        sector: q.sector || "",
-        industry: q.industry || "",
-        ceo: "",
-        fullTimeEmployees: null,
-        beta: toNum(q.beta),
-        peRatio: toNum(q.trailingPE),
-        marketCap: toNum(q.marketCap),
-        price: toNum(q.regularMarketPrice),
-        exchange: q.exchange,
-        currency: q.currency,
-        image: "",
-      });
-    }
-  } catch {}
-  res.json({
-    symbol,
-    companyName: symbol,
-    description: "",
-    sector: "",
-    industry: "",
-    ceo: "",
-    fullTimeEmployees: null,
-    beta: null,
-    peRatio: null,
-  });
+    const result = q
+      ? {
+          symbol: q.symbol || symbol,
+          companyName: q.longName || q.shortName || q.displayName || symbol,
+          description: q.longBusinessSummary || "",
+          sector: q.sector || "",
+          industry: q.industry || "",
+          ceo: "",
+          fullTimeEmployees: null,
+          beta: toNum(q.beta),
+          peRatio: toNum(q.trailingPE),
+          marketCap: toNum(q.marketCap),
+          price: toNum(q.regularMarketPrice),
+          exchange: q.exchange,
+          currency: q.currency,
+          image: "",
+        }
+      : {
+          symbol,
+          companyName: symbol,
+          description: "",
+          sector: "",
+          industry: "",
+          ceo: "",
+          fullTimeEmployees: null,
+          beta: null,
+          peRatio: null,
+        };
+    // 1h for a real profile so cold-started peers see the same
+    // company description; the empty-shape fallback uses a shorter TTL
+    // so a transient Yahoo miss recovers quickly.
+    await kvJsonCache.setJSON(ck, result, q ? 3600 : 30);
+    return res.json(result);
+  } catch (e) {
+    throttledWarn(`overview:${symbol}`, `overview ${symbol}:`, e?.message);
+    return res.json({
+      symbol,
+      companyName: symbol,
+      description: "",
+      sector: "",
+      industry: "",
+      ceo: "",
+      fullTimeEmployees: null,
+      beta: null,
+      peRatio: null,
+    });
+  }
 }
 
 // Yahoo returns summary fields either as bare numbers (defaultKeyStatistics)
@@ -300,8 +407,12 @@ export async function handleStockMetrics(req, res) {
   const symbol = String(req.query?.symbol || "").toUpperCase();
   if (!symbol)
     return res.status(400).json({ error: "symbol parameter required" });
+  // KV-backed cross-instance cache (parity twin of
+  // stockService.getMetrics). Metrics are slow-moving between earnings,
+  // so we extend the TTL from 10 min to 1h — a freshly-deployed peer
+  // reads the same payload from KV instead of re-quoting Yahoo.
   const ck = `metrics_${symbol}`;
-  const cached = cache.get(ck);
+  const cached = await kvJsonCache.getJSON(ck);
   if (cached) return res.json(cached);
 
   try {
@@ -377,7 +488,11 @@ export async function handleStockMetrics(req, res) {
       scores: null,
       source: "yahoo",
     };
-    cache.set(ck, result, 600); // 10-minute TTL — ratios refresh slowly between earnings reports
+    // 1h KV TTL — ratios don't tick minute-to-minute, and the
+    // cross-instance write means a second lambda cold-start reads
+    // the same Yahoo snapshot instead of paying for another
+    // quoteSummary round-trip.
+    await kvJsonCache.setJSON(ck, result, 3600);
     res.json(result);
   } catch (e) {
     throttledWarn(`metrics:${symbol}`, `metrics ${symbol}:`, e?.message);
@@ -393,6 +508,13 @@ export async function handleStockMetrics(req, res) {
  * client fall back to the plain total-revenue card while keeping the
  * segment filters visible as a locked premium feature. `period` (annual|
  * quarter) selects the reporting granularity served to the modal's toggle.
+ *
+ * Caching: cross-instance via `kvJsonCache` (Upstash REST when
+ * `KV_REST_API_URL` + `KV_REST_API_TOKEN` are present, in-process
+ * NodeCache otherwise) so the locked-premium state and the segment
+ * payload both survive cold starts. Rate-limited payloads use a 5-min
+ * TTL so cold-started lambdas don't re-attempt a quota FMP still
+ * refuses; healthy payloads use a 1-hour TTL matching FMP's row caps.
  */
 export async function handleRevenueSegmentation(req, res) {
   const symbol = String(req.query?.symbol || "").toUpperCase();
@@ -400,12 +522,14 @@ export async function handleRevenueSegmentation(req, res) {
     return res.status(400).json({ error: "symbol parameter required" });
   const period = req.query?.period === "quarter" ? "quarter" : "annual";
   const ck = `revSeg_${symbol}_${period}`;
-  const cached = cache.get(ck);
+  const cached = await kvJsonCache.getJSON(ck);
   if (cached) return res.json(cached);
 
   if (!process.env.FMP_KEY) {
     const noKey = { rows: [], rateLimited: false, unavailable: true };
-    cache.set(ck, noKey, 300);
+    // Stable config — 1h TTL means a freshly-deployed peer instance
+    // learns "no FMP key" from KV instead of probing every request.
+    await kvJsonCache.setJSON(ck, noKey, 3600);
     return res.json(noKey);
   }
 
@@ -417,7 +541,7 @@ export async function handleRevenueSegmentation(req, res) {
     if (r.status === 429 || r.status === 403) {
       apiUsageTracker.recordRateLimit && apiUsageTracker.recordRateLimit("fmp");
       const limited = { rows: [], rateLimited: true, unavailable: false };
-      cache.set(ck, limited, 300);
+      await kvJsonCache.setJSON(ck, limited, 300);
       return res.json(limited);
     }
     const text = await r.text();
@@ -438,13 +562,13 @@ export async function handleRevenueSegmentation(req, res) {
     ) {
       apiUsageTracker.recordRateLimit && apiUsageTracker.recordRateLimit("fmp");
       const limited = { rows: [], rateLimited: true, unavailable: false };
-      cache.set(ck, limited, 300);
+      await kvJsonCache.setJSON(ck, limited, 300);
       return res.json(limited);
     }
 
     const rows = normalizeRevenueSegmentationRows(data, symbol);
     const payload = { rows, rateLimited: false, unavailable: false };
-    cache.set(ck, payload, 3600);
+    await kvJsonCache.setJSON(ck, payload, 3600);
     return res.json(payload);
   } catch (e) {
     throttledWarn(
@@ -544,8 +668,13 @@ export async function handleStockFinancials(req, res) {
     String(req.query?.period || "annual").toLowerCase() === "quarter"
       ? "quarter"
       : "annual";
+  // KV-backed cross-instance cache (parity twin of
+  // stockService.getFinancialStatements). Fundamentals are slow-moving
+  // — a freshly-deployed peer reads the same Yahoo FTS snapshot from
+  // KV instead of paying for three more finance/balance/cash
+  // round-trips plus a possible Yahoo fallback.
   const ck = `fin_${symbol}_${period}`;
-  const cached = cache.get(ck);
+  const cached = await kvJsonCache.getJSON(ck);
   if (cached) return res.json(cached);
 
   // Strict: only the literal string `"quoteSummary"` flips us to the legacy
@@ -688,7 +817,7 @@ export async function handleStockFinancials(req, res) {
       // 6h TTL — fundamentalsTimeSeries modules propagate asynchronously at
       // Yahoo's end (income may land before balance sheet on earnings day),
       // so 6h strikes the balance between fresh and not-thrashing rate limits.
-      cache.set(ck, result, 21600);
+      await kvJsonCache.setJSON(ck, result, 21600);
       res.json(result);
       return;
     }
@@ -796,7 +925,7 @@ export async function handleStockFinancials(req, res) {
       balance: balanceLegacy,
       cash: cashLegacy,
     };
-    cache.set(ck, result, 86400); // 24h — quarterly statements don't change daily
+    await kvJsonCache.setJSON(ck, result, 86400); // 24h — quarterly statements don't change daily
     res.json(result);
   } catch (e) {
     throttledWarn(`fin:${symbol}`, `financials ${symbol}:`, e?.message);

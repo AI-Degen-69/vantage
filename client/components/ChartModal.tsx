@@ -60,6 +60,26 @@ interface ChartModalProps {
    * segment visible. Ignored in the single-series (non-segment) path.
    */
   selectedSegment?: string | null;
+  /**
+   * Why the segment payload is unavailable for premium reasons —
+   * `"rateLimited"` when FMP returned 429/403 (free-tier quota), or
+   * `"unavailable"` when no FMP key was configured. When set AND the
+   * modal falls back to the single-series revenue chart (segment rows
+   * empty), a small banner above the chart clarifies why per-segment
+   * breakdown would normally be available and isn't now. Sets the
+   * visual parity with the card's locked chip strip so a user who
+   * expanded the modal sees the same premium-tier explanation in both
+   * places.
+   */
+  segmentLockedReason?: "rateLimited" | "unavailable" | null;
+  /**
+   * Callback that opens the placeholder /pricing modal from any
+   * Upgrade link rendered beside the locked banner. Required when the
+   * page wires `<PricingModal>` at the page root; left undefined in
+   * Storybook / standalone previews — the Upgrade link is hidden in
+   * that mode so the modal doesn't crash on a missing callback.
+   */
+  onUpgradeClick?: () => void;
 }
 
 type TimeframeType = "1Y" | "3Y" | "5Y";
@@ -140,6 +160,8 @@ export default function ChartModal({
   ticker = "AAPL",
   segmentRows = [],
   selectedSegment = null,
+  segmentLockedReason = null,
+  onUpgradeClick,
 }: ChartModalProps) {
   const { t } = useI18n();
   const [timeframe, setTimeframe] = useState<TimeframeType>("1Y");
@@ -1192,6 +1214,88 @@ export default function ChartModal({
               <div className="mb-3 rounded-lg border border-chart-amber/30 bg-chart-amber/5 px-3 py-2 text-xs text-chart-amber">
                 {t("chart.segmentQuarterlyUnavailable")}
               </div>
+            )}
+            {/* Locked-premium fallback — surfaced when the revenue card
+                falls back to the total-revenue chart because the segment
+                payload is rate-limited / unavailable. Mirrors the card's
+                `:lock` chip strip so the modal and the card agree about
+                the premium-tier state. Hidden in segment mode (data is
+                fine; the chips below suffice). */}
+            {segmentLockedReason && !isSegmentMode && (
+              <>
+                <div className="mb-3 flex items-start gap-2 rounded-lg border border-border/40 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                  <Lock className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                  <div className="text-left rtl:text-right flex-1">
+                    <p className="font-semibold text-foreground/80 mb-0.5">
+                      {t("revenueSegments.modalBannerTitle")}
+                    </p>
+                    <p>
+                      {segmentLockedReason === "rateLimited"
+                        ? t("revenueSegments.modalBannerRateLimited")
+                        : t("revenueSegments.modalBannerUnavailable")}
+                    </p>
+                  </div>
+                  {/* Inline CTA — opens the placeholder /pricing modal
+                      hosted at the page root. Hidden when no callback
+                      was supplied (standalone preview / Storybook). */}
+                  {onUpgradeClick && (
+                    <button
+                      type="button"
+                      onClick={onUpgradeClick}
+                      data-testid="revenue-segments-upgrade-cta"
+                      className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+                    >
+                      {t("revenueSegments.upgradeCta")}
+                      <span aria-hidden="true">→</span>
+                    </button>
+                  )}
+                </div>
+                <div
+                  className="flex flex-wrap items-center gap-1.5 mb-4"
+                  aria-label={t("revenueSegments.locked")}
+                >
+                  <button
+                    type="button"
+                    disabled
+                    aria-disabled="true"
+                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-blue-500/15 text-blue-400 border-blue-500/30"
+                  >
+                    {t("revenueSegments.all")}
+                  </button>
+                  <span className="inline-flex items-center gap-1.5">
+                    {/* Locked chip — same shape as the card so the
+                        modal's strip mirrors the card chrome. */}
+                    <span
+                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-muted/40 text-muted-foreground border-border/40 cursor-not-allowed select-none"
+                      title={
+                        segmentLockedReason === "rateLimited"
+                          ? t("revenueSegments.rateLimitedTooltip")
+                          : t("revenueSegments.unavailableTooltip")
+                      }
+                    >
+                      <Lock className="h-3 w-3" />
+                      {t("revenueSegments.locked")}
+                    </span>
+                    {/* Premium pill — Starlight Gold so the gate is
+                        discoverable without hovering the tooltip, just
+                        like the card. Mirrors the card exactly so users
+                        who saw `Premium` next to `Segments 🔒` on the
+                        card see the same here when they expand. */}
+                    <span
+                      className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide border border-primary/40 bg-primary/15 text-primary"
+                      aria-label={t("revenueSegments.premiumBadge")}
+                      title={
+                        segmentLockedReason === "rateLimited"
+                          ? t("revenueSegments.rateLimitedTooltip")
+                          : t("revenueSegments.unavailableTooltip")
+                      }
+                      data-testid="revenue-segments-premium-badge"
+                    >
+                      {t("revenueSegments.premiumBadge")}
+                    </span>
+                  </span>
+                </div>
+              </>
             )}
             {/* Segment filter chips — hide / reveal individual layers in
                 the stacked chart (and the tooltip, table, and CSV below).

@@ -1,6 +1,7 @@
 import yahooFinanceDefault from "yahoo-finance2";
 import { apiUsageTracker, __test__ as usageTestSeam } from "./apiUsageTracker";
 import NodeCache from "node-cache";
+import { kvJsonCache } from "../helpers/kvJsonCache";
 import {
   AnalystTrendPoint,
   AnalystTrends,
@@ -1287,21 +1288,34 @@ export const stockService = {
     symbol: string,
   ): Promise<{ profile: CompanyProfile | null; unavailable: boolean }> {
     const normalizedSymbol = symbol.trim().toUpperCase();
-    const cacheKey = `profile_${normalizedSymbol}`;
-    const cached = cache.get<{
+    // Namespaced from the prod twin: `api/_router.js` (the Vercel
+    // router) stores a FLAT CompanyProfile under `profile_<SYMBOL>`, while
+    // this service path stores `{ profile, unavailable }`. The prefix
+    // keeps the shapes apart so a dev instance sharing the KV store
+    // can never poison prod's reads with the wrong envelope.
+    const cacheKey = `profile_ts_${normalizedSymbol}`;
+    const cached = await kvJsonCache.get<{
       profile: CompanyProfile | null;
       unavailable: boolean;
     }>(cacheKey);
     if (cached) return cached;
 
     return profileInFlight.getOrCreate(cacheKey, async () => {
-      const inFlightCached = cache.get<{
+      // Re-check inside the in-flight lock so two concurrent misses that
+      // both waited on the registry still don't issue duplicate upstream
+      // calls — the registry serialises them, and the second lockee finds
+      // the freshly-written KV entry from the first.
+      const inFlightCached = await kvJsonCache.get<{
         profile: CompanyProfile | null;
         unavailable: boolean;
       }>(cacheKey);
       if (inFlightCached) return inFlightCached;
       const result = await fetchProfileWithAvailability(normalizedSymbol);
-      cache.set(cacheKey, result, result.profile ? 3600 : PROFILE_NEGATIVE_TTL);
+      // 1h on a real profile so a second lambda (cold start) reads the same
+      // company description / sector instead of hitting FMP again. Short
+      // backoff on the unavailable path so the next deployment can recover.
+      const ttl = result.profile ? 3600 : PROFILE_NEGATIVE_TTL;
+      await kvJsonCache.set(cacheKey, result, ttl);
       return result;
     });
   },
@@ -1453,7 +1467,8 @@ export const stockService = {
     period: "annual" | "quarter" = "annual",
   ): Promise<FinancialStatements> {
     const cacheKey = `financials_${symbol}_${period}`;
-    if (cache.has(cacheKey)) return cache.get(cacheKey) as FinancialStatements;
+    const cached = await kvJsonCache.get<FinancialStatements>(cacheKey);
+    if (cached) return cached;
 
     let result: FinancialStatements = { income: [], balance: [], cash: [] };
     const limit = period === "quarter" ? 7 : 5;
@@ -1505,7 +1520,12 @@ export const stockService = {
       : await this.getYahooFinancialStatements(symbol, period, limit);
     result = mergeFinancialStatements(primary, fallback);
 
-    cache.set(cacheKey, result);
+    // 1h KV TTL — earnings reports anchor once per quarter so this stays
+    // warm across cold starts without serving stale pre-earnings figures.
+    // Cross-lambda propagation matters here: a freshly-deployed peer
+    // skipping the FMP re-fetch after `Object` writeback is the same win
+    // as the locked-premium route.
+    await kvJsonCache.set(cacheKey, result, 3600);
     return result;
   },
 
@@ -1525,6 +1545,16 @@ export const stockService = {
    * keep the segment filters visible as a locked premium feature while
    * rendering the plain total-revenue card. No FMP key → `unavailable: true`
    * and the network is never touched.
+   *
+   * Caching: this payload is durable — once one lambda discovers the FMP
+   * quota is exhausted, every other instance should see the same
+   * `rateLimited: true` state on its cold start so we don't rack up
+   * another 429. The KV-backed `kvJsonCache` (local NodeCache mirror +
+   * Vercel KV when `KV_REST_API_URL`/`KV_REST_API_TOKEN` are set) gives
+   * us that cross-instance propagation; without it, this method still
+   * works correctly per-instance via the local cache. Rate-limited
+   * payloads back off briefly (5 min) so the page doesn't re-hit a
+   * quota FMP still refuses; real data sticks for an hour.
    */
   async getRevenueSegmentation(
     symbol: string,
@@ -1534,7 +1564,7 @@ export const stockService = {
     // Annual and quarterly payloads cache under separate keys so the modal's
     // granularity toggle never serves one period's rows as the other.
     const cacheKey = `revenueSegmentation_${normalizedSymbol}_${period}`;
-    const cached = cache.get<RevenueSegmentation>(cacheKey);
+    const cached = await kvJsonCache.get<RevenueSegmentation>(cacheKey);
     if (cached) return cached;
 
     if (!hasFmp()) {
@@ -1543,7 +1573,11 @@ export const stockService = {
         rateLimited: false,
         unavailable: true,
       };
-      cache.set(cacheKey, noKeyResult);
+      // No FMP key is a stable config — cache it for an hour so the
+      // client doesn't refetch a known-missing dependency on every page
+      // load. A live KV write also lets a freshly-deployed instance
+      // learn the config from its peers instead of probing every time.
+      await kvJsonCache.set(cacheKey, noKeyResult, 3600);
       return noKeyResult;
     }
 
@@ -1581,15 +1615,19 @@ export const stockService = {
       rateLimited,
       unavailable: false,
     };
-    // Rate-limited payloads back off briefly (5 min) so the page doesn't
-    // re-hit a quota FMP still refuses; real data sticks for an hour.
-    cache.set(cacheKey, payload, rateLimited ? 300 : 3600);
+    // Rate-limited payloads back off briefly (5 min KV TTL) so the page
+    // doesn't re-hit a quota FMP still refuses — KV writes are durable,
+    // so a cold-started lambda on the other side of the cluster reads
+    // the same `rateLimited: true` and skips the upstream call too.
+    // Real data sticks for an hour.
+    await kvJsonCache.set(cacheKey, payload, rateLimited ? 300 : 3600);
     return payload;
   },
 
   async getMetrics(symbol: string): Promise<StockMetrics> {
     const cacheKey = `metrics_${symbol}`;
-    if (cache.has(cacheKey)) return cache.get(cacheKey) as StockMetrics;
+    const cached = await kvJsonCache.get<StockMetrics>(cacheKey);
+    if (cached) return cached;
 
     const extract = (value: unknown): number | undefined => {
       if (value === undefined || value === null || value === "")
@@ -1667,7 +1705,9 @@ export const stockService = {
 
     if (!hasFmp()) {
       const result = await getYahooMetrics();
-      cache.set(cacheKey, result);
+      // 1h KV TTL — metrics are slow-moving; cross-lambda propagation
+      // means a fresh peer doesn't re-fetch the same Yahoo quoteSummary.
+      await kvJsonCache.set(cacheKey, result, 3600);
       return result;
     }
     const [m, r, s] = await Promise.all([
@@ -1692,7 +1732,7 @@ export const stockService = {
       );
     if (!hasObjectValues(m0) && !hasObjectValues(r0) && !hasObjectValues(s0)) {
       const result = await getYahooMetrics();
-      cache.set(cacheKey, result);
+      await kvJsonCache.set(cacheKey, result, 3600);
       return result;
     }
     const result: StockMetrics = {
@@ -1707,7 +1747,7 @@ export const stockService = {
         : null,
       source: "fmp",
     };
-    cache.set(cacheKey, result);
+    await kvJsonCache.set(cacheKey, result, 3600);
     return result;
   },
 

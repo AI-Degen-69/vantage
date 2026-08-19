@@ -122,9 +122,12 @@ export class LocalMemoryStore implements UsageStore {
  *   POST {KV_REST_API_URL}
  *   Authorization: Bearer {KV_REST_API_TOKEN}
  *   body: ["GET","vantage:usage:{provider}:{day}"]
- *      → returns [null, "<value>"]   (or [null, null] if missing)
+ *      → returns { "result": "<value>" }   (or { "result": null } if missing)
  *   body: ["SET","vantage:usage:{provider}:{day}", "{json}"]
- *      → returns [null, "OK"]
+ *      → returns { "result": "OK" }
+ *
+ * Failures return { "error": "..." } — parsed as an [error, null] tuple
+ * so callers keep their existing `if (err || value === null)` guards.
  *
  * Errors are swallowed and logged so a flaky KV never breaks a request
  * path — the in-process mirror remains the source of truth for THIS
@@ -162,8 +165,15 @@ export class VercelKvStore implements UsageStore {
         signal: controller.signal,
       });
       if (!r.ok) throw new Error(`KV ${cmd} failed: ${r.status} ${r.statusText}`);
-      const arr = (await r.json()) as Array<unknown>;
-      return [arr[0] ?? null, (arr[1] as T | null) ?? null];
+      // Upstash REST returns a single `{ result: ... }` object for a
+      // one-command POST (or `{ error: "..." }` on failure) — NOT the
+      // `[err, value]` tuple. Parse the real shape so GET hits actually
+      // hydrate instead of always reading as a miss.
+      const body = (await r.json()) as { result?: unknown; error?: unknown };
+      if (body && typeof body === "object" && "error" in body) {
+        return [body.error, null];
+      }
+      return [null, (body?.result as T | null) ?? null];
     } finally {
       clearTimeout(timeoutId);
     }
