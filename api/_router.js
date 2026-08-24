@@ -82,7 +82,9 @@ const _kwExec = async (cmd, ...args) => {
 };
 const _kwEnabled = () =>
   !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
-const kvJsonCache = {
+// Exported for the parity tripwire spec (`_router.kv-cache-parity.spec.ts`)
+// which pins this twin's behavior against server/helpers/kvJsonCache.ts.
+export const kvJsonCache = {
   async getJSON(key) {
     const local = kw.local.get(key);
     if (local !== undefined) return local;
