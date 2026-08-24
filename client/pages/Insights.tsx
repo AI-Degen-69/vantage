@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useI18n, translateSector } from "@/lib/i18n";
+import { formatMoneyCompact } from "@/lib/format";
 import BatchQuoteFallbackHint from "@/components/BatchQuoteFallbackHint";
 import {
   useAllInsightsTabs,
@@ -40,19 +41,9 @@ const TABS: { id: InsightsTabId; i18nKey: string; Icon: React.ElementType }[] =
     { id: "leisure", i18nKey: "insights.tabs.leisure", Icon: Gamepad2 },
   ];
 
-/**
- * Formats a market capitalization value using a compact human-readable unit.
- *
- * @param mc - The market capitalization value to format
- * @returns A formatted market capitalization string, or an em dash when the value is missing or not finite
- */
-function formatMarketCap(mc: number | undefined): string {
-  if (mc === undefined || mc === null || !Number.isFinite(mc)) return "—";
-  if (mc >= 1e12) return `$${(mc / 1e12).toFixed(2)}T`;
-  if (mc >= 1e9) return `$${(mc / 1e9).toFixed(1)}B`;
-  if (mc >= 1e6) return `$${(mc / 1e6).toFixed(1)}M`;
-  return `$${mc.toLocaleString()}`;
-}
+// Market-cap rendering delegates to the canonical compact formatter in
+// `lib/format` — the local copy here had drifted from CompanyProfile's
+// (different decimals per tier, no negative handling).
 
 /**
  * Displays searchable market insights with tabbed stock universes and live quote data.
@@ -416,7 +407,7 @@ export default function Insights() {
                         <p className="text-xs text-muted-foreground flex items-center gap-1">
                           <span>{t("insights.marketCap")}:</span>
                           <span dir="ltr">
-                            {formatMarketCap(row.marketCap)}
+                            {formatMoneyCompact(row.marketCap) ?? "—"}
                           </span>
                         </p>
                         <div className="flex -space-x-1 rtl:space-x-reverse">
@@ -678,7 +669,7 @@ export default function Insights() {
                       </p>
                     </div>
                     <p className="vt-cap" dir="ltr">
-                      {formatMarketCap(row.marketCap)}
+                      {formatMoneyCompact(row.marketCap) ?? "—"}
                     </p>
                   </div>
                 );
@@ -780,7 +771,7 @@ export default function Insights() {
                         {live ? `$${row.price!.toFixed(2)}` : "—"}
                       </span>
                       <span className="vt-cap" dir="ltr">
-                        {formatMarketCap(row.marketCap)}
+                        {formatMoneyCompact(row.marketCap) ?? "—"}
                       </span>
                     </div>
                   </div>
