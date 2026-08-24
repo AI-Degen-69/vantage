@@ -1,5 +1,12 @@
 import { RequestHandler } from "express";
 import { stockService } from "../services/stockService";
+// Shared symbols-query validation (also consumed by the Vercel
+// `_router.js` twin) — see server/services/symbolsQuery.ts.
+import {
+  MAX_SYMBOLS,
+  parseSymbolsQuery,
+  TICKER_PATTERN,
+} from "../services/symbolsQuery";
 import type {
   BatchQuoteResponse,
   ChartSeries,
@@ -20,66 +27,12 @@ import type {
   YahooFallbackFinancials,
 } from "../../shared/api";
 
-const MAX_SYMBOLS = 50;
-const TICKER_PATTERN = /^[A-Z]{1,5}(?:[.-][A-Z])?$/;
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 function parseTicker(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const symbol = value.trim().toUpperCase();
   return TICKER_PATTERN.test(symbol) ? symbol : null;
-}
-
-function parseSymbolList(value: unknown): { symbols: string[]; invalid: string[] } {
-  const raw = typeof value === "string"
-    ? value.split(",")
-    : Array.isArray(value) && value.every((item) => typeof item === "string")
-      ? value.flatMap((item) => item.split(","))
-      : [];
-  const symbols: string[] = [];
-  const invalid: string[] = [];
-  const seen = new Set<string>();
-
-  for (const item of raw) {
-    const candidate = item.trim().toUpperCase();
-    if (!candidate) continue;
-    if (!TICKER_PATTERN.test(candidate)) {
-      invalid.push(candidate);
-    } else if (!seen.has(candidate)) {
-      seen.add(candidate);
-      symbols.push(candidate);
-    }
-  }
-  return { symbols, invalid };
-}
-
-type ParsedSymbols =
-  | { ok: true; symbols: string[] }
-  | { ok: false; status: number; body: { error: string; symbols?: string[] } };
-
-/**
- * Validate a symbols query parameter end-to-end: split/clean/dedupe via
- * `parseSymbolList`, then enforce the shared route policy (no invalid
- * tickers, non-empty, at most MAX_SYMBOLS). Returns either the cleaned
- * list or the exact 400 response body every symbols-consuming handler
- * must emit, so the policy lives here instead of at each call site.
- */
-function parseSymbolsQuery(value: unknown): ParsedSymbols {
-  const { symbols, invalid } = parseSymbolList(value);
-  if (invalid.length > 0) {
-    return { ok: false, status: 400, body: { error: "invalid symbol parameter", symbols: invalid } };
-  }
-  if (symbols.length === 0) {
-    return { ok: false, status: 400, body: { error: "symbols parameter required" } };
-  }
-  if (symbols.length > MAX_SYMBOLS) {
-    return {
-      ok: false,
-      status: 400,
-      body: { error: `Too many symbols requested. Maximum is ${MAX_SYMBOLS}, received ${symbols.length}` },
-    };
-  }
-  return { ok: true, symbols };
 }
 
 const MAX_SECTOR_LEN = 64;
