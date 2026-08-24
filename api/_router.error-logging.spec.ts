@@ -71,14 +71,24 @@ describe("per-item failure paths warn instead of vanishing", () => {
     vi.unstubAllGlobals();
   });
 
-  it("SMA rows degrade to null but warn on per-symbol failure", async () => {
-    const { res, statusCalls } = makeRes();
-    await handleSmaDistances(makeReq({ symbols: "AAPL" }), res);
-    expect(statusCalls).toEqual([]);
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("sma history failed for AAPL"),
-      expect.anything(),
+  it("SMA rows degrade to the exact null row and warn once per symbol", async () => {
+    const first = makeRes();
+    await handleSmaDistances(makeReq({ symbols: "AAPL" }), first.res);
+    expect(first.statusCalls).toEqual([]);
+    expect(first.getJson()).toEqual({
+      rows: [
+        { symbol: "AAPL", sma200: null, distancePct: null, sampleSize: 0, price: null },
+      ],
+    });
+    // Throttle contract: a second failure for the same key inside the
+    // window stays silent.
+    const second = makeRes();
+    await handleSmaDistances(makeReq({ symbols: "AAPL" }), second.res);
+    expect(second.getJson()).toEqual(first.getJson());
+    const smaWarns = warnSpy.mock.calls.filter((c) =>
+      String(c[0]).includes("sma history failed for AAPL"),
     );
+    expect(smaWarns).toHaveLength(1);
   });
 
   it("batch quotes keep null placeholders but warn on quote failure", async () => {
@@ -92,14 +102,32 @@ describe("per-item failure paths warn instead of vanishing", () => {
     );
   });
 
-  it("FX rates skip failed pairs but warn per pair", async () => {
+  it("FX rates skip both failed pairs with exactly one warning each", async () => {
     const { res, statusCalls, getJson } = makeRes();
     await handleFxRates(makeReq({ currencies: "USD,ILS" }), res);
     expect(statusCalls).toEqual([]);
     expect(getJson()).toMatchObject({ rates: { USDUSD: 1 } });
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("fx pair failed for"),
-      expect.anything(),
+    const fxWarns = warnSpy.mock.calls.filter((c) =>
+      String(c[0]).includes("fx pair failed for"),
     );
+    // USDILS=X and ILSUSD=X — one throttled warn per failed pair.
+    expect(fxWarns).toHaveLength(2);
+  });
+
+  it("re-allows a key after its throttle window expires", async () => {
+    vi.useFakeTimers();
+    try {
+      const t0 = new Date("2026-08-24T12:00:00.000Z");
+      vi.setSystemTime(t0);
+      const first = makeRes();
+      await handleSmaDistances(makeReq({ symbols: "QQQ" }), first.res);
+      expect(warnSpy.mock.calls.length).toBe(1);
+      vi.setSystemTime(new Date(t0.getTime() + 61_000));
+      const second = makeRes();
+      await handleSmaDistances(makeReq({ symbols: "QQQ" }), second.res);
+      expect(warnSpy.mock.calls.length).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
