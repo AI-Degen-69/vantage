@@ -16,6 +16,16 @@
 import yfDefault from "yahoo-finance2";
 import NodeCache from "node-cache";
 import apiUsageTracker from "../server/services/apiUsageTracker.js";
+// Canonical curated Insights universes + labels — single source shared
+// with the Express server (same .js-extension import mechanism as
+// apiUsageTracker.js). Replaces the former hand-copied 3-tab
+// INSIGHTS_UNIVERSES map that had drifted from the canonical module.
+// Known limitation vs the Express side: the `trending` tab serves the
+// curated editorial list here, not FMP live movers.
+import {
+  insightsTabLabels,
+  insightsTabUniverses,
+} from "../server/services/insightsUniverses.js";
 
 const yfInner = new yfDefault({ suppressNotices: ["yahooSurvey"] });
 // Proxy-wrap yf so every method invocation auto-records one Yahoo call
@@ -1389,57 +1399,20 @@ export async function handleSectorHeatmap(req, res) {
   res.json(result);
 }
 
-const INSIGHTS_UNIVERSES = {
-  sp500: {
-    label: "S&P 500",
-    entries: [
-      { symbol: "AAPL", name: "Apple" },
-      { symbol: "MSFT", name: "Microsoft" },
-      { symbol: "GOOGL", name: "Alphabet" },
-      { symbol: "AMZN", name: "Amazon" },
-      { symbol: "NVDA", name: "NVIDIA" },
-      { symbol: "META", name: "Meta" },
-      { symbol: "TSLA", name: "Tesla" },
-      { symbol: "JPM", name: "JPMorgan Chase" },
-      { symbol: "V", name: "Visa" },
-      { symbol: "MA", name: "Mastercard", sector: "Financial Services" },
-      { symbol: "PLD", name: "Prologis", sector: "Real Estate" },
-      { symbol: "NEE", name: "NextEra Energy", sector: "Utilities" },
-      { symbol: "LIN", name: "Linde", sector: "Basic Materials" },
-    ],
-  },
-  trending: {
-    label: "Trending",
-    entries: [
-      { symbol: "PLTR", name: "Palantir" },
-      { symbol: "ARM", name: "Arm Holdings" },
-      { symbol: "COIN", name: "Coinbase" },
-      { symbol: "RDDT", name: "Reddit" },
-    ],
-  },
-  growth: {
-    label: "Growth",
-    entries: [
-      { symbol: "CRM", name: "Salesforce" },
-      { symbol: "NOW", name: "ServiceNow" },
-      { symbol: "ADBE", name: "Adobe" },
-      { symbol: "INTU", name: "Intuit" },
-    ],
-  },
-};
-
 export async function handleInsightsTab(req, res) {
   const tab = String(req.query?.tab || "sp500");
-  const universe = INSIGHTS_UNIVERSES[tab] || INSIGHTS_UNIVERSES.sp500;
-  res.json({ tab, label: universe.label, entries: universe.entries });
+  const validKey = Object.prototype.hasOwnProperty.call(insightsTabUniverses, tab)
+    ? tab
+    : "sp500";
+  res.json({
+    tab: validKey,
+    label: insightsTabLabels[validKey],
+    entries: insightsTabUniverses[validKey] ?? insightsTabUniverses.sp500,
+  });
 }
 
 export async function handleInsightsTabsAll(_req, res) {
-  const result = {};
-  for (const [id, universe] of Object.entries(INSIGHTS_UNIVERSES)) {
-    result[id] = universe.entries;
-  }
-  res.json(result);
+  res.json(insightsTabUniverses);
 }
 
 export async function handleSmaDistances(req, res) {

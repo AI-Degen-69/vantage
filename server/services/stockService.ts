@@ -37,7 +37,10 @@ import {
   YahooFallbackFinancials,
   AvailabilityState,
 } from "../../shared/api";
-import { insightsTabUniverses } from "./insightsUniverses";
+import {
+  insightsTabLabels,
+  insightsTabUniverses,
+} from "./insightsUniverses";
 // Relative path (not `@shared/...`) so the helper resolves cleanly under Vite's
 // config-file resolver, which doesn't apply its own `resolve.alias` map when
 // bundling vite.config.ts at startup. The TS path alias still works — this is
@@ -2392,20 +2395,9 @@ export const stockService = {
       validKey === "trending"
         ? await this.getTrendingUniverse()
         : insightsTabUniverses[validKey] ?? insightsTabUniverses.sp500;
-    const labels: Record<InsightsTabId, string> = {
-      sp500: "S&P 500",
-      trending: "Trending",
-      growth: "Growth",
-      dividend: "Dividend",
-      buyback: "Buyback",
-      ai: "AI",
-      cloud: "Cloud",
-      ev: "EV",
-      leisure: "Leisure",
-    };
     return {
       tab: validKey,
-      label: labels[validKey],
+      label: insightsTabLabels[validKey],
       entries,
     };
   },
