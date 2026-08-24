@@ -39,6 +39,11 @@ import {
 } from "../../shared/api";
 import { insightsTabUniverses } from "./insightsUniverses";
 import {
+  classifyFmp,
+  hasObjectValues,
+  yahooQuoteSummaryToMetrics,
+} from "./metricsMapping";
+import {
   normalizeDividendYield,
   normalizeYahooPercentage,
   normalizeYahooQuote,
@@ -1599,95 +1604,15 @@ export const stockService = {
     const cached = await kvJsonCache.get<StockMetrics>(cacheKey);
     if (cached) return cached;
 
-    const extract = (value: unknown): number | undefined => {
-      if (value === undefined || value === null || value === "")
-        return undefined;
-      if (typeof value === "object" && value !== null && "raw" in value) {
-        return extract((value as { raw?: unknown }).raw);
-      }
-      const n = Number(value);
-      return Number.isFinite(n) ? n : undefined;
-    };
-
+    // Pure mapping lives in `./metricsMapping` so it can be unit-tested
+    // without mocking FMP/Yahoo; this method only orchestrates cache,
+    // network fan-out, and fallback order.
     const getYahooMetrics = async (): Promise<StockMetrics> => {
       try {
         const raw: any = await yahooFinance.quoteSummary(symbol, {
           modules: ["defaultKeyStatistics", "financialData", "summaryDetail", "price"],
         });
-        const dks = raw?.defaultKeyStatistics ?? {};
-        const fd = raw?.financialData ?? {};
-        const sd = raw?.summaryDetail ?? {};
-        const price = raw?.price ?? {};
-        // Yahoo's free cash flow + market cap let us derive the
-        // price-to-cash-flow coverage ratios without FMP's premium
-        // /ratios-ttm endpoint. Falls back to null when a field is missing.
-        const marketCap = extract(price.marketCap) ?? null;
-        const operatingCashFlow = extract(fd.operatingCashflow) ?? null;
-        const freeCashFlow = extract(fd.freeCashflow) ?? null;
-        const pcf =
-          operatingCashFlow && marketCap ? marketCap / operatingCashFlow : null;
-        const pfcf = freeCashFlow && marketCap ? marketCap / freeCashFlow : null;
-        const fcfYield =
-          freeCashFlow && marketCap ? (freeCashFlow / marketCap) * 100 : null;
-        const metrics: KeyMetricsTTM = {
-          revenuePerShareTTM: extract(fd.revenuePerShare),
-          netIncomePerShareTTM: extract(dks.trailingEps),
-          peRatioTTM: extract(sd.trailingPE) ?? extract(dks.forwardPE),
-          dividendYieldTTM: normalizeYahooPercentage(
-            extract(sd.dividendYield) ??
-              extract(sd.trailingAnnualDividendYield),
-          ),
-          priceToSalesRatioTTM:
-            extract(sd.priceToSalesTrailing12Months) ??
-            extract(dks.enterpriseToRevenue),
-          priceToBookRatioTTM: extract(dks.priceToBook),
-          evToSalesTTM: extract(dks.enterpriseToRevenue),
-          evToEBITDATTM: extract(dks.enterpriseToEbitda),
-          returnOnEquityTTM: extract(fd.returnOnEquity),
-          returnOnAssetsTTM: extract(fd.returnOnAssets),
-          freeCashFlowYieldTTM: fcfYield ?? undefined,
-        };
-        const ratios: RatiosTTM = {
-          priceEarningsRatioTTM: extract(sd.trailingPE),
-          priceToBookRatioTTM: extract(dks.priceToBook),
-          priceToSalesRatioTTM:
-            extract(sd.priceToSalesTrailing12Months) ??
-            extract(dks.enterpriseToRevenue),
-          priceToEarningsGrowthRatioTTM: extract(dks.pegRatio),
-          priceToOperatingCashFlowRatioTTM: pcf ?? undefined,
-          priceToFreeCashFlowRatioTTM: pfcf ?? undefined,
-          netProfitMargin: normalizeYahooPercentage(extract(fd.profitMargins)),
-          operatingProfitMarginTTM: normalizeYahooPercentage(
-            extract(fd.operatingMargins),
-          ),
-          grossProfitMarginTTM: normalizeYahooPercentage(
-            extract(fd.grossMargins),
-          ),
-          dividendPayoutRatioTTM: normalizeYahooPercentage(
-            extract(sd.payoutRatio),
-          ),
-          currentRatio: extract(fd.currentRatio),
-          quickRatio: extract(fd.quickRatio),
-          debtToEquityRatio: extract(fd.debtToEquity),
-        };
-        const hasValues =
-          Object.values(metrics).some((v) => v !== undefined) ||
-          Object.values(ratios).some((v) => v !== undefined);
-        // Availability: derived metrics that lack an input are calcBroken,
-        // roic is FMP-premium only (Yahoo never supplies it), so it's pro.
-        const availability: Partial<Record<string, AvailabilityState>> = {
-          pcf: pcf === null ? "calcBroken" : "available",
-          pfcf: pfcf === null ? "calcBroken" : "available",
-          fcfYield: fcfYield === null ? "calcBroken" : "available",
-          roic: "pro",
-        };
-        return {
-          metrics: hasValues ? metrics : {},
-          ratios: hasValues ? ratios : {},
-          scores: null,
-          source: hasValues ? "yahoo" : null,
-          availability: hasValues ? availability : undefined,
-        };
+        return yahooQuoteSummaryToMetrics(raw);
       } catch (error: any) {
         throttledWarn(
           `metrics-yahoo:${symbol}`,
@@ -1721,23 +1646,7 @@ export const stockService = {
     const m0 = Array.isArray(m) ? m[0] : m;
     const r0 = Array.isArray(r) ? r[0] : r;
     const s0 = Array.isArray(s) ? s[0] : s;
-    const hasObjectValues = (value: unknown): boolean =>
-      Boolean(
-        value &&
-          typeof value === "object" &&
-          Object.keys(value as object).length > 0,
-      );
     // Classify the FMP failure so the UI can show *why* a value is missing.
-    const classifyFmp = (
-      status: number | null,
-      hasData: boolean,
-    ): AvailabilityState | undefined => {
-      if (hasData) return undefined; // present → no badge
-      if (status === 429 || status === 403) return "rateLimited";
-      if (status === 404 || status === null) return "notFound";
-      // 200 but empty payload ⇒ premium endpoint returned nothing on free tier
-      return "pro";
-    };
     const fmpAvailability: Partial<Record<string, AvailabilityState>> = {
       roic: classifyFmp(mRes.status, hasObjectValues(m0)),
       payoutDate: classifyFmp(rRes.status, hasObjectValues(r0)),
