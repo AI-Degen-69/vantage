@@ -36,6 +36,11 @@ export function hasObjectValues(value: unknown): boolean {
   );
 }
 
+/** Strict fraction→percent conversion that preserves undefined (0.28 → 28, 1.52 → 152). */
+function toPercent(value: number | undefined): number | undefined {
+  return value === undefined ? undefined : value * 100;
+}
+
 /**
  * Classify an FMP endpoint failure so the UI can show *why* a value is
  * missing: quota/auth → rateLimited, unknown symbol / no response →
@@ -79,28 +84,31 @@ export function yahooQuoteSummaryToMetrics(raw: any): StockMetrics {
   const metrics: KeyMetricsTTM = {
     revenuePerShareTTM: extractNumber(fd.revenuePerShare),
     netIncomePerShareTTM: extractNumber(dks.trailingEps),
-    peRatioTTM:
-      extractNumber(sd.trailingPE) ?? extractNumber(dks.forwardPE),
+    // Trailing only — substituting forward P/E here would mislabel the
+    // number under the client's "P/E (TTM)" rendering.
+    peRatioTTM: extractNumber(sd.trailingPE),
     dividendYieldTTM: normalizeYahooPercentage(
       extractNumber(sd.dividendYield) ??
         extractNumber(sd.trailingAnnualDividendYield),
     ),
-    priceToSalesRatioTTM:
-      extractNumber(sd.priceToSalesTrailing12Months) ??
-      extractNumber(dks.enterpriseToRevenue),
+    // Price/Sales only — enterpriseToRevenue belongs to evToSalesTTM
+    // below; substituting it would mislabel the "P/S" card.
+    priceToSalesRatioTTM: extractNumber(sd.priceToSalesTrailing12Months),
     priceToBookRatioTTM: extractNumber(dks.priceToBook),
     evToSalesTTM: extractNumber(dks.enterpriseToRevenue),
     evToEBITDATTM: extractNumber(dks.enterpriseToEbitda),
-    returnOnEquityTTM: extractNumber(fd.returnOnEquity),
-    returnOnAssetsTTM: extractNumber(fd.returnOnAssets),
+    // Yahoo reports ROE/ROA as decimal fractions (1.52 = 152%) while the
+    // FMP path serves percent units — convert strictly so both sources
+    // agree at the API boundary. Plain ×100, NOT normalizeYahooPercentage:
+    // values above 1 must not skip the conversion.
+    returnOnEquityTTM: toPercent(extractNumber(fd.returnOnEquity)),
+    returnOnAssetsTTM: toPercent(extractNumber(fd.returnOnAssets)),
     freeCashFlowYieldTTM: fcfYield ?? undefined,
   };
   const ratios: RatiosTTM = {
     priceEarningsRatioTTM: extractNumber(sd.trailingPE),
     priceToBookRatioTTM: extractNumber(dks.priceToBook),
-    priceToSalesRatioTTM:
-      extractNumber(sd.priceToSalesTrailing12Months) ??
-      extractNumber(dks.enterpriseToRevenue),
+    priceToSalesRatioTTM: extractNumber(sd.priceToSalesTrailing12Months),
     priceToEarningsGrowthRatioTTM: extractNumber(dks.pegRatio),
     priceToOperatingCashFlowRatioTTM: pcf ?? undefined,
     priceToFreeCashFlowRatioTTM: pfcf ?? undefined,

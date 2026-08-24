@@ -113,6 +113,10 @@ describe("yahooQuoteSummaryToMetrics", () => {
     expect(result.scores).toBeNull();
     expect(result.metrics.peRatioTTM).toBeCloseTo(34.6, 6);
     expect(result.metrics.netIncomePerShareTTM).toBeCloseTo(6.57, 6);
+    // Yahoo's decimal ROE/ROA convert to strict percent units so the
+    // Yahoo and FMP paths agree at the API boundary.
+    expect(result.metrics.returnOnEquityTTM).toBeCloseTo(152, 6);
+    expect(result.metrics.returnOnAssetsTTM).toBeCloseTo(28, 6);
     // decimal yields/margins convert to percent units
     expect(result.metrics.dividendYieldTTM).toBeCloseTo(0.44, 6);
     expect(result.ratios.netProfitMargin).toBeCloseTo(26, 6);
@@ -166,10 +170,22 @@ describe("yahooQuoteSummaryToMetrics", () => {
     expect(result.availability).toBeUndefined();
   });
 
-  it("falls back through the pe chain (trailingPE missing → forwardPE)", () => {
+  it("does not substitute forward P/E for trailing P/E", () => {
+    // peRatioTTM is rendered under the client's "P/E (TTM)" label — a
+    // forward estimate must stay undefined rather than masquerade.
     const noTrailingPe = JSON.parse(JSON.stringify(fullFixture));
     delete noTrailingPe.summaryDetail.trailingPE;
     const result = yahooQuoteSummaryToMetrics(noTrailingPe as any);
-    expect(result.metrics.peRatioTTM).toBeCloseTo(30.1, 6);
+    expect(result.metrics.peRatioTTM).toBeUndefined();
+  });
+
+  it("does not substitute EV/Revenue for Price/Sales", () => {
+    const noPs = JSON.parse(JSON.stringify(fullFixture));
+    delete noPs.summaryDetail.priceToSalesTrailing12Months;
+    const result = yahooQuoteSummaryToMetrics(noPs as any);
+    expect(result.metrics.priceToSalesRatioTTM).toBeUndefined();
+    expect(result.ratios.priceToSalesRatioTTM).toBeUndefined();
+    // …while EV/Sales keeps its correct source.
+    expect(result.metrics.evToSalesTTM).toBeCloseTo(7.9, 6);
   });
 });
