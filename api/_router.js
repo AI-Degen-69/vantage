@@ -221,7 +221,12 @@ async function getYahooQuote(symbol) {
     const result = normalizeQuote(q, symbol);
     cache.set(cacheKey, result, QUOTE_TTL);
     return result;
-  } catch {
+  } catch (e) {
+    throttledWarn(
+      `yahoo_quote_js:${symbol}`,
+      `[router] yahoo quote failed for ${symbol}:`,
+      e?.message,
+    );
     return null;
   }
 }
@@ -1487,7 +1492,12 @@ export async function handleSmaDistances(req, res) {
           sampleSize: tail.length,
           price,
         };
-      } catch {
+      } catch (e) {
+        throttledWarn(
+          `sma:${sym}`,
+          `[router] sma history failed for ${sym}:`,
+          e?.message,
+        );
         return {
           symbol: sym,
           sma200: null,
@@ -1823,7 +1833,12 @@ export async function handleFxRates(req, res) {
         return Number.isFinite(px) && px > 0
           ? [sym.replace("=X", ""), px]
           : null;
-      } catch {
+      } catch (e) {
+        throttledWarn(
+          `fx_pair:${sym}`,
+          `[router] fx pair failed for ${sym}:`,
+          e?.message,
+        );
         return null;
       }
     }),
