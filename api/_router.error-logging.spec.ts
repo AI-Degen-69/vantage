@@ -153,4 +153,29 @@ describe("per-item failure paths warn instead of vanishing", () => {
     }
     expect(warned).toBe(count);
   });
+
+  it("checks the throttle BEFORE evicting when the map is full", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-08-24T12:00:00.000Z"));
+      // Fill the map to exactly its hard cap with unique keys.
+      for (let i = 0; i < 512; i += 1) {
+        await handleSmaDistances(
+          makeReq({ symbols: `F${i.toString(36).toUpperCase().padStart(3, "0")}` }),
+          makeRes().res,
+        );
+      }
+      warnSpy.mockClear();
+      // Repeat a key that is in-map and still fresh. The throttle check
+      // must win over eviction: no new warning AND no collateral eviction.
+      await handleSmaDistances(makeReq({ symbols: "F000" }), makeRes().res);
+      expect(
+        warnSpy.mock.calls.filter((c) =>
+          String(c[0]).includes("sma history failed for F000"),
+        ),
+      ).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

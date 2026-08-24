@@ -138,13 +138,16 @@ function throttledWarn(key, ...args) {
       if (now - _lastWarned[k] >= WARN_THROTTLE_MS) delete _lastWarned[k];
     }
   }
+  // Throttle check BEFORE eviction: a repeated-but-throttled key must
+  // not make room it doesn't need — otherwise sustained repeats drain
+  // fresh guards from other keys (or its own).
+  if (_lastWarned[key] && now - _lastWarned[key] < WARN_THROTTLE_MS) return;
   const keys = Object.keys(_lastWarned);
   while (keys.length >= WARN_MAP_SOFT_CAP) {
     const oldest = keys[0];
     delete _lastWarned[oldest];
     keys.shift();
   }
-  if (_lastWarned[key] && now - _lastWarned[key] < WARN_THROTTLE_MS) return;
   _lastWarned[key] = now;
   console.warn(...args);
 }
