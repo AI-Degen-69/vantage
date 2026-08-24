@@ -47,8 +47,9 @@ vi.mock("../services/stockService", () => ({
       async (from: string, to: string) => [{ symbol: "AAPL", date: from }],
     ),
     getFxRates: vi.fn(async (currencies: string[]) => ({
-      base: "USD",
       rates: Object.fromEntries(currencies.map((c) => [c, 1])),
+      fetchedAt: "2026-08-24T00:00:00.000Z",
+      source: "yahoo",
     })),
   },
 }));
@@ -278,6 +279,26 @@ describe("handleEarningsCalendar (route validation)", () => {
     expect(mockedCalendar).toHaveBeenCalledWith("2026-08-01", "2026-08-24");
     expect(getJson()).toEqual([{ symbol: "AAPL", date: "2026-08-01" }]);
   });
+
+  it("accepts the inclusive boundaries: same-day (0) and exactly 31 days", async () => {
+    const sameDay = makeRes();
+    await handleEarningsCalendar(
+      makeReq({ from: "2026-08-24", to: "2026-08-24" }),
+      sameDay.res,
+      () => undefined,
+    );
+    expect(sameDay.statusCalls).toEqual([]);
+    expect(mockedCalendar).toHaveBeenCalledWith("2026-08-24", "2026-08-24");
+
+    const exact31 = makeRes();
+    await handleEarningsCalendar(
+      makeReq({ from: "2026-07-24", to: "2026-08-24" }),
+      exact31.res,
+      () => undefined,
+    );
+    expect(exact31.statusCalls).toEqual([]);
+    expect(mockedCalendar).toHaveBeenCalledWith("2026-07-24", "2026-08-24");
+  });
 });
 
 describe("handleFxRates (route validation)", () => {
@@ -307,6 +328,29 @@ describe("handleFxRates (route validation)", () => {
     await handleFxRates(makeReq({ currencies: " gbp ,usd " }), res, () => undefined);
     expect(statusCalls).toEqual([]);
     expect(mockedFx).toHaveBeenCalledWith(["GBP", "USD"]);
+  });
+
+  it("dedupes repeated currencies while preserving first-seen order", async () => {
+    // Duplicates would multiply upstream pair requests in getFxRates.
+    const { res, statusCalls } = makeRes();
+    await handleFxRates(
+      makeReq({ currencies: "EUR,USD,EUR,ILS,usd" }),
+      res,
+      () => undefined,
+    );
+    expect(statusCalls).toEqual([]);
+    expect(mockedFx).toHaveBeenCalledWith(["EUR", "USD", "ILS"]);
+  });
+
+  it("returns the service payload verbatim on success", async () => {
+    const { res, statusCalls, getJson } = makeRes();
+    await handleFxRates(makeReq({ currencies: "USD,ILS" }), res, () => undefined);
+    expect(statusCalls).toEqual([]);
+    expect(getJson()).toEqual({
+      rates: { USD: 1, ILS: 1 },
+      fetchedAt: "2026-08-24T00:00:00.000Z",
+      source: "yahoo",
+    });
   });
 
   it("documents lenient filtering: unknown currencies are dropped individually", async () => {

@@ -103,15 +103,26 @@ function dateRangeDays(from: string, to: string): number {
  * Parse `?currencies=USD,ILS,…` into the supported FxCurrency list.
  * Lenient by design: entries are uppercased and unknown codes are
  * dropped individually — a request survives as long as ONE supported
- * currency remains (callers 400 on an empty result). If this ever
- * flips to strict validation, update handleFxRates's spec AND the
- * client, which relies on partial success for mixed lists.
+ * currency remains (callers 400 on an empty result). Duplicates are
+ * removed preserving first-seen order so repeated query values cannot
+ * amplify upstream pair requests. If this ever flips to strict
+ * validation, update handleFxRates's spec AND the client, which relies
+ * on partial success for mixed lists.
  */
 function parseFxCurrencies(raw: string): FxCurrency[] {
-  return raw
-    .split(",")
-    .map((s) => s.trim().toUpperCase())
-    .filter((s): s is FxCurrency => s === "USD" || s === "ILS" || s === "EUR" || s === "GBP");
+  const seen = new Set<FxCurrency>();
+  const out: FxCurrency[] = [];
+  for (const entry of raw.split(",")) {
+    const code = entry.trim().toUpperCase();
+    if (
+      (code === "USD" || code === "ILS" || code === "EUR" || code === "GBP") &&
+      !seen.has(code)
+    ) {
+      seen.add(code);
+      out.push(code);
+    }
+  }
+  return out;
 }
 
 export const handleStockQuote: RequestHandler = async (req, res) => {
