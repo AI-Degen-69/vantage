@@ -96,7 +96,14 @@ describe("api/_router.js handleBatchQuotes validation ↔ Express contract", () 
     expect(quote).not.toHaveBeenCalled();
   });
 
-  it("dedupes and case-folds before hitting Yahoo (unique tickers per run)", async () => {
+  it("dedupes, case-folds, and preserves ordered null placeholders", async () => {
+    // ZVVB's quote rejects → its position must become null while ZVVA
+    // keeps its value; request order (not upstream completion order)
+    // governs the response.
+    quote.mockImplementation(async (symbol: string) => {
+      if (symbol === "ZVVB") throw new Error("quote unavailable");
+      return { symbol, regularMarketPrice: 42.5 };
+    });
     const { res, statusCalls, getJson } = makeRes();
     await handleBatchQuotes(makeReq({ symbol: ["zvva", "ZVVA", "ZVVB"] }), res);
     expect(statusCalls).toEqual([]);
@@ -104,8 +111,9 @@ describe("api/_router.js handleBatchQuotes validation ↔ Express contract", () 
     const requested = quote.mock.calls.map((c) => c[0]);
     expect(requested).toContain("ZVVA");
     expect(requested).toContain("ZVVB");
-    // null placeholders for unresolvable quotes are preserved in order
-    const body = getJson() as { quotes: unknown[] };
+    const body = getJson() as { quotes: Array<{ symbol: string; price: number } | null> };
     expect(body.quotes).toHaveLength(2);
+    expect(body.quotes[0]).toMatchObject({ symbol: "ZVVA", price: 42.5 });
+    expect(body.quotes[1]).toBeNull();
   });
 });
