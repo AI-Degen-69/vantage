@@ -387,7 +387,11 @@ export const handleProviderHealth: RequestHandler = async (_req, res) => {
 };
 
 export const handleFxRates: RequestHandler = async (req, res) => {
-  const raw = String(req.query.currencies || "USD,ILS,EUR");
+  // Default only when the parameter is ABSENT: an explicitly empty
+  // `?currencies=` parses to zero supported currencies and must 400
+  // like any other all-unsupported list, per parseFxCurrencies's
+  // documented contract.
+  const raw = req.query.currencies === undefined ? "USD,ILS,EUR" : String(req.query.currencies);
   const currencies = parseFxCurrencies(raw);
   if (currencies.length === 0) {
     return res.status(400).json({ error: "currencies parameter required" });

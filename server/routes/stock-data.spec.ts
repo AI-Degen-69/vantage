@@ -292,6 +292,16 @@ describe("handleFxRates (route validation)", () => {
     expect(mockedFx).toHaveBeenCalledWith(["USD", "ILS", "EUR"]);
   });
 
+  it("rejects an explicitly empty currencies value instead of substituting defaults", async () => {
+    // `?currencies=` means the caller asked for nothing — same as any
+    // all-unsupported list — NOT a silent fallback to defaults.
+    const { res, statusCalls, getJson } = makeRes();
+    await handleFxRates(makeReq({ currencies: "" }), res, () => undefined);
+    expect(statusCalls).toEqual([400]);
+    expect(getJson()).toMatchObject({ error: "currencies parameter required" });
+    expect(mockedFx).not.toHaveBeenCalled();
+  });
+
   it("uppercases and trims supported currencies", async () => {
     const { res, statusCalls } = makeRes();
     await handleFxRates(makeReq({ currencies: " gbp ,usd " }), res, () => undefined);
