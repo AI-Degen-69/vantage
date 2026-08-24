@@ -706,7 +706,11 @@ export default function Insights() {
             <div className="vt-grid">
               {filtered.map((row) => {
                 const { liveText, pctText, cls } = presentQuoteRow(row);
-                const pct = row.changePercent;
+                const pct =
+                  row.changePercent !== undefined &&
+                  Number.isFinite(row.changePercent)
+                    ? row.changePercent
+                    : undefined;
                 const barColor =
                   pct === undefined || pct >= 0
                     ? "hsl(var(--chart-positive))"

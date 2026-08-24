@@ -18,7 +18,13 @@ export function presentQuoteRow(row: {
   changePercent?: number;
 }): QuoteRowView {
   const live = row.price !== undefined && Number.isFinite(row.price);
-  const pct = row.changePercent;
+  // Normalize non-finite changePercent (NaN / ±Infinity) to the same
+  // unavailable state as a missing value — otherwise it leaks into the
+  // output as "+NaN%" or "+Infinity%".
+  const pct =
+    row.changePercent !== undefined && Number.isFinite(row.changePercent)
+      ? row.changePercent
+      : undefined;
   const sign = pct === undefined || pct < 0 ? "" : "+";
   return {
     liveText: live ? `$${row.price!.toFixed(2)}` : "—",

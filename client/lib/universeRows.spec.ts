@@ -45,4 +45,15 @@ describe("presentQuoteRow", () => {
     expect(view.pctText).toBe("+0.00%");
     expect(view.cls).toBe("text-chart-positive");
   });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    "normalizes non-finite changePercent %p to the unavailable state",
+    (bad) => {
+      expect(presentQuoteRow({ price: 10, changePercent: bad })).toEqual({
+        liveText: "$10.00",
+        pctText: "—",
+        cls: "text-muted-foreground",
+      });
+    },
+  );
 });
