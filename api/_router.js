@@ -27,6 +27,10 @@ import {
   insightsTabUniverses,
 } from "../server/services/insightsUniverses.js";
 import { normalizeYahooQuote } from "../server/services/yahooQuoteShape.js";
+// Shared symbols-query validation — same parser, error bodies, and
+// dedupe semantics as the Express stock-data routes (same
+// .js-extension import mechanism as apiUsageTracker.js).
+import { parseSymbolsQuery } from "../server/services/symbolsQuery.js";
 
 const yfInner = new yfDefault({ suppressNotices: ["yahooSurvey"] });
 // Proxy-wrap yf so every method invocation auto-records one Yahoo call
@@ -1501,20 +1505,19 @@ export async function handleInsightsTabsAll(_req, res) {
 }
 
 export async function handleSmaDistances(req, res) {
-  const raw = req.query?.symbols ?? req.query?.symbol ?? [];
-  const list = Array.isArray(raw)
-    ? raw.map(String)
-    : String(raw)
-        .split(",")
-        .map((s) => s.trim());
-  const symbols = list.filter(Boolean).map((s) => s.toUpperCase());
-  if (!symbols.length)
-    return res.status(400).json({ error: "symbols parameter required" });
-  if (symbols.length > 50)
-    return res.status(400).json({ error: "Too many symbols. Max 50." });
+  // Shared symbols-query validation — same parser, error bodies, and
+  // dedupe/case-folding semantics as the Express twin
+  // (server/routes/stock-data.ts). Before this delegation the serverless
+  // copy forwarded invalid tickers to Yahoo per-symbol, emitted a
+  // different over-limit message, kept duplicates, and produced a NaN
+  // windowSize for non-numeric ?window= values.
+  const parsed = parseSymbolsQuery(req.query?.symbols ?? req.query?.symbol);
+  if (parsed.ok === false) return res.status(parsed.status).json(parsed.body);
+  const symbols = parsed.symbols;
+  const windowRaw = Number(req.query?.window ?? 200);
   const windowSize = Math.max(
     5,
-    Math.min(200, Math.floor(Number(req.query?.window ?? 200))),
+    Math.min(200, Number.isFinite(windowRaw) ? Math.floor(windowRaw) : 200),
   );
   const rows = await Promise.all(
     symbols.map(async (sym) => {
