@@ -63,10 +63,16 @@ function makeJsSide() {
 describe("api/_router.js kvJsonCache ↔ server/helpers/kvJsonCache.ts parity", () => {
   let ts: ReturnType<typeof makeTsSide>;
   let js: ReturnType<typeof makeJsSide>;
+  // The JS twin's local NodeCache lives on a module-level singleton and
+  // outlives individual tests (and vitest retries). Unique key prefixes
+  // per test run keep mirror-hydration assertions honest regardless.
+  let keyPrefix: string;
+  let run = 0;
 
   beforeEach(() => {
     ts = makeTsSide();
     js = makeJsSide();
+    keyPrefix = `parity_${Date.now()}_${run++}_`;
   });
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -77,33 +83,33 @@ describe("api/_router.js kvJsonCache ↔ server/helpers/kvJsonCache.ts parity", 
     const payload = { segments: [{ name: "iPhone", revenue: 200e9 }] };
     ts.nextUpstashResult(JSON.stringify(payload));
     js.nextUpstashResult(JSON.stringify(payload));
-    await expect(ts.cache.get("seg")).resolves.toEqual(payload);
-    await expect(js.get("seg")).resolves.toEqual(payload);
+    await expect(ts.cache.get(`${keyPrefix}seg`)).resolves.toEqual(payload);
+    await expect(js.get(`${keyPrefix}seg`)).resolves.toEqual(payload);
   });
 
   it("treats a null result as a miss on both sides", async () => {
     ts.nextUpstashResult(null);
     js.nextUpstashResult(null);
-    await expect(ts.cache.get("missing")).resolves.toBeNull();
-    await expect(js.get("missing")).resolves.toBeNull();
+    await expect(ts.cache.get(`${keyPrefix}missing`)).resolves.toBeNull();
+    await expect(js.get(`${keyPrefix}missing`)).resolves.toBeNull();
   });
 
   it("swallows an Upstash {error} envelope and returns null on both sides", async () => {
     ts.nextUpstashResult(null, "WRONGTYPE");
     js.nextUpstashResult(null, "WRONGTYPE");
-    await expect(ts.cache.get("bad")).resolves.toBeNull();
-    await expect(js.get("bad")).resolves.toBeNull();
+    await expect(ts.cache.get(`${keyPrefix}bad`)).resolves.toBeNull();
+    await expect(js.get(`${keyPrefix}bad`)).resolves.toBeNull();
   });
 
   it("writes SET with EX ttl clamped to ≥1s on both sides", async () => {
-    await ts.cache.set("k", { v: 1 }, 0); // 0 must clamp to 1
-    await js.set("k", { v: 1 }, 0);
+    await ts.cache.set(`${keyPrefix}k`, { v: 1 }, 0); // 0 must clamp to 1
+    await js.set(`${keyPrefix}k`, { v: 1 }, 0);
     const tsCmd = ts.sets()[0];
     expect(tsCmd?.[0]).toBe("SET");
     expect(Number(tsCmd?.[4])).toBe(1);
     expect(js.lastSetCommand()).toEqual([
       "SET",
-      "k",
+      `${keyPrefix}k`,
       JSON.stringify({ v: 1 }),
       "EX",
       1,
@@ -112,15 +118,16 @@ describe("api/_router.js kvJsonCache ↔ server/helpers/kvJsonCache.ts parity", 
 
   it("hydrates a local mirror so the second read never re-probes KV", async () => {
     const payload = { rateLimited: true };
+    const lockKey = `${keyPrefix}lock`;
     ts.nextUpstashResult(JSON.stringify(payload));
     js.nextUpstashResult(JSON.stringify(payload));
 
-    await ts.cache.get("lock");
-    await js.get("lock");
+    await ts.cache.get(lockKey);
+    await js.get(lockKey);
 
     // Mirror hit — no additional upstream probes.
-    await expect(ts.cache.get("lock")).resolves.toEqual(payload);
-    await expect(js.get("lock")).resolves.toEqual(payload);
+    await expect(ts.cache.get(lockKey)).resolves.toEqual(payload);
+    await expect(js.get(lockKey)).resolves.toEqual(payload);
     expect(ts.probes()).toBe(1);
     expect(js.probes()).toBe(1);
   });
