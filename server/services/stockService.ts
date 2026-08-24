@@ -144,7 +144,7 @@ const yahooFallbackInFlight = createInFlightRegistry();
 // biggest-losers / most-actives) behind one upstream round-trip.
 const trendingMoversInFlight = createInFlightRegistry();
 
-/** Throttle to once-per-key per minute. Logs once per (function, symbol) per minute. Keys embed dynamic ids (symbol, label), so the map is bounded two ways: an amortized sweep (at most once per window) drops expired entries, and a hard cap evicts oldest-inserted keys — a sustained sweep of unique non-expired keys can neither grow the map unboundedly nor pay per-write full scans. Mirrors the bounded throttle in api/_router.js. */
+/** Throttle to once-per-key per minute. Logs once per (function, symbol) per minute. Keys embed dynamic ids (symbol, label), so the map is bounded two ways: an amortized sweep (at most once per window) drops expired entries, and a hard cap evicts oldest-inserted keys. The throttle check runs BEFORE eviction — a repeated-but-throttled key must not make room it doesn't need, or sustained repeats drain fresh guards from other keys. Mirrors the bounded throttle in api/_router.js. */
 function throttledWarn(key: string, ...args: unknown[]): void {
   const now = Date.now();
   if (now - lastWarnSweepAt >= WARN_THROTTLE_MS) {
@@ -153,13 +153,13 @@ function throttledWarn(key: string, ...args: unknown[]): void {
       if (now - at >= WARN_THROTTLE_MS) lastWarnAt.delete(k);
     }
   }
+  const last = lastWarnAt.get(key);
+  if (last !== undefined && now - last < WARN_THROTTLE_MS) return;
   while (lastWarnAt.size >= WARN_MAP_SOFT_CAP) {
     const oldest = lastWarnAt.keys().next().value;
     if (oldest === undefined) break;
     lastWarnAt.delete(oldest);
   }
-  const last = lastWarnAt.get(key);
-  if (last !== undefined && now - last < WARN_THROTTLE_MS) return;
   lastWarnAt.set(key, now);
   console.warn(...args);
 }
