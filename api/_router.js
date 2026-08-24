@@ -1243,10 +1243,15 @@ export async function handleEarningsCalendar(req, res) {
   if (cached) return res.json(cached);
   const FMP_KEY = process.env.FMP_KEY;
   if (!FMP_KEY) return res.json([]);
+  // 12s deadline mirroring fetchJSONStatus in stockService.ts — a hung
+  // FMP request must not pin the serverless function.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12000);
   try {
     const base = FMP_USE_STABLE ? "stable" : "api/v3";
     const r = await fetch(
       `https://financialmodelingprep.com/${base}/${EARNINGS_ENDPOINT}?from=${from}&to=${to}&apikey=${FMP_KEY}`,
+      { signal: ctrl.signal },
     );
     if (!r.ok) throw new Error(`http_${r.status}`);
     const raw = await r.json();
@@ -1274,6 +1279,8 @@ export async function handleEarningsCalendar(req, res) {
   } catch (e) {
     throttledWarn(`earnings_cal:${from}..${to}`, `earnings calendar ${from}..${to}:`, e?.message);
     res.json([]);
+  } finally {
+    clearTimeout(timer);
   }
 }
 

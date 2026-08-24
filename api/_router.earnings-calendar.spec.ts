@@ -167,9 +167,12 @@ describe("api/_router.js handleEarningsCalendar ↔ Express contract", () => {
       second.res,
     );
     expect(second.statusCalls).toEqual([]);
-    const fmpFetches = fetchMock.mock.calls.filter(([, init]) =>
-      String((init as RequestInit)?.method ?? "") === "" ,
+    // Quote enrichment goes through the mocked Yahoo SDK, not global
+    // fetch — so every global-fetch call here is an FMP request, and
+    // the second handler call must serve from cache (exactly one).
+    const fmpFetches = fetchMock.mock.calls.filter((c) =>
+      String(c[0]).includes("financialmodelingprep"),
     );
-    expect(fmpFetches.length).toBeLessThanOrEqual(3); // 1 FMP + up to 2 quote enrichments
+    expect(fmpFetches).toHaveLength(1);
   });
 });
