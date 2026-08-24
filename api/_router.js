@@ -122,17 +122,27 @@ const kvJsonCache = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 let _lastWarned = {};
+let _lastWarnSweepAt = 0;
 const WARN_THROTTLE_MS = 60000;
+const WARN_MAP_SOFT_CAP = 512;
 function throttledWarn(key, ...args) {
   const now = Date.now();
-  // Bound memory: warning keys embed dynamic ids (symbol, pair), so an
-  // outage plus a wide symbol sweep would otherwise grow this map for
-  // the process lifetime. Once it grows past the soft cap, drop entries
-  // whose throttle window has already expired.
-  if (Object.keys(_lastWarned).length > 512) {
+  // Keys embed dynamic ids (symbol, pair), so the map is bounded two
+  // ways: an amortized sweep (at most once per window) drops expired
+  // entries, and a hard cap evicts oldest-inserted keys — a sustained
+  // sweep of unique non-expired keys can neither grow this map
+  // unboundedly nor pay per-write full scans.
+  if (now - _lastWarnSweepAt >= WARN_THROTTLE_MS) {
+    _lastWarnSweepAt = now;
     for (const k of Object.keys(_lastWarned)) {
       if (now - _lastWarned[k] >= WARN_THROTTLE_MS) delete _lastWarned[k];
     }
+  }
+  const keys = Object.keys(_lastWarned);
+  while (keys.length >= WARN_MAP_SOFT_CAP) {
+    const oldest = keys[0];
+    delete _lastWarned[oldest];
+    keys.shift();
   }
   if (_lastWarned[key] && now - _lastWarned[key] < WARN_THROTTLE_MS) return;
   _lastWarned[key] = now;

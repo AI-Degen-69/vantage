@@ -130,4 +130,27 @@ describe("per-item failure paths warn instead of vanishing", () => {
       vi.useRealTimers();
     }
   });
+
+  it("never silences a first warning, even past the hard map cap", async () => {
+    // Sustained sweep of unique, non-expired keys: eviction must keep
+    // memory bounded WITHOUT dropping any first-time warning.
+    const count = 600;
+    const symbols = Array.from(
+      { length: count },
+      (_, i) => `W${i.toString(36).toUpperCase().padStart(3, "0")}`,
+    );
+    let warned = 0;
+    for (const sym of symbols) {
+      warnSpy.mockClear();
+      await handleSmaDistances(makeReq({ symbols: sym }), makeRes().res);
+      if (
+        warnSpy.mock.calls.some((c) =>
+          String(c[0]).includes(`sma history failed for ${sym}`),
+        )
+      ) {
+        warned += 1;
+      }
+    }
+    expect(warned).toBe(count);
+  });
 });
