@@ -270,14 +270,15 @@ export async function handleStockQuote(req, res) {
 }
 
 export async function handleBatchQuotes(req, res) {
-  const raw = String(req.query?.symbols || req.query?.symbol || "");
-  const symbols = raw
-    .split(",")
-    .map((s) => s.trim().toUpperCase())
-    .filter(Boolean);
-  if (!symbols.length)
-    return res.status(400).json({ error: "symbols parameter required" });
-  const quotes = await Promise.all(symbols.map(getYahooQuote));
+  // Shared symbols-query validation — same cap, invalid-ticker
+  // rejection, dedupe, and error bodies as the Express twin. Before this
+  // delegation the serverless copy forwarded raw client lists straight
+  // to Yahoo (no 50 cap, no ticker check, duplicates included).
+  const parsed = parseSymbolsQuery(
+    req.query?.symbols || req.query?.symbol,
+  );
+  if (parsed.ok === false) return res.status(parsed.status).json(parsed.body);
+  const quotes = await Promise.all(parsed.symbols.map(getYahooQuote));
   res.json({ quotes });
 }
 
