@@ -347,9 +347,7 @@ export default function CompanyProfile({
                         {price}
                       </td>
                       <td className="py-3 font-mono tabular-nums" dir="ltr">
-                        {trade.value !== null
-                          ? formatMoneyCompact(trade.value)
-                          : "—"}
+                        {formatMoneyCompact(trade.value) ?? "—"}
                       </td>
                       <td
                         className="py-3 text-right font-mono tabular-nums text-muted-foreground"
