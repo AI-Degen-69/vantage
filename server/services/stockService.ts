@@ -142,9 +142,14 @@ const yahooFallbackInFlight = createInFlightRegistry();
 // biggest-losers / most-actives) behind one upstream round-trip.
 const trendingMoversInFlight = createInFlightRegistry();
 
-/** Throttle to once-per-key per minute. Logs once per (function, symbol) per minute. */
+/** Throttle to once-per-key per minute. Logs once per (function, symbol) per minute. Keys embed dynamic ids (symbol, label), so once the map grows past a soft cap we prune entries whose window has expired — otherwise an outage plus a wide symbol sweep grows it for the process lifetime. Mirrors the bounded throttle in api/_router.js. */
 function throttledWarn(key: string, ...args: unknown[]): void {
   const now = Date.now();
+  if (lastWarnAt.size > 512) {
+    for (const [k, at] of lastWarnAt) {
+      if (now - at >= WARN_THROTTLE_MS) lastWarnAt.delete(k);
+    }
+  }
   const last = lastWarnAt.get(key);
   if (last !== undefined && now - last < WARN_THROTTLE_MS) return;
   lastWarnAt.set(key, now);
