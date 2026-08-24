@@ -127,6 +127,8 @@ const PROVIDER_HEALTH_TIMEOUT_MS = 8_000; // per-provider probe timeout
 // ---- Warn throttling --------------------------------------
 const lastWarnAt = new Map<string, number>();
 const WARN_THROTTLE_MS = 60_000;
+const WARN_MAP_SOFT_CAP = 512;
+let lastWarnSweepAt = 0;
 
 const quoteInFlight = createInFlightRegistry();
 const batchQuoteInFlight = createInFlightRegistry();
@@ -142,13 +144,19 @@ const yahooFallbackInFlight = createInFlightRegistry();
 // biggest-losers / most-actives) behind one upstream round-trip.
 const trendingMoversInFlight = createInFlightRegistry();
 
-/** Throttle to once-per-key per minute. Logs once per (function, symbol) per minute. Keys embed dynamic ids (symbol, label), so once the map grows past a soft cap we prune entries whose window has expired — otherwise an outage plus a wide symbol sweep grows it for the process lifetime. Mirrors the bounded throttle in api/_router.js. */
+/** Throttle to once-per-key per minute. Logs once per (function, symbol) per minute. Keys embed dynamic ids (symbol, label), so the map is bounded two ways: an amortized sweep (at most once per window) drops expired entries, and a hard cap evicts oldest-inserted keys — a sustained sweep of unique non-expired keys can neither grow the map unboundedly nor pay per-write full scans. Mirrors the bounded throttle in api/_router.js. */
 function throttledWarn(key: string, ...args: unknown[]): void {
   const now = Date.now();
-  if (lastWarnAt.size > 512) {
+  if (now - lastWarnSweepAt >= WARN_THROTTLE_MS) {
+    lastWarnSweepAt = now;
     for (const [k, at] of lastWarnAt) {
       if (now - at >= WARN_THROTTLE_MS) lastWarnAt.delete(k);
     }
+  }
+  while (lastWarnAt.size >= WARN_MAP_SOFT_CAP) {
+    const oldest = lastWarnAt.keys().next().value;
+    if (oldest === undefined) break;
+    lastWarnAt.delete(oldest);
   }
   const last = lastWarnAt.get(key);
   if (last !== undefined && now - last < WARN_THROTTLE_MS) return;
