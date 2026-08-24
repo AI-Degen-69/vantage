@@ -115,14 +115,19 @@ describe("api/_router.js handleSmaDistances validation ↔ Express contract", ()
     expect(requested).toContain("MSFT");
   });
 
-  it("survives ?window=abc without producing a NaN window", async () => {
-    const { res, statusCalls } = makeRes();
-    await handleSmaDistances(makeReq({ symbols: "AAPL,MSFT", window: "abc" }), res);
+  it("survives ?window=abc and clamps the window to 200 closes", async () => {
+    // 201 valid closes: a correct windowSize of 200 samples exactly 200
+    // rows; the old NaN bug (slice(-NaN) → whole array) would sample 201.
+    const closes = Array.from({ length: 201 }, (_, i) => ({
+      close: 100 + i,
+      date: `2026-0${(i % 9) + 1}-15`,
+    }));
+    historical.mockResolvedValue(closes);
+    const { res, statusCalls, getJson } = makeRes();
+    await handleSmaDistances(makeReq({ symbols: "AAPL", window: "abc" }), res);
     expect(statusCalls).toEqual([]);
-    // Every per-symbol fetch must have received a sane numeric period,
-    // i.e. the handler fell back to the 200-day default.
-    for (const call of historical.mock.calls) {
-      expect(Number.isFinite(Number(call[1]?.period1?.getTime()))).toBe(true);
-    }
+    expect(Number.isFinite(Number(historical.mock.calls[0]?.[1]?.period1?.getTime()))).toBe(true);
+    const row = (getJson() as { rows: Array<{ sampleSize: number }> }).rows[0];
+    expect(row.sampleSize).toBe(200);
   });
 });
