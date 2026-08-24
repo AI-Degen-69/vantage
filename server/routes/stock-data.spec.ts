@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Request, Response } from "express";
-import { handleBatchQuotes, handleSectorHeatmap } from "./stock-data";
+import {
+  handleBatchQuotes,
+  handleEarningsCalendar,
+  handleFxRates,
+  handleSectorHeatmap,
+} from "./stock-data";
 
 function fakeQuote(symbol: string) {
   return {
@@ -38,12 +43,21 @@ vi.mock("../services/stockService", () => ({
       untagged: [],
       generatedAt: "2026-08-02T00:00:00.000Z",
     })),
+    getEarningsCalendar: vi.fn(
+      async (from: string, to: string) => [{ symbol: "AAPL", date: from }],
+    ),
+    getFxRates: vi.fn(async (currencies: string[]) => ({
+      base: "USD",
+      rates: Object.fromEntries(currencies.map((c) => [c, 1])),
+    })),
   },
 }));
 
 import { stockService } from "../services/stockService";
 const mockedBatch = vi.mocked(stockService.getBatchQuotes);
 const mockedHeatmap = vi.mocked(stockService.getSectorHeatmap);
+const mockedCalendar = vi.mocked(stockService.getEarningsCalendar);
+const mockedFx = vi.mocked(stockService.getFxRates);
 
 /** Minimal Express req/res doubles; every assertion here is against the shape
  * the real handler produces (status code, JSON body), so a full request
@@ -209,5 +223,97 @@ describe("handleSectorHeatmap (route validation)", () => {
     );
     expect(statusCalls).toEqual([400]);
     expect(JSON.stringify(getJson())).not.toMatch(/FMP_KEY|AV_KEY|apikey|token/i);
+  });
+});
+
+describe("handleEarningsCalendar (route validation)", () => {
+  beforeEach(() => {
+    mockedCalendar.mockClear();
+  });
+
+  it("rejects non-ISO dates without calling the service", async () => {
+    const badFroms = ["2026-13-01", "not-a-date", "2026-02-30", "08/24/2026", ""];
+    for (const bad of badFroms) {
+      const { res, statusCalls } = makeRes();
+      await handleEarningsCalendar(makeReq({ from: bad, to: "2026-08-24" }), res, () => undefined);
+      expect(statusCalls, `from=${bad}`).toEqual([400]);
+      expect(mockedCalendar).not.toHaveBeenCalled();
+    }
+    for (const bad of badFroms.slice(1)) {
+      const { res, statusCalls } = makeRes();
+      await handleEarningsCalendar(makeReq({ from: "2026-08-24", to: bad }), res, () => undefined);
+      expect(statusCalls, `to=${bad}`).toEqual([400]);
+      expect(mockedCalendar).not.toHaveBeenCalled();
+    }
+  });
+
+  it("rejects ranges outside 0-31 days", async () => {
+    const { res, statusCalls } = makeRes();
+    await handleEarningsCalendar(
+      makeReq({ from: "2026-08-01", to: "2026-09-15" }),
+      res,
+      () => undefined,
+    );
+    expect(statusCalls).toEqual([400]);
+    expect(mockedCalendar).not.toHaveBeenCalled();
+
+    const reversed = makeRes();
+    await handleEarningsCalendar(
+      makeReq({ from: "2026-08-24", to: "2026-08-20" }),
+      reversed.res,
+      () => undefined,
+    );
+    expect(reversed.statusCalls).toEqual([400]);
+    expect(mockedCalendar).not.toHaveBeenCalled();
+  });
+
+  it("accepts a valid range and forwards the dates to the service", async () => {
+    const { res, statusCalls, getJson } = makeRes();
+    await handleEarningsCalendar(
+      makeReq({ from: "2026-08-01", to: "2026-08-24" }),
+      res,
+      () => undefined,
+    );
+    expect(statusCalls).toEqual([]);
+    expect(mockedCalendar).toHaveBeenCalledWith("2026-08-01", "2026-08-24");
+    expect(getJson()).toEqual([{ symbol: "AAPL", date: "2026-08-01" }]);
+  });
+});
+
+describe("handleFxRates (route validation)", () => {
+  beforeEach(() => {
+    mockedFx.mockClear();
+  });
+
+  it("defaults to USD, ILS, EUR when the parameter is absent", async () => {
+    const { res, statusCalls } = makeRes();
+    await handleFxRates(makeReq({}), res, () => undefined);
+    expect(statusCalls).toEqual([]);
+    expect(mockedFx).toHaveBeenCalledWith(["USD", "ILS", "EUR"]);
+  });
+
+  it("uppercases and trims supported currencies", async () => {
+    const { res, statusCalls } = makeRes();
+    await handleFxRates(makeReq({ currencies: " gbp ,usd " }), res, () => undefined);
+    expect(statusCalls).toEqual([]);
+    expect(mockedFx).toHaveBeenCalledWith(["GBP", "USD"]);
+  });
+
+  it("documents lenient filtering: unknown currencies are dropped individually", async () => {
+    // `?currencies=USD,JPY` serves USD rather than erroring — the
+    // documented lenient semantics. If this ever flips to strict
+    // (400 on any unknown code), update this test AND the client.
+    const { res, statusCalls } = makeRes();
+    await handleFxRates(makeReq({ currencies: "USD,JPY" }), res, () => undefined);
+    expect(statusCalls).toEqual([]);
+    expect(mockedFx).toHaveBeenCalledWith(["USD"]);
+  });
+
+  it("rejects requests where every currency is unsupported", async () => {
+    const { res, statusCalls, getJson } = makeRes();
+    await handleFxRates(makeReq({ currencies: "JPY,CAD" }), res, () => undefined);
+    expect(statusCalls).toEqual([400]);
+    expect(getJson()).toMatchObject({ error: "currencies parameter required" });
+    expect(mockedFx).not.toHaveBeenCalled();
   });
 });

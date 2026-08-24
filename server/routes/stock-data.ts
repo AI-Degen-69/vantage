@@ -91,6 +91,29 @@ function isIsoDate(value: unknown): value is string {
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
+/** Whole days between two YYYY-MM-DD strings (to − from). */
+function dateRangeDays(from: string, to: string): number {
+  return (
+    (Date.parse(`${to}T00:00:00.000Z`) - Date.parse(`${from}T00:00:00.000Z`)) /
+    86_400_000
+  );
+}
+
+/**
+ * Parse `?currencies=USD,ILS,…` into the supported FxCurrency list.
+ * Lenient by design: entries are uppercased and unknown codes are
+ * dropped individually — a request survives as long as ONE supported
+ * currency remains (callers 400 on an empty result). If this ever
+ * flips to strict validation, update handleFxRates's spec AND the
+ * client, which relies on partial success for mixed lists.
+ */
+function parseFxCurrencies(raw: string): FxCurrency[] {
+  return raw
+    .split(",")
+    .map((s) => s.trim().toUpperCase())
+    .filter((s): s is FxCurrency => s === "USD" || s === "ILS" || s === "EUR" || s === "GBP");
+}
+
 export const handleStockQuote: RequestHandler = async (req, res) => {
   const symbol = parseTicker(req.query.symbol);
   if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
@@ -226,7 +249,7 @@ export const handleEarningsCalendar: RequestHandler = async (req, res) => {
   if (!isIsoDate(from) || !isIsoDate(to)) {
     return res.status(400).json({ error: "from and to must be valid YYYY-MM-DD dates" });
   }
-  const rangeDays = (Date.parse(`${to}T00:00:00.000Z`) - Date.parse(`${from}T00:00:00.000Z`)) / 86_400_000;
+  const rangeDays = dateRangeDays(from, to);
   if (rangeDays < 0 || rangeDays > 31) {
     return res.status(400).json({ error: "date range must be between 0 and 31 days" });
   }
@@ -365,10 +388,7 @@ export const handleProviderHealth: RequestHandler = async (_req, res) => {
 
 export const handleFxRates: RequestHandler = async (req, res) => {
   const raw = String(req.query.currencies || "USD,ILS,EUR");
-  const currencies: FxCurrency[] = raw
-    .split(",")
-    .map((s) => s.trim().toUpperCase())
-    .filter((s): s is FxCurrency => s === "USD" || s === "ILS" || s === "EUR" || s === "GBP");
+  const currencies = parseFxCurrencies(raw);
   if (currencies.length === 0) {
     return res.status(400).json({ error: "currencies parameter required" });
   }
