@@ -1187,8 +1187,94 @@ export async function handleStockChart(req, res) {
   }
 }
 
+const FMP_USE_STABLE = process.env.FMP_USE_STABLE !== "0";
+// `/stable/` uses `earnings-calendar` (plural, hyphen); legacy v3 still
+// accepts `earning_calendar`. Mirrors EARNINGS_ENDPOINT in stockService.ts.
+const EARNINGS_ENDPOINT = FMP_USE_STABLE ? "earnings-calendar" : "earning_calendar";
+const MAX_EARNINGS_ENRICH_SYMBOLS = 100; // protect provider quotas on unusually large calendars
+
+function normalizeEarningEvent(raw) {
+  const toNum = (v) => {
+    if (v === undefined || v === null || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  return {
+    symbol: String(raw.symbol ?? ""),
+    date: String(raw.date ?? ""),
+    marketCap: toNum(raw.marketCap ?? raw.mktCap),
+    epsEstimated: toNum(raw.epsEstimated ?? raw.epsEstimate),
+    eps: toNum(raw.eps),
+    revenueEstimated: toNum(raw.revenueEstimated ?? raw.revenueEstimate),
+    revenue: toNum(raw.revenue),
+    time: String(raw.time ?? "bmo"),
+  };
+}
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+function isIsoDateStr(value) {
+  if (!ISO_DATE_RE.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+/**
+ * FMP earnings calendar for a date window — parity twin of
+ * `stockService.getEarningsCalendar` (Express). This used to be a stub
+ * returning `[]` unconditionally, so Vercel deployments served an
+ * always-empty calendar while local dev showed real data. Validation,
+ * normalization, caching, and bounded market-cap enrichment (via Yahoo
+ * quotes, deduped, capped at MAX_EARNINGS_ENRICH_SYMBOLS) mirror the
+ * TS side; `api/_router.earnings-calendar.spec.ts` pins the contract.
+ */
 export async function handleEarningsCalendar(req, res) {
-  res.json([]);
+  const from = String(req.query?.from || "");
+  const to = String(req.query?.to || "");
+  if (!isIsoDateStr(from) || !isIsoDateStr(to)) {
+    return res.status(400).json({ error: "from and to must be valid YYYY-MM-DD dates" });
+  }
+  const rangeDays =
+    (Date.parse(`${to}T00:00:00.000Z`) - Date.parse(`${from}T00:00:00.000Z`)) / 86_400_000;
+  if (rangeDays < 0 || rangeDays > 31) {
+    return res.status(400).json({ error: "date range must be between 0 and 31 days" });
+  }
+  const ck = `earnings_cal_${from}_${to}`;
+  const cached = cache.get(ck);
+  if (cached) return res.json(cached);
+  const FMP_KEY = process.env.FMP_KEY;
+  if (!FMP_KEY) return res.json([]);
+  try {
+    const base = FMP_USE_STABLE ? "stable" : "api/v3";
+    const r = await fetch(
+      `https://financialmodelingprep.com/${base}/${EARNINGS_ENDPOINT}?from=${from}&to=${to}&apikey=${FMP_KEY}`,
+    );
+    if (!r.ok) throw new Error(`http_${r.status}`);
+    const raw = await r.json();
+    const result = Array.isArray(raw) ? raw.map(normalizeEarningEvent) : [];
+
+    // FMP's calendar often omits market cap; enrich distinct symbols from
+    // the quote path so the client's large/mid/small filters work.
+    const symbols = Array.from(
+      new Set(result.map((e) => e.symbol.trim().toUpperCase()).filter(Boolean)),
+    ).slice(0, MAX_EARNINGS_ENRICH_SYMBOLS);
+    if (symbols.length > 0) {
+      const quotes = await Promise.all(symbols.map(getYahooQuote));
+      const marketCaps = new Map();
+      for (const quote of quotes) {
+        if (!quote?.symbol || !quote.marketCap || quote.marketCap <= 0) continue;
+        marketCaps.set(String(quote.symbol).toUpperCase(), quote.marketCap);
+      }
+      for (const event of result) {
+        event.marketCap ??= marketCaps.get(event.symbol.toUpperCase()) ?? null;
+      }
+    }
+
+    cache.set(ck, result);
+    res.json(result);
+  } catch (e) {
+    throttledWarn(`earnings_cal:${from}..${to}`, `earnings calendar ${from}..${to}:`, e?.message);
+    res.json([]);
+  }
 }
 
 export const handleStockProfile = handleStockOverview;
