@@ -78,6 +78,29 @@ describe("api/_router.js normalizeQuote ↔ shared normalizeYahooQuote parity", 
     expect(normalizeQuoteJs(raw)).toEqual(normalizeYahooQuote(raw));
   });
 
+  it("treats null/empty dividend fields as absent, not as a 0% yield", () => {
+    // A null dividendRate must not take the rate-derived branch and
+    // collapse a valid direct yield to 0…
+    const nullRate = fixture({ dividendRate: null, dividendYield: 0.0042 });
+    expect(normalizeYahooQuote(nullRate)?.dividendYield).toBeCloseTo(0.42, 6);
+    // …and with NO usable yield source at all, result must be undefined,
+    // never a fake 0%.
+    const bothNull = fixture({ dividendYield: null, dividendRate: null });
+    expect(normalizeYahooQuote(bothNull)?.dividendYield).toBeUndefined();
+    const bothEmpty = fixture({ dividendYield: "", dividendRate: "" });
+    expect(normalizeYahooQuote(bothEmpty)?.dividendYield).toBeUndefined();
+    expect(normalizeQuoteJs(nullRate)).toEqual(normalizeYahooQuote(nullRate));
+    expect(normalizeQuoteJs(bothNull)).toEqual(normalizeYahooQuote(bothNull));
+    expect(normalizeQuoteJs(bothEmpty)).toEqual(normalizeYahooQuote(bothEmpty));
+  });
+
+  it("returns null earningsAnnouncement for non-numeric garbage without throwing", () => {
+    const raw = fixture({ earningsTimestamp: "invalid" });
+    expect(() => normalizeYahooQuote(raw)).not.toThrow();
+    expect(normalizeYahooQuote(raw)?.earningsAnnouncement).toBeNull();
+    expect(normalizeQuoteJs(raw)).toEqual(normalizeYahooQuote(raw));
+  });
+
   it("normalizes empty-string numeric fields to undefined (not 0) on both sides", () => {
     const raw = fixture({
       trailingPE: "",

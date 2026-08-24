@@ -46,9 +46,12 @@ export function normalizeDividendYield(
   dividendRate: unknown,
   price: unknown,
 ): number | undefined {
-  const direct = Number(rawYield);
-  const rate = Number(dividendRate);
-  const currentPrice = Number(price);
+  // toFiniteNumber (not Number()) so null/"" don't coerce to 0 — a null
+  // dividendRate must fall through to the direct yield, and a null
+  // dividendYield must stay undefined rather than masquerade as 0%.
+  const direct = toFiniteNumber(rawYield);
+  const rate = toFiniteNumber(dividendRate);
+  const currentPrice = toFiniteNumber(price);
   if (
     Number.isFinite(rate) &&
     rate >= 0 &&
