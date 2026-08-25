@@ -53,6 +53,35 @@ function parseSymbolList(value: unknown): { symbols: string[]; invalid: string[]
   return { symbols, invalid };
 }
 
+type ParsedSymbols =
+  | { ok: true; symbols: string[] }
+  | { ok: false; status: number; body: { error: string; symbols?: string[] } };
+
+/**
+ * Validate a symbols query parameter end-to-end: split/clean/dedupe via
+ * `parseSymbolList`, then enforce the shared route policy (no invalid
+ * tickers, non-empty, at most MAX_SYMBOLS). Returns either the cleaned
+ * list or the exact 400 response body every symbols-consuming handler
+ * must emit, so the policy lives here instead of at each call site.
+ */
+function parseSymbolsQuery(value: unknown): ParsedSymbols {
+  const { symbols, invalid } = parseSymbolList(value);
+  if (invalid.length > 0) {
+    return { ok: false, status: 400, body: { error: "invalid symbol parameter", symbols: invalid } };
+  }
+  if (symbols.length === 0) {
+    return { ok: false, status: 400, body: { error: "symbols parameter required" } };
+  }
+  if (symbols.length > MAX_SYMBOLS) {
+    return {
+      ok: false,
+      status: 400,
+      body: { error: `Too many symbols requested. Maximum is ${MAX_SYMBOLS}, received ${symbols.length}` },
+    };
+  }
+  return { ok: true, symbols };
+}
+
 const MAX_SECTOR_LEN = 64;
 const SECTOR_NAME_PATTERN = /^[A-Za-z0-9 &\-]+$/; // Letters, digits, spaces, ampersand, hyphen only
 
@@ -65,8 +94,8 @@ const SECTOR_NAME_PATTERN = /^[A-Za-z0-9 &\-]+$/; // Letters, digits, spaces, am
  */
 function parseSectorMeta(value: unknown): SectorHeatmapMetadata | null {
   if (value === undefined) return {};
-  if (typeof value !== "string" || value.trim().length === 0) return {};
   if (Array.isArray(value)) return null; // Reject arrays explicitly — symbol-list semantics don't apply to metadata.
+  if (typeof value !== "string" || value.trim().length === 0) return {};
   const entries = value.split(",");
   if (entries.length > MAX_SYMBOLS) return null;
   const out: SectorHeatmapMetadata = {};
@@ -99,13 +128,9 @@ export const handleStockQuote: RequestHandler = async (req, res) => {
 };
 
 export const handleBatchQuotes: RequestHandler = async (req, res) => {
-  const { symbols, invalid } = parseSymbolList(req.query.symbols);
-  if (invalid.length > 0) return res.status(400).json({ error: "invalid symbol parameter", symbols: invalid });
-  if (symbols.length === 0) return res.status(400).json({ error: "symbols parameter required" });
-  if (symbols.length > MAX_SYMBOLS) {
-    return res.status(400).json({ error: `Too many symbols requested. Maximum is ${MAX_SYMBOLS}, received ${symbols.length}` });
-  }
-  const result: BatchQuoteResponse = await stockService.getBatchQuotes(symbols);
+  const parsed = parseSymbolsQuery(req.query.symbols);
+  if (parsed.ok === false) return res.status(parsed.status).json(parsed.body);
+  const result: BatchQuoteResponse = await stockService.getBatchQuotes(parsed.symbols);
   res.json(result);
 };
 
@@ -270,14 +295,9 @@ export const handleIndexQuotes: RequestHandler = async (_req, res) => {
  *     sector names ≤ 64 chars, max `MAX_SYMBOLS` entries)
  */
 export const handleSectorHeatmap: RequestHandler = async (req, res) => {
-  const { symbols, invalid } = parseSymbolList(req.query.symbols);
-  if (invalid.length > 0) return res.status(400).json({ error: "invalid symbol parameter", symbols: invalid });
-  if (symbols.length === 0) return res.status(400).json({ error: "symbols parameter required" });
-  if (symbols.length > MAX_SYMBOLS) {
-    return res.status(400).json({
-      error: `Too many symbols requested. Maximum is ${MAX_SYMBOLS}, received ${symbols.length}`,
-    });
-  }
+  const parsed = parseSymbolsQuery(req.query.symbols);
+  if (parsed.ok === false) return res.status(parsed.status).json(parsed.body);
+  const { symbols } = parsed;
   const daysRaw = Number(req.query.days ?? 5);
   const days = Math.max(3, Math.min(10, Number.isFinite(daysRaw) ? Math.floor(daysRaw) : 5));
   const sectorsRaw = String(req.query.sectors || "").trim();
@@ -336,12 +356,9 @@ export const handleInsightsTabsAll: RequestHandler = async (_req, res) => {
  */
 export const handleSmaDistances: RequestHandler = async (req, res) => {
   const listRaw = req.query.symbols ?? req.query.symbol;
-  const { symbols, invalid } = parseSymbolList(listRaw);
-  if (invalid.length > 0) return res.status(400).json({ error: "invalid symbol parameter", symbols: invalid });
-  if (symbols.length === 0) return res.status(400).json({ error: "symbols parameter required" });
-  if (symbols.length > MAX_SYMBOLS) {
-    return res.status(400).json({ error: `Too many symbols requested. Maximum is ${MAX_SYMBOLS}, received ${symbols.length}` });
-  }
+  const parsed = parseSymbolsQuery(listRaw);
+  if (parsed.ok === false) return res.status(parsed.status).json(parsed.body);
+  const { symbols } = parsed;
   const windowRaw = Number(req.query.window ?? 200);
   const windowSize = Number.isFinite(windowRaw) ? windowRaw : 200;
   const data: SmaDistanceResponse = await stockService.getSmaDistancesFor(symbols, windowSize);
