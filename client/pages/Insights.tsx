@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useI18n, translateSector } from "@/lib/i18n";
+import { presentQuoteRow } from "@/lib/universeRows";
 import BatchQuoteFallbackHint from "@/components/BatchQuoteFallbackHint";
 import {
   useAllInsightsTabs,
@@ -359,16 +360,7 @@ export default function Insights() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {filtered.map((row) => {
-                  const live =
-                    row.price !== undefined && Number.isFinite(row.price);
-                  const pct = row.changePercent;
-                  const cls =
-                    pct === undefined
-                      ? "text-muted-foreground"
-                      : pct >= 0
-                        ? "text-chart-positive"
-                        : "text-chart-negative";
-                  const sign = pct === undefined || pct < 0 ? "" : "+";
+                  const { liveText, pctText, cls } = presentQuoteRow(row);
                   return (
                     <div
                       key={row.symbol}
@@ -397,15 +389,13 @@ export default function Insights() {
                             className="text-sm font-bold text-foreground font-mono tabular-nums"
                             dir="ltr"
                           >
-                            {live ? `$${row.price!.toFixed(2)}` : "—"}
+                            {liveText}
                           </p>
                           <p
                             className={`text-xs font-semibold font-mono tabular-nums ${cls}`}
                             dir="ltr"
                           >
-                            {pct === undefined
-                              ? "—"
-                              : `${sign}${pct.toFixed(2)}%`}
+                            {pctText}
                           </p>
                         </div>
                       </div>
@@ -632,16 +622,7 @@ export default function Insights() {
           ) : (
             <div className="vt-ledger">
               {filtered.map((row, i) => {
-                const live =
-                  row.price !== undefined && Number.isFinite(row.price);
-                const pct = row.changePercent;
-                const cls =
-                  pct === undefined
-                    ? "text-muted-foreground"
-                    : pct >= 0
-                      ? "text-chart-positive"
-                      : "text-chart-negative";
-                const sign = pct === undefined || pct < 0 ? "" : "+";
+                const { liveText, pctText, cls } = presentQuoteRow(row);
                 return (
                   <div
                     key={row.symbol}
@@ -671,10 +652,10 @@ export default function Insights() {
                     </p>
                     <div className="vt-quote">
                       <p className="vt-price" dir="ltr">
-                        {live ? `$${row.price!.toFixed(2)}` : "—"}
+                        {liveText}
                       </p>
                       <p className={`vt-chg ${cls}`} dir="ltr">
-                        {pct === undefined ? "—" : `${sign}${pct.toFixed(2)}%`}
+                        {pctText}
                       </p>
                     </div>
                     <p className="vt-cap" dir="ltr">
@@ -724,20 +705,16 @@ export default function Insights() {
           ) : (
             <div className="vt-grid">
               {filtered.map((row) => {
-                const live =
-                  row.price !== undefined && Number.isFinite(row.price);
-                const pct = row.changePercent;
-                const cls =
-                  pct === undefined
-                    ? "text-muted-foreground"
-                    : pct >= 0
-                      ? "text-chart-positive"
-                      : "text-chart-negative";
+                const { liveText, pctText, cls } = presentQuoteRow(row);
+                const pct =
+                  row.changePercent !== undefined &&
+                  Number.isFinite(row.changePercent)
+                    ? row.changePercent
+                    : undefined;
                 const barColor =
                   pct === undefined || pct >= 0
                     ? "hsl(var(--chart-positive))"
                     : "hsl(var(--chart-negative))";
-                const sign = pct === undefined || pct < 0 ? "" : "+";
                 const magnitude =
                   pct === undefined ? 0 : Math.min(100, Math.abs(pct) * 14);
                 return (
@@ -751,7 +728,7 @@ export default function Insights() {
                       <span className="vt-sym">{row.symbol}</span>
                     </div>
                     <p className={`vt-hero ${cls}`} dir="ltr">
-                      {pct === undefined ? "—" : `${sign}${pct.toFixed(2)}%`}
+                      {pctText}
                     </p>
                     <div className="vt-meter">
                       <i
@@ -777,7 +754,7 @@ export default function Insights() {
                         })}
                       </div>
                       <span className="vt-price" dir="ltr">
-                        {live ? `$${row.price!.toFixed(2)}` : "—"}
+                        {liveText}
                       </span>
                       <span className="vt-cap" dir="ltr">
                         {formatMarketCap(row.marketCap)}

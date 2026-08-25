@@ -27,7 +27,8 @@ import type {
 import type { QuickStat } from "@/lib/mockData";
 import { serializeSectorMeta } from "@shared/sectorMeta";
 import type { CompanyProfile as ApiCompanyProfile } from "@shared/api";
-import { chunkSymbols } from "@/lib/batchQuotes";
+import { chunkSymbols, mergeBatchQuoteResponses } from "@/lib/batchQuotes";
+import { isProviderStatus } from "@/lib/providerHealth";
 
 interface IndexQuotesResponse {
   dow: IndexQuote | null;
@@ -87,19 +88,7 @@ export function useBatchQuotes(tickers: string[]) {
           ),
         ),
       );
-      const successful = responses.filter(
-        (response): response is PromiseFulfilledResult<BatchQuoteResponse> =>
-          response.status === "fulfilled",
-      );
-      if (successful.length === 0) {
-        const firstFailure = responses.find(
-          (response): response is PromiseRejectedResult => response.status === "rejected",
-        );
-        throw firstFailure?.reason ?? new Error("All quote batches failed");
-      }
-      return {
-        quotes: successful.flatMap((response) => response.value.quotes),
-      } satisfies BatchQuoteResponse;
+      return mergeBatchQuoteResponses(responses);
     },
     enabled: tickers.length > 0,
     refetchInterval: 60_000,
@@ -206,11 +195,7 @@ export function useProviderHealth() {
  */
 export function useYahooDown() {
   const { data } = useProviderHealth();
-  return (
-    data?.providers?.some(
-      (p) => p.provider === "yahoo" && p.feature === "quote" && p.status === "down",
-    ) ?? false
-  );
+  return isProviderStatus(data?.providers, "yahoo", "quote", "down");
 }
 
 /**
@@ -236,11 +221,7 @@ export function useYahooDown() {
  */
 export function useYahooChartDown() {
   const { data } = useProviderHealth();
-  return (
-    data?.providers?.some(
-      (p) => p.provider === "yahoo" && p.feature === "chart" && p.status === "down",
-    ) ?? false
-  );
+  return isProviderStatus(data?.providers, "yahoo", "chart", "down");
 }
 
 /**
@@ -255,12 +236,7 @@ export function useYahooChartDown() {
  */
 export function useFmpBatchQuoteRestricted() {
   const { data } = useProviderHealth();
-  return (
-    data?.providers?.some(
-      (p) =>
-        p.provider === "fmp" && p.feature === "batch-quote" && p.status === "known_restriction",
-    ) ?? false
-  );
+  return isProviderStatus(data?.providers, "fmp", "batch-quote", "known_restriction");
 }
 
 /**
