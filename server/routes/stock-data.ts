@@ -70,7 +70,10 @@ function parseSectorMeta(value: unknown): SectorHeatmapMetadata | null {
 function isIsoDate(value: unknown): value is string {
   if (typeof value !== "string" || !ISO_DATE_PATTERN.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00.000Z`);
-  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+  return (
+    Number.isFinite(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === value
+  );
 }
 
 /** Whole days between two YYYY-MM-DD strings (to − from). */
@@ -109,15 +112,20 @@ function parseFxCurrencies(raw: string): FxCurrency[] {
 
 export const handleStockQuote: RequestHandler = async (req, res) => {
   const symbol = parseTicker(req.query.symbol);
-  if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
+  if (!symbol)
+    return res.status(400).json({ error: "valid symbol parameter required" });
   const quote = await stockService.getQuote(symbol);
   res.json(quote satisfies StockQuote | null);
 };
 
 export const handleBatchQuotes: RequestHandler = async (req, res) => {
-  const parsed = parseSymbolsQuery(req.query.symbols);
+  const parsed = parseSymbolsQuery(
+    req.query.symbols !== undefined ? req.query.symbols : req.query.symbol,
+  );
   if (parsed.ok === false) return res.status(parsed.status).json(parsed.body);
-  const result: BatchQuoteResponse = await stockService.getBatchQuotes(parsed.symbols);
+  const result: BatchQuoteResponse = await stockService.getBatchQuotes(
+    parsed.symbols,
+  );
   res.json(result);
 };
 
@@ -128,39 +136,53 @@ export const handleBatchQuotes: RequestHandler = async (req, res) => {
  */
 export const handleStockProfile: RequestHandler = async (req, res) => {
   const symbol = parseTicker(req.query.symbol);
-  if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
+  if (!symbol)
+    return res.status(400).json({ error: "valid symbol parameter required" });
   const result = await stockService.getProfileValidation(symbol);
   if (result.unavailable) {
-    return res.status(503).json({ error: "profile service temporarily unavailable" });
+    return res
+      .status(503)
+      .json({ error: "profile service temporarily unavailable" });
   }
   res.json(result.profile);
 };
 
 export const handleStockOverview: RequestHandler = async (req, res) => {
   const symbol = parseTicker(req.query.symbol);
-  if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
+  if (!symbol)
+    return res.status(400).json({ error: "valid symbol parameter required" });
   const result = await stockService.getProfileValidation(symbol);
   if (result.unavailable) {
-    return res.status(503).json({ error: "profile service temporarily unavailable" });
+    return res
+      .status(503)
+      .json({ error: "profile service temporarily unavailable" });
   }
   res.json(result.profile);
 };
 
 export const handleStockFinancials: RequestHandler = async (req, res) => {
   const symbol = parseTicker(req.query.symbol);
-  if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
+  if (!symbol)
+    return res.status(400).json({ error: "valid symbol parameter required" });
   // Granularity is opt-in via `?period=quarter`; unknown strings fall
   // back to annual rather than 400-ing the caller so existing clients
   // keep working untouched. (A 400 here would be backwards-incompatible.)
-  const periodRaw = String(req.query.period ?? "").trim().toLowerCase();
-  const period: "annual" | "quarter" = periodRaw === "quarter" ? "quarter" : "annual";
-  const data: FinancialStatements = await stockService.getFinancialStatements(symbol, period);
+  const periodRaw = String(req.query.period ?? "")
+    .trim()
+    .toLowerCase();
+  const period: "annual" | "quarter" =
+    periodRaw === "quarter" ? "quarter" : "annual";
+  const data: FinancialStatements = await stockService.getFinancialStatements(
+    symbol,
+    period,
+  );
   res.json(data);
 };
 
 export const handleStockMetrics: RequestHandler = async (req, res) => {
   const symbol = parseTicker(req.query.symbol);
-  if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
+  if (!symbol)
+    return res.status(400).json({ error: "valid symbol parameter required" });
   const data: StockMetrics = await stockService.getMetrics(symbol);
   res.json(data);
 };
@@ -174,7 +196,8 @@ export const handleStockMetrics: RequestHandler = async (req, res) => {
  */
 export const handleRevenueSegmentation: RequestHandler = async (req, res) => {
   const symbol = parseTicker(req.query.symbol);
-  if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
+  if (!symbol)
+    return res.status(400).json({ error: "valid symbol parameter required" });
   const period: "annual" | "quarter" =
     req.query.period === "quarter" ? "quarter" : "annual";
   const data: RevenueSegmentation = await stockService.getRevenueSegmentation(
@@ -193,10 +216,15 @@ export const handleRevenueSegmentation: RequestHandler = async (req, res) => {
  * upstream values normalise to `null` so the client renders em-dashes
  * instead of misleading zeros.
  */
-export const handleStockYahooFallbackFinancials: RequestHandler = async (req, res) => {
+export const handleStockYahooFallbackFinancials: RequestHandler = async (
+  req,
+  res,
+) => {
   const symbol = parseTicker(req.query.symbol);
-  if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
-  const data: YahooFallbackFinancials = await stockService.getYahooFallbackFinancials(symbol);
+  if (!symbol)
+    return res.status(400).json({ error: "valid symbol parameter required" });
+  const data: YahooFallbackFinancials =
+    await stockService.getYahooFallbackFinancials(symbol);
   res.json(data);
 };
 
@@ -213,21 +241,24 @@ export const handleStockYahooFallbackFinancials: RequestHandler = async (req, re
  */
 export const handleStockAnalyst: RequestHandler = async (req, res) => {
   const symbol = parseTicker(req.query.symbol);
-  if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
+  if (!symbol)
+    return res.status(400).json({ error: "valid symbol parameter required" });
   const data = await stockService.getAnalystEstimates(symbol);
   res.json(data);
 };
 
 export const handleStockInsider: RequestHandler = async (req, res) => {
   const symbol = parseTicker(req.query.symbol);
-  if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
+  if (!symbol)
+    return res.status(400).json({ error: "valid symbol parameter required" });
   const data = await stockService.getInsiderTrading(symbol);
   res.json(data);
 };
 
 export const handleStockNews: RequestHandler = async (req, res) => {
   const symbol = parseTicker(req.query.symbol);
-  if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
+  if (!symbol)
+    return res.status(400).json({ error: "valid symbol parameter required" });
   const data = await stockService.getNews(symbol);
   res.json(data);
 };
@@ -236,19 +267,27 @@ export const handleEarningsCalendar: RequestHandler = async (req, res) => {
   const from = req.query.from;
   const to = req.query.to;
   if (!isIsoDate(from) || !isIsoDate(to)) {
-    return res.status(400).json({ error: "from and to must be valid YYYY-MM-DD dates" });
+    return res
+      .status(400)
+      .json({ error: "from and to must be valid YYYY-MM-DD dates" });
   }
   const rangeDays = dateRangeDays(from, to);
   if (rangeDays < 0 || rangeDays > 31) {
-    return res.status(400).json({ error: "date range must be between 0 and 31 days" });
+    return res
+      .status(400)
+      .json({ error: "date range must be between 0 and 31 days" });
   }
-  const data: EarningsEvent[] = await stockService.getEarningsCalendar(from, to);
+  const data: EarningsEvent[] = await stockService.getEarningsCalendar(
+    from,
+    to,
+  );
   res.json(data);
 };
 
 export const handleStockChart: RequestHandler = async (req, res) => {
   const symbol = parseTicker(req.query.symbol);
-  if (!symbol) return res.status(400).json({ error: "valid symbol parameter required" });
+  if (!symbol)
+    return res.status(400).json({ error: "valid symbol parameter required" });
   const data: ChartSeries | null = await stockService.getChart(symbol);
   res.json(data);
 };
@@ -256,10 +295,16 @@ export const handleStockChart: RequestHandler = async (req, res) => {
 export const handleIndexQuotes: RequestHandler = async (_req, res) => {
   const data = await stockService.getIndexQuotes();
   // Wrap in a typed shape for the client; missing entries are null.
-  const wrap = (
-    q: StockQuote | null,
-    name: string
-  ): IndexQuote | null => (q ? { symbol: q.symbol, name, price: q.price, change: q.change, changesPercentage: q.changesPercentage } : null);
+  const wrap = (q: StockQuote | null, name: string): IndexQuote | null =>
+    q
+      ? {
+          symbol: q.symbol,
+          name,
+          price: q.price,
+          change: q.change,
+          changesPercentage: q.changesPercentage,
+        }
+      : null;
   res.json({
     dow: wrap(data.dow, "Dow Jones"),
     sp500: wrap(data.sp500, "S&P 500"),
@@ -282,15 +327,23 @@ export const handleIndexQuotes: RequestHandler = async (_req, res) => {
  *     sector names ≤ 64 chars, max `MAX_SYMBOLS` entries)
  */
 export const handleSectorHeatmap: RequestHandler = async (req, res) => {
-  const parsed = parseSymbolsQuery(req.query.symbols);
+  const parsed = parseSymbolsQuery(
+    req.query.symbols !== undefined ? req.query.symbols : req.query.symbol,
+  );
   if (parsed.ok === false) return res.status(parsed.status).json(parsed.body);
   const { symbols } = parsed;
   const daysRaw = Number(req.query.days ?? 5);
-  const days = Math.max(3, Math.min(10, Number.isFinite(daysRaw) ? Math.floor(daysRaw) : 5));
+  const days = Math.max(
+    3,
+    Math.min(10, Number.isFinite(daysRaw) ? Math.floor(daysRaw) : 5),
+  );
   const sectorsRaw = String(req.query.sectors || "").trim();
   const sectorAllow =
     sectorsRaw.length > 0
-      ? sectorsRaw.split(",").map((s) => s.trim()).filter(Boolean)
+      ? sectorsRaw
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
       : null;
   // Validate sector allowlist names with the same character-set constraint
   if (sectorAllow) {
@@ -348,7 +401,10 @@ export const handleSmaDistances: RequestHandler = async (req, res) => {
   const { symbols } = parsed;
   const windowRaw = Number(req.query.window ?? 200);
   const windowSize = Number.isFinite(windowRaw) ? windowRaw : 200;
-  const data: SmaDistanceResponse = await stockService.getSmaDistancesFor(symbols, windowSize);
+  const data: SmaDistanceResponse = await stockService.getSmaDistancesFor(
+    symbols,
+    windowSize,
+  );
   res.json(data);
 };
 
@@ -372,7 +428,10 @@ export const handleFxRates: RequestHandler = async (req, res) => {
   // `?currencies=` parses to zero supported currencies and must 400
   // like any other all-unsupported list, per parseFxCurrencies's
   // documented contract.
-  const raw = req.query.currencies === undefined ? "USD,ILS,EUR" : String(req.query.currencies);
+  const raw =
+    req.query.currencies === undefined
+      ? "USD,ILS,EUR"
+      : String(req.query.currencies);
   const currencies = parseFxCurrencies(raw);
   if (currencies.length === 0) {
     return res.status(400).json({ error: "currencies parameter required" });

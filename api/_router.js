@@ -60,7 +60,10 @@ const CHART_TTL = 600;
 // are swallowed + throttled-warned so a flaky KV never breaks a request
 // path. Used by `handleRevenueSegmentation` so the locked-premium state
 // and the segment payload both persist across cold starts.
-const kw = { warned: {}, local: new NodeCache({ stdTTL: 3600, maxKeys: 10000 }) };
+const kw = {
+  warned: {},
+  local: new NodeCache({ stdTTL: 3600, maxKeys: 10000 }),
+};
 const _kwWarn = (key, ...rest) => {
   const now = Date.now();
   if (kw.warned[key] && now - kw.warned[key] < 60000) return;
@@ -126,7 +129,13 @@ export const kvJsonCache = {
     kw.local.set(key, value, Math.max(1, ttlSeconds));
     if (!_kwEnabled()) return;
     try {
-      await _kwExec("SET", key, JSON.stringify(value), "EX", Math.max(1, ttlSeconds));
+      await _kwExec(
+        "SET",
+        key,
+        JSON.stringify(value),
+        "EX",
+        Math.max(1, ttlSeconds),
+      );
     } catch (e) {
       _kwWarn(
         `kvJsonCache.set:${key}`,
@@ -276,8 +285,11 @@ export async function handleBatchQuotes(req, res) {
   // rejection, dedupe, and error bodies as the Express twin. Before this
   // delegation the serverless copy forwarded raw client lists straight
   // to Yahoo (no 50 cap, no ticker check, duplicates included).
+  // Identical parameter selection to the Express twin: an explicit
+  // ?symbols= wins (even empty → 400), otherwise fall back to ?symbol=
+  // (including its repeated-value array form).
   const parsed = parseSymbolsQuery(
-    req.query?.symbols || req.query?.symbol,
+    req.query?.symbols !== undefined ? req.query?.symbols : req.query?.symbol,
   );
   if (parsed.ok === false) return res.status(parsed.status).json(parsed.body);
   const quotes = await Promise.all(parsed.symbols.map(getYahooQuote));
@@ -547,8 +559,7 @@ export async function handleRevenueSegmentation(req, res) {
   }
 
   apiUsageTracker.recordCall && apiUsageTracker.recordCall("fmp");
-  const url =
-    `https://financialmodelingprep.com/stable/revenue-product-segmentation?symbol=${encodeURIComponent(symbol)}&period=${period}&limit=${period === "quarter" ? 8 : 5}&apikey=${process.env.FMP_KEY}`;
+  const url = `https://financialmodelingprep.com/stable/revenue-product-segmentation?symbol=${encodeURIComponent(symbol)}&period=${period}&limit=${period === "quarter" ? 8 : 5}&apikey=${process.env.FMP_KEY}`;
   try {
     const r = await fetch(url);
     if (r.status === 429 || r.status === 403) {
@@ -625,7 +636,9 @@ function normalizeRevenueSegmentationRows(raw, symbol) {
       const name = String(
         entry.name ?? entry.product ?? entry.segment ?? "",
       ).trim();
-      const revenue = toFinite(entry.revenue ?? entry.value ?? entry.revenueValue);
+      const revenue = toFinite(
+        entry.revenue ?? entry.value ?? entry.revenueValue,
+      );
       if (!name || revenue === null) continue;
       products.push({ name, revenue });
     }
@@ -1197,7 +1210,9 @@ export async function handleStockChart(req, res) {
 const FMP_USE_STABLE = process.env.FMP_USE_STABLE !== "0";
 // `/stable/` uses `earnings-calendar` (plural, hyphen); legacy v3 still
 // accepts `earning_calendar`. Mirrors EARNINGS_ENDPOINT in stockService.ts.
-const EARNINGS_ENDPOINT = FMP_USE_STABLE ? "earnings-calendar" : "earning_calendar";
+const EARNINGS_ENDPOINT = FMP_USE_STABLE
+  ? "earnings-calendar"
+  : "earning_calendar";
 const MAX_EARNINGS_ENRICH_SYMBOLS = 100; // protect provider quotas on unusually large calendars
 
 function normalizeEarningEvent(raw) {
@@ -1222,7 +1237,10 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 function isIsoDateStr(value) {
   if (!ISO_DATE_RE.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00.000Z`);
-  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+  return (
+    Number.isFinite(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === value
+  );
 }
 
 /**
@@ -1238,12 +1256,17 @@ export async function handleEarningsCalendar(req, res) {
   const from = String(req.query?.from || "");
   const to = String(req.query?.to || "");
   if (!isIsoDateStr(from) || !isIsoDateStr(to)) {
-    return res.status(400).json({ error: "from and to must be valid YYYY-MM-DD dates" });
+    return res
+      .status(400)
+      .json({ error: "from and to must be valid YYYY-MM-DD dates" });
   }
   const rangeDays =
-    (Date.parse(`${to}T00:00:00.000Z`) - Date.parse(`${from}T00:00:00.000Z`)) / 86_400_000;
+    (Date.parse(`${to}T00:00:00.000Z`) - Date.parse(`${from}T00:00:00.000Z`)) /
+    86_400_000;
   if (rangeDays < 0 || rangeDays > 31) {
-    return res.status(400).json({ error: "date range must be between 0 and 31 days" });
+    return res
+      .status(400)
+      .json({ error: "date range must be between 0 and 31 days" });
   }
   const ck = `earnings_cal_${from}_${to}`;
   const cached = cache.get(ck);
@@ -1273,7 +1296,8 @@ export async function handleEarningsCalendar(req, res) {
       const quotes = await Promise.all(symbols.map(getYahooQuote));
       const marketCaps = new Map();
       for (const quote of quotes) {
-        if (!quote?.symbol || !quote.marketCap || quote.marketCap <= 0) continue;
+        if (!quote?.symbol || !quote.marketCap || quote.marketCap <= 0)
+          continue;
         marketCaps.set(String(quote.symbol).toUpperCase(), quote.marketCap);
       }
       for (const event of result) {
@@ -1284,7 +1308,11 @@ export async function handleEarningsCalendar(req, res) {
     cache.set(ck, result);
     res.json(result);
   } catch (e) {
-    throttledWarn(`earnings_cal:${from}..${to}`, `earnings calendar ${from}..${to}:`, e?.message);
+    throttledWarn(
+      `earnings_cal:${from}..${to}`,
+      `earnings calendar ${from}..${to}:`,
+      e?.message,
+    );
     res.json([]);
   } finally {
     clearTimeout(timer);
@@ -1491,7 +1519,10 @@ export async function handleSectorHeatmap(req, res) {
 
 export async function handleInsightsTab(req, res) {
   const tab = String(req.query?.tab || "sp500");
-  const validKey = Object.prototype.hasOwnProperty.call(insightsTabUniverses, tab)
+  const validKey = Object.prototype.hasOwnProperty.call(
+    insightsTabUniverses,
+    tab,
+  )
     ? tab
     : "sp500";
   res.json({

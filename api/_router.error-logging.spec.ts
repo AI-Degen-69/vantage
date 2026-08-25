@@ -58,6 +58,18 @@ function makeRes() {
 
 const makeReq = (query: Record<string, unknown>) => ({ query }) as any;
 
+/** Unique letters-only symbols (shared route contract: /^[A-Z]{1,5}$/). */
+const letter = (i: number) => String.fromCharCode(65 + (i % 26));
+const cappedSymbols = (prefix: string, count: number) =>
+  Array.from({ length: count }, (_, i) =>
+    [
+      prefix,
+      letter(i),
+      letter(Math.floor(i / 26)),
+      letter(Math.floor(i / 676)),
+    ].join(""),
+  );
+
 describe("per-item failure paths warn instead of vanishing", () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
 
@@ -143,15 +155,7 @@ describe("per-item failure paths warn instead of vanishing", () => {
     // must satisfy the shared route contract ([A-Z]{1,5}) — digit-bearing
     // tickers 400 before ever reaching the warn path.
     const count = 600;
-    const letter = (i: number) => String.fromCharCode(65 + (i % 26));
-    const symbols = Array.from({ length: count }, (_, i) =>
-      [
-        "W",
-        letter(i),
-        letter(Math.floor(i / 26)),
-        letter(Math.floor(i / 676)),
-      ].join(""),
-    );
+    const symbols = cappedSymbols("W", count);
     let warned = 0;
     for (const sym of symbols) {
       warnSpy.mockClear();
@@ -175,7 +179,7 @@ describe("per-item failure paths warn instead of vanishing", () => {
       for (let i = 0; i < 512; i += 1) {
         await handleSmaDistances(
           makeReq({
-            symbols: `F${i.toString(36).toUpperCase().padStart(3, "0")}`,
+            symbols: cappedSymbols("F", 512)[i],
           }),
           makeRes().res,
         );
@@ -183,10 +187,10 @@ describe("per-item failure paths warn instead of vanishing", () => {
       warnSpy.mockClear();
       // Repeat a key that is in-map and still fresh. The throttle check
       // must win over eviction: no new warning AND no collateral eviction.
-      await handleSmaDistances(makeReq({ symbols: "F000" }), makeRes().res);
+      await handleSmaDistances(makeReq({ symbols: "FAAA" }), makeRes().res);
       expect(
         warnSpy.mock.calls.filter((c) =>
-          String(c[0]).includes("sma history failed for F000"),
+          String(c[0]).includes("sma history failed for FAAA"),
         ),
       ).toHaveLength(0);
     } finally {

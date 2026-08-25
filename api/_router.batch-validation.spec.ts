@@ -86,7 +86,9 @@ describe("api/_router.js handleBatchQuotes validation ↔ Express contract", () 
         ? String.fromCharCode(65 + n)
         : String.fromCharCode(65 + Math.floor(n / 26) - 1) +
           String.fromCharCode(65 + (n % 26));
-    const many = Array.from({ length: 51 }, (_, i) => `T${suffix(i)}`).join(",");
+    const many = Array.from({ length: 51 }, (_, i) => `T${suffix(i)}`).join(
+      ",",
+    );
     const { res, statusCalls, getJson } = makeRes();
     await handleBatchQuotes(makeReq({ symbols: many }), res);
     expect(statusCalls).toEqual([400]);
@@ -111,9 +113,37 @@ describe("api/_router.js handleBatchQuotes validation ↔ Express contract", () 
     const requested = quote.mock.calls.map((c) => c[0]);
     expect(requested).toContain("ZVVA");
     expect(requested).toContain("ZVVB");
-    const body = getJson() as { quotes: Array<{ symbol: string; price: number } | null> };
+    const body = getJson() as {
+      quotes: Array<{ symbol: string; price: number } | null>;
+    };
     expect(body.quotes).toHaveLength(2);
     expect(body.quotes[0]).toMatchObject({ symbol: "ZVVA", price: 42.5 });
     expect(body.quotes[1]).toBeNull();
+  });
+
+  it("accepts repeated ?symbol= values exactly like the Express twin", async () => {
+    // Both runtimes must share parameter selection: without ?symbols=,
+    // repeated ?symbol= entries are parsed the same way parseSymbolList
+    // handles them in server/routes/stock-data.ts.
+    quote.mockImplementation(async (symbol: string) => ({
+      symbol,
+      regularMarketPrice: 100,
+    }));
+    const { res, statusCalls, getJson } = makeRes();
+    await handleBatchQuotes(makeReq({ symbol: ["ZVVA", "ZVVB"] }), res);
+    expect(statusCalls).toEqual([]);
+    const body = getJson() as { quotes: Array<{ symbol: string }> };
+    expect(body.quotes.map((q) => q?.symbol)).toEqual(["ZVVA", "ZVVB"]);
+  });
+
+  it("lets an explicit ?symbols= win over ?symbol=", async () => {
+    const { res, getJson } = makeRes();
+    await handleBatchQuotes(
+      makeReq({ symbols: "ZVVA", symbol: ["ZVVB"] }),
+      res,
+    );
+    const body = getJson() as { quotes: Array<{ symbol: string }> };
+    expect(body.quotes).toHaveLength(1);
+    expect(body.quotes[0]?.symbol).toBe("ZVVA");
   });
 });
