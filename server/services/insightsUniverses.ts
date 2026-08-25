@@ -1,6 +1,24 @@
 import type { InsightsTabEntry, InsightsTabId } from "../../shared/api";
 
 /**
+ * English stable tab labels so the client can map them to i18n keys.
+ * Lives beside the universes so both runtimes (Express `stockService`
+ * and the Vercel `_router.js` twin) read one source — see
+ * `api/_router.insights-parity.spec.ts`.
+ */
+export const insightsTabLabels: Record<InsightsTabId, string> = {
+  sp500: "S&P 500",
+  trending: "Trending",
+  growth: "Growth",
+  dividend: "Dividend",
+  buyback: "Buyback",
+  ai: "AI",
+  cloud: "Cloud",
+  ev: "EV",
+  leisure: "Leisure",
+};
+
+/**
  * Per-tab curated ticker universes.
  *
  * Why server-side: a single source of truth for "what counts as trending / AI /

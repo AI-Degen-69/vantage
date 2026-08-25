@@ -16,6 +16,17 @@
 import yfDefault from "yahoo-finance2";
 import NodeCache from "node-cache";
 import apiUsageTracker from "../server/services/apiUsageTracker.js";
+// Canonical curated Insights universes + labels — single source shared
+// with the Express server (same .js-extension import mechanism as
+// apiUsageTracker.js). Replaces the former hand-copied 3-tab
+// INSIGHTS_UNIVERSES map that had drifted from the canonical module.
+// Known limitation vs the Express side: the `trending` tab serves the
+// curated editorial list here, not FMP live movers.
+import {
+  insightsTabLabels,
+  insightsTabUniverses,
+} from "../server/services/insightsUniverses.js";
+import { normalizeYahooQuote } from "../server/services/yahooQuoteShape.js";
 
 const yfInner = new yfDefault({ suppressNotices: ["yahooSurvey"] });
 // Proxy-wrap yf so every method invocation auto-records one Yahoo call
@@ -82,7 +93,9 @@ const _kwExec = async (cmd, ...args) => {
 };
 const _kwEnabled = () =>
   !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
-const kvJsonCache = {
+// Exported for the parity tripwire spec (`_router.kv-cache-parity.spec.ts`)
+// which pins this twin's behavior against server/helpers/kvJsonCache.ts.
+export const kvJsonCache = {
   async getJSON(key) {
     const local = kw.local.get(key);
     if (local !== undefined) return local;
@@ -122,9 +135,32 @@ const kvJsonCache = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 let _lastWarned = {};
+let _lastWarnSweepAt = 0;
+const WARN_THROTTLE_MS = 60000;
+const WARN_MAP_SOFT_CAP = 512;
 function throttledWarn(key, ...args) {
   const now = Date.now();
-  if (_lastWarned[key] && now - _lastWarned[key] < 60000) return;
+  // Keys embed dynamic ids (symbol, pair), so the map is bounded two
+  // ways: an amortized sweep (at most once per window) drops expired
+  // entries, and a hard cap evicts oldest-inserted keys — a sustained
+  // sweep of unique non-expired keys can neither grow this map
+  // unboundedly nor pay per-write full scans.
+  if (now - _lastWarnSweepAt >= WARN_THROTTLE_MS) {
+    _lastWarnSweepAt = now;
+    for (const k of Object.keys(_lastWarned)) {
+      if (now - _lastWarned[k] >= WARN_THROTTLE_MS) delete _lastWarned[k];
+    }
+  }
+  // Throttle check BEFORE eviction: a repeated-but-throttled key must
+  // not make room it doesn't need — otherwise sustained repeats drain
+  // fresh guards from other keys (or its own).
+  if (_lastWarned[key] && now - _lastWarned[key] < WARN_THROTTLE_MS) return;
+  const keys = Object.keys(_lastWarned);
+  while (keys.length >= WARN_MAP_SOFT_CAP) {
+    const oldest = keys[0];
+    delete _lastWarned[oldest];
+    keys.shift();
+  }
   _lastWarned[key] = now;
   console.warn(...args);
 }
@@ -141,56 +177,17 @@ function normalizePercentage(v) {
   return Math.abs(n) <= 1 ? n * 100 : n;
 }
 
-function normalizeDividendYield(rawYield, dividendRate, price) {
-  const direct = toNum(rawYield);
-  const rate = toNum(dividendRate);
-  const currentPrice = toNum(price);
-  if (
-    rate !== undefined &&
-    rate >= 0 &&
-    currentPrice !== undefined &&
-    currentPrice > 0
-  ) {
-    const derived = (rate / currentPrice) * 100;
-    return derived <= 20 ? derived : undefined;
-  }
-  if (direct === undefined || direct < 0 || direct > 20) return undefined;
-  return direct;
-}
-
-function normalizeQuote(q, symbol) {
-  if (!q) return null;
-  return {
-    symbol: String(q.symbol || symbol || ""),
-    name: q.longName || q.shortName || q.displayName,
-    price: toNum(q.regularMarketPrice) ?? 0,
-    change: toNum(q.regularMarketChange) ?? 0,
-    changesPercentage: toNum(q.regularMarketChangePercent) ?? 0,
-    previousClose: toNum(q.regularMarketPreviousClose),
-    dayLow: toNum(q.regularMarketDayLow),
-    dayHigh: toNum(q.regularMarketDayHigh),
-    yearLow: toNum(q.fiftyTwoWeekLow),
-    yearHigh: toNum(q.fiftyTwoWeekHigh),
-    priceAvg50: toNum(q.fiftyDayAverage),
-    priceAvg200: toNum(q.twoHundredDayAverage),
-    marketCap: toNum(q.marketCap),
-    volume: toNum(q.regularMarketVolume),
-    avgVolume: toNum(q.averageDailyVolume10Day || q.averageDailyVolume3Month),
-    exchange: q.exchange,
-    sharesOutstanding: toNum(q.sharesOutstanding),
-    eps: toNum(q.epsTrailingTwelveMonths),
-    pe: toNum(q.trailingPE),
-    dividendRate: toNum(q.dividendRate),
-    dividendYield: normalizeDividendYield(
-      q.dividendYield,
-      q.dividendRate,
-      q.regularMarketPrice,
-    ),
-    payoutRatio: normalizePercentage(q.payoutRatio),
-    earningsAnnouncement: q.earningsTimestamp
-      ? new Date(q.earningsTimestamp * 1000).toISOString()
-      : null,
-  };
+/**
+ * Yahoo-quote field mapping is shared with the Express server via
+ * `server/services/yahooQuoteShape.ts` (imported below with the `.js`
+ * extension, same mechanism as `apiUsageTracker.js`). The former local
+ * copy drifted from the TS implementation — most visibly multiplying
+ * `earningsTimestamp` by 1000 unconditionally, producing year-52k dates
+ * whenever upstream sent milliseconds. Kept as a thin exported wrapper
+ * so `api/_router.yahoo-quote-parity.spec.ts` can pin the lock-step.
+ */
+export function normalizeQuote(q, symbol) {
+  return normalizeYahooQuote(q, symbol);
 }
 
 function normalizeChartPoint(r) {
@@ -221,7 +218,12 @@ async function getYahooQuote(symbol) {
     const result = normalizeQuote(q, symbol);
     cache.set(cacheKey, result, QUOTE_TTL);
     return result;
-  } catch {
+  } catch (e) {
+    throttledWarn(
+      `yahoo_quote_js:${symbol}`,
+      `[router] yahoo quote failed for ${symbol}:`,
+      e?.message,
+    );
     return null;
   }
 }
@@ -1389,57 +1391,20 @@ export async function handleSectorHeatmap(req, res) {
   res.json(result);
 }
 
-const INSIGHTS_UNIVERSES = {
-  sp500: {
-    label: "S&P 500",
-    entries: [
-      { symbol: "AAPL", name: "Apple" },
-      { symbol: "MSFT", name: "Microsoft" },
-      { symbol: "GOOGL", name: "Alphabet" },
-      { symbol: "AMZN", name: "Amazon" },
-      { symbol: "NVDA", name: "NVIDIA" },
-      { symbol: "META", name: "Meta" },
-      { symbol: "TSLA", name: "Tesla" },
-      { symbol: "JPM", name: "JPMorgan Chase" },
-      { symbol: "V", name: "Visa" },
-      { symbol: "MA", name: "Mastercard", sector: "Financial Services" },
-      { symbol: "PLD", name: "Prologis", sector: "Real Estate" },
-      { symbol: "NEE", name: "NextEra Energy", sector: "Utilities" },
-      { symbol: "LIN", name: "Linde", sector: "Basic Materials" },
-    ],
-  },
-  trending: {
-    label: "Trending",
-    entries: [
-      { symbol: "PLTR", name: "Palantir" },
-      { symbol: "ARM", name: "Arm Holdings" },
-      { symbol: "COIN", name: "Coinbase" },
-      { symbol: "RDDT", name: "Reddit" },
-    ],
-  },
-  growth: {
-    label: "Growth",
-    entries: [
-      { symbol: "CRM", name: "Salesforce" },
-      { symbol: "NOW", name: "ServiceNow" },
-      { symbol: "ADBE", name: "Adobe" },
-      { symbol: "INTU", name: "Intuit" },
-    ],
-  },
-};
-
 export async function handleInsightsTab(req, res) {
   const tab = String(req.query?.tab || "sp500");
-  const universe = INSIGHTS_UNIVERSES[tab] || INSIGHTS_UNIVERSES.sp500;
-  res.json({ tab, label: universe.label, entries: universe.entries });
+  const validKey = Object.prototype.hasOwnProperty.call(insightsTabUniverses, tab)
+    ? tab
+    : "sp500";
+  res.json({
+    tab: validKey,
+    label: insightsTabLabels[validKey],
+    entries: insightsTabUniverses[validKey] ?? insightsTabUniverses.sp500,
+  });
 }
 
 export async function handleInsightsTabsAll(_req, res) {
-  const result = {};
-  for (const [id, universe] of Object.entries(INSIGHTS_UNIVERSES)) {
-    result[id] = universe.entries;
-  }
-  res.json(result);
+  res.json(insightsTabUniverses);
 }
 
 export async function handleSmaDistances(req, res) {
@@ -1487,7 +1452,12 @@ export async function handleSmaDistances(req, res) {
           sampleSize: tail.length,
           price,
         };
-      } catch {
+      } catch (e) {
+        throttledWarn(
+          `sma:${sym}`,
+          `[router] sma history failed for ${sym}:`,
+          e?.message,
+        );
         return {
           symbol: sym,
           sma200: null,
@@ -1823,7 +1793,12 @@ export async function handleFxRates(req, res) {
         return Number.isFinite(px) && px > 0
           ? [sym.replace("=X", ""), px]
           : null;
-      } catch {
+      } catch (e) {
+        throttledWarn(
+          `fx_pair:${sym}`,
+          `[router] fx pair failed for ${sym}:`,
+          e?.message,
+        );
         return null;
       }
     }),
