@@ -66,6 +66,12 @@ describe("formatMoneyCompact", () => {
     expect(formatMoneyCompact(949_999)).toBe("$950.00K");
   });
 
+  it("promotes sub-K values that round up to 1,000 into the K tier", () => {
+    expect(formatMoneyCompact(999.5)).toBe("$1.00K");
+    expect(formatMoneyCompact(999.49)).toBe("$999");
+    expect(formatMoneyCompact(-999.5)).toBe("-$1.00K");
+  });
+
   it("returns null for missing or non-finite input so callers render em-dashes", () => {
     expect(formatMoneyCompact(undefined)).toBeNull();
     expect(formatMoneyCompact(null)).toBeNull();

@@ -46,7 +46,11 @@ export function formatMoneyCompact(
   if (n === null) return null;
   const abs = Math.abs(n);
   const sign = n < 0 ? "-" : "";
-  if (abs < 1e3) return `${sign}$${Math.round(abs).toLocaleString()}`;
+  // Stay un-suffixed only when the rendered value stays below 1,000 —
+  // rounding 999.5 up to 1,000 belongs in the K tier ($1.00K), not a
+  // locale-grouped "$1,000" that hides the boundary crossing.
+  const rounded = Math.round(abs);
+  if (rounded < 1e3) return `${sign}$${rounded.toLocaleString()}`;
   const tiers = [
     [1e3, "K"],
     [1e6, "M"],
