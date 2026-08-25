@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Response } from "express";
-import { handleEarningsCalendar } from "./_router";
 
 /**
  * Contract tests for `_router.js`'s earnings-calendar handler against
@@ -8,6 +7,11 @@ import { handleEarningsCalendar } from "./_router";
  * `stockService.getEarningsCalendar`). The handler used to be a stub
  * returning `[]` unconditionally — Vercel deployments served an
  * always-empty calendar while local dev showed real FMP data.
+ *
+ * The router reads FMP_USE_STABLE at module scope, so every test loads
+ * the module fresh via dynamic import after stubbing the env — this way
+ * both the stable (`earnings-calendar`) and legacy (`earning_calendar`)
+ * endpoint variants are covered regardless of the runner's environment.
  */
 
 vi.mock("../server/services/apiUsageTracker.js", () => ({
@@ -35,6 +39,12 @@ vi.mock("yahoo-finance2", () => {
   };
   return { default: YF, __inst: inst };
 });
+
+async function loadHandler(legacyEndpoint = false) {
+  vi.resetModules();
+  vi.stubEnv("FMP_USE_STABLE", legacyEndpoint ? "0" : "1");
+  return (await import("./_router")).handleEarningsCalendar;
+}
 
 function makeRes() {
   const statusCalls: number[] = [];
@@ -68,8 +78,12 @@ describe("api/_router.js handleEarningsCalendar ↔ Express contract", () => {
   });
 
   it("rejects non-ISO dates like the Express twin", async () => {
+    const handleEarningsCalendar = await loadHandler();
     const { res, statusCalls, getJson } = makeRes();
-    await handleEarningsCalendar(makeReq({ from: "nope", to: "2026-08-24" }), res);
+    await handleEarningsCalendar(
+      makeReq({ from: "nope", to: "2026-08-24" }),
+      res,
+    );
     expect(statusCalls).toEqual([400]);
     expect(getJson()).toEqual({
       error: "from and to must be valid YYYY-MM-DD dates",
@@ -77,6 +91,7 @@ describe("api/_router.js handleEarningsCalendar ↔ Express contract", () => {
   });
 
   it("rejects ranges outside 0-31 days like the Express twin", async () => {
+    const handleEarningsCalendar = await loadHandler();
     const long = makeRes();
     await handleEarningsCalendar(
       makeReq({ from: "2026-08-01", to: "2026-09-15" }),
@@ -96,6 +111,7 @@ describe("api/_router.js handleEarningsCalendar ↔ Express contract", () => {
   });
 
   it("serves an empty calendar when FMP is not configured", async () => {
+    const handleEarningsCalendar = await loadHandler();
     vi.stubEnv("FMP_KEY", "");
     const { res, statusCalls, getJson } = makeRes();
     await handleEarningsCalendar(
@@ -108,22 +124,24 @@ describe("api/_router.js handleEarningsCalendar ↔ Express contract", () => {
   });
 
   it("fetches FMP, normalizes events, and enriches market caps from quotes", async () => {
-    fetchMock.mockImplementation(async (url: unknown) =>
-      new Response(
-        JSON.stringify([
-          {
-            symbol: "AAPL",
-            date: "2026-08-27",
-            epsEstimated: 1.51,
-            eps: 1.57,
-            revenueEstimated: 89_000_000_000,
-            revenue: 91_000_000_000,
-          },
-          // duplicate symbol — enrichment must dedupe upstream quote calls
-          { symbol: "aapl", date: "2026-08-28" },
-        ]),
-        { status: 200 },
-      ),
+    const handleEarningsCalendar = await loadHandler();
+    fetchMock.mockImplementation(
+      async (url: unknown) =>
+        new Response(
+          JSON.stringify([
+            {
+              symbol: "AAPL",
+              date: "2026-08-27",
+              epsEstimated: 1.51,
+              eps: 1.57,
+              revenueEstimated: 89_000_000_000,
+              revenue: 91_000_000_000,
+            },
+            // duplicate symbol — enrichment must dedupe upstream quote calls
+            { symbol: "aapl", date: "2026-08-28" },
+          ]),
+          { status: 200 },
+        ),
     );
     const { res, statusCalls, getJson } = makeRes();
     await handleEarningsCalendar(
@@ -151,10 +169,12 @@ describe("api/_router.js handleEarningsCalendar ↔ Express contract", () => {
   });
 
   it("caches the range so a repeat call does not re-hit FMP", async () => {
-    fetchMock.mockImplementation(async () =>
-      new Response(JSON.stringify([{ symbol: "AAPL", date: "2026-08-27" }]), {
-        status: 200,
-      }),
+    const handleEarningsCalendar = await loadHandler();
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(JSON.stringify([{ symbol: "AAPL", date: "2026-08-27" }]), {
+          status: 200,
+        }),
     );
     const first = makeRes();
     await handleEarningsCalendar(
@@ -174,5 +194,27 @@ describe("api/_router.js handleEarningsCalendar ↔ Express contract", () => {
       String(c[0]).includes("financialmodelingprep"),
     );
     expect(fmpFetches).toHaveLength(1);
+  });
+
+  it("falls back to the legacy earning_calendar endpoint when FMP_USE_STABLE=0", async () => {
+    const handleEarningsCalendar = await loadHandler(true);
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(JSON.stringify([{ symbol: "AAPL", date: "2026-08-27" }]), {
+          status: 200,
+        }),
+    );
+    const { res, statusCalls, getJson } = makeRes();
+    await handleEarningsCalendar(
+      makeReq({ from: "2026-08-01", to: "2026-08-24" }),
+      res,
+    );
+    expect(statusCalls).toEqual([]);
+    const url = String(fetchMock.mock.calls[0]?.[0]);
+    expect(url).toContain("api/v3/earning_calendar");
+    expect(url).not.toContain("earnings-calendar");
+    const events = getJson() as Array<Record<string, unknown>>;
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ symbol: "AAPL", date: "2026-08-27" });
   });
 });
