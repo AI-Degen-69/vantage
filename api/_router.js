@@ -16,6 +16,7 @@
 import yfDefault from "yahoo-finance2";
 import NodeCache from "node-cache";
 import apiUsageTracker from "../server/services/apiUsageTracker.js";
+import { normalizeYahooQuote } from "../server/services/yahooQuoteShape.js";
 
 const yfInner = new yfDefault({ suppressNotices: ["yahooSurvey"] });
 // Proxy-wrap yf so every method invocation auto-records one Yahoo call
@@ -141,56 +142,17 @@ function normalizePercentage(v) {
   return Math.abs(n) <= 1 ? n * 100 : n;
 }
 
-function normalizeDividendYield(rawYield, dividendRate, price) {
-  const direct = toNum(rawYield);
-  const rate = toNum(dividendRate);
-  const currentPrice = toNum(price);
-  if (
-    rate !== undefined &&
-    rate >= 0 &&
-    currentPrice !== undefined &&
-    currentPrice > 0
-  ) {
-    const derived = (rate / currentPrice) * 100;
-    return derived <= 20 ? derived : undefined;
-  }
-  if (direct === undefined || direct < 0 || direct > 20) return undefined;
-  return direct;
-}
-
-function normalizeQuote(q, symbol) {
-  if (!q) return null;
-  return {
-    symbol: String(q.symbol || symbol || ""),
-    name: q.longName || q.shortName || q.displayName,
-    price: toNum(q.regularMarketPrice) ?? 0,
-    change: toNum(q.regularMarketChange) ?? 0,
-    changesPercentage: toNum(q.regularMarketChangePercent) ?? 0,
-    previousClose: toNum(q.regularMarketPreviousClose),
-    dayLow: toNum(q.regularMarketDayLow),
-    dayHigh: toNum(q.regularMarketDayHigh),
-    yearLow: toNum(q.fiftyTwoWeekLow),
-    yearHigh: toNum(q.fiftyTwoWeekHigh),
-    priceAvg50: toNum(q.fiftyDayAverage),
-    priceAvg200: toNum(q.twoHundredDayAverage),
-    marketCap: toNum(q.marketCap),
-    volume: toNum(q.regularMarketVolume),
-    avgVolume: toNum(q.averageDailyVolume10Day || q.averageDailyVolume3Month),
-    exchange: q.exchange,
-    sharesOutstanding: toNum(q.sharesOutstanding),
-    eps: toNum(q.epsTrailingTwelveMonths),
-    pe: toNum(q.trailingPE),
-    dividendRate: toNum(q.dividendRate),
-    dividendYield: normalizeDividendYield(
-      q.dividendYield,
-      q.dividendRate,
-      q.regularMarketPrice,
-    ),
-    payoutRatio: normalizePercentage(q.payoutRatio),
-    earningsAnnouncement: q.earningsTimestamp
-      ? new Date(q.earningsTimestamp * 1000).toISOString()
-      : null,
-  };
+/**
+ * Yahoo-quote field mapping is shared with the Express server via
+ * `server/services/yahooQuoteShape.ts` (imported below with the `.js`
+ * extension, same mechanism as `apiUsageTracker.js`). The former local
+ * copy drifted from the TS implementation — most visibly multiplying
+ * `earningsTimestamp` by 1000 unconditionally, producing year-52k dates
+ * whenever upstream sent milliseconds. Kept as a thin exported wrapper
+ * so `api/_router.yahoo-quote-parity.spec.ts` can pin the lock-step.
+ */
+export function normalizeQuote(q, symbol) {
+  return normalizeYahooQuote(q, symbol);
 }
 
 function normalizeChartPoint(r) {
