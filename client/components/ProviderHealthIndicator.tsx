@@ -31,16 +31,16 @@ type Severity = "down" | "degraded" | "notConfigured";
 
 const SEVERITY_STYLES: Record<Severity, { banner: string; dot: string }> = {
   down: {
-    banner: "bg-red-950/60 border-red-700/60 text-red-200",
-    dot: "bg-red-500",
+    banner: "bg-destructive/15 border-destructive/30 text-destructive/80",
+    dot: "bg-destructive",
   },
   degraded: {
-    banner: "bg-amber-950/50 border-amber-700/60 text-amber-200",
-    dot: "bg-amber-400",
+    banner: "bg-chart-amber/15 border-chart-amber/30 text-chart-amber",
+    dot: "bg-chart-amber",
   },
   notConfigured: {
-    banner: "bg-slate-900/70 border-slate-700/60 text-slate-300",
-    dot: "bg-slate-500",
+    banner: "bg-card/70 border-border/60 text-foreground",
+    dot: "bg-progress",
   },
 };
 
@@ -126,9 +126,9 @@ export default function ProviderHealthIndicator() {
           role="status"
           aria-live="polite"
           title={`${t("providerHealth.title")}\n${detailLines}`}
-          className="w-full border-b px-6 py-1.5 text-xs font-medium flex items-center gap-2 shrink-0 bg-sky-950/50 border-sky-700/60 text-sky-200"
+          className="w-full border-b px-6 py-1.5 text-xs font-medium flex items-center gap-2 shrink-0 bg-chart-blue/15 border-chart-blue/30 text-chart-blue"
         >
-          <span className="inline-block h-1.5 w-1.5 rounded-full bg-sky-400" aria-hidden />
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-chart-blue" aria-hidden />
           <span>{t("providerHealth.knownRestriction")}</span>
           <span className="text-muted-foreground">·</span>
           <span>{restrictions.join(", ")}</span>
@@ -136,7 +136,7 @@ export default function ProviderHealthIndicator() {
             href={PROVIDER_DOCS_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="ms-1 underline decoration-dotted underline-offset-2 hover:text-sky-100 transition-colors"
+            className="ms-1 underline decoration-dotted underline-offset-2 hover:text-chart-blue transition-colors"
           >
             {t("providerHealth.docsLink")} ↗
           </a>

@@ -30,14 +30,14 @@ export function EarningsAlertHistoryButton() {
     <Popover.Root>
       <Popover.Trigger asChild>
         <button
-          className="relative p-2 rounded-md hover:bg-slate-800 transition-colors text-slate-300 hover:text-white"
+          className="relative p-2 rounded-md hover:bg-muted transition-colors text-foreground hover:text-white"
           aria-label={t("earningsAlerts.historyTitle")}
           title={t("earningsAlerts.historyTitle")}
         >
           <Bell className="w-4 h-4" />
           {todayEntries.length > 0 && (
             <span
-              className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-xs font-bold bg-blue-500 text-white shadow"
+              className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-xs font-bold bg-chart-blue text-white shadow"
               dir="ltr"
             >
               {todayEntries.length > 99 ? "99+" : todayEntries.length}
@@ -49,11 +49,11 @@ export function EarningsAlertHistoryButton() {
         <Popover.Content
           align="end"
           sideOffset={8}
-          className="z-50 w-80 max-h-[480px] overflow-auto rounded-lg border border-slate-700 bg-slate-900/95 backdrop-blur shadow-2xl"
+          className="z-50 w-80 max-h-[480px] overflow-auto rounded-lg border border-border bg-card/95 backdrop-blur shadow-2xl"
         >
-          <div className="p-3 border-b border-slate-800 flex items-center justify-between sticky top-0 bg-slate-900/95 backdrop-blur">
+          <div className="p-3 border-b border-border/70 flex items-center justify-between sticky top-0 bg-card/95 backdrop-blur">
             <h3 className="font-bold text-sm">{t("earningsAlerts.historyTitle")}</h3>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-muted-foreground">
               {todayEntries.length === 1
                 ? t("earningsAlerts.historyCount_one", { count: todayEntries.length })
                 : t("earningsAlerts.historyCount_other", { count: todayEntries.length })}
@@ -61,31 +61,31 @@ export function EarningsAlertHistoryButton() {
           </div>
           {todayEntries.length === 0 ? (
             <div className="p-6 text-center">
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-muted-foreground">
                 {t("earningsAlerts.historyEmpty")}
               </p>
             </div>
           ) : (
-            <ul className="divide-y divide-slate-800">
+            <ul className="divide-y divide-border">
               {todayEntries.map((h) => (
                 <li
                   key={`${h.key}-${h.ts}`}
-                  className="p-3 flex items-center gap-2 hover:bg-slate-800/40 transition-colors"
+                  className="p-3 flex items-center gap-2 hover:bg-muted/40 transition-colors"
                 >
                   <div className="flex flex-col flex-1 min-w-0" dir="ltr">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-sm text-foreground">
                         {h.symbol}
                       </span>
-                      <span className="text-xs text-slate-500">{h.date}</span>
+                      <span className="text-xs text-muted-foreground">{h.date}</span>
                     </div>
                     <span
                       className={`text-xs uppercase tracking-wide px-1.5 py-0.5 rounded w-fit ${
                         h.action === "opened"
                           ? "bg-emerald-500/15 text-emerald-300"
                           : h.action === "snoozed"
-                          ? "bg-amber-500/15 text-amber-300"
-                          : "bg-slate-700 text-slate-300"
+                          ? "bg-chart-amber/15 text-chart-amber"
+                          : "bg-accent text-foreground"
                       }`}
                     >
                       {t(`earningsAlerts.historyAction.${h.action}`)}

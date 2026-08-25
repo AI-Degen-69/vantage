@@ -139,7 +139,7 @@ export default function RevenueSegmentsCard({
         onKeyDown={(e) => e.stopPropagation()}
         className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors ${
           selectedSegment === null
-            ? "bg-blue-500/15 text-blue-400 border-blue-500/30"
+            ? "bg-chart-blue/15 text-chart-blue border-chart-blue/30"
             : "bg-muted/40 text-muted-foreground border-border/40 hover:text-foreground"
         }`}
       >
@@ -157,7 +157,7 @@ export default function RevenueSegmentsCard({
               onKeyDown={(e) => e.stopPropagation()}
               className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors max-w-32 truncate ${
                 selectedSegment === name
-                  ? "bg-blue-500/15 text-blue-400 border-blue-500/30"
+                  ? "bg-chart-blue/15 text-chart-blue border-chart-blue/30"
                   : "bg-muted/40 text-muted-foreground border-border/40 hover:text-foreground"
               }`}
             >

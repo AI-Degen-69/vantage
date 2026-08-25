@@ -226,10 +226,10 @@ export default function TickerLogo({
 
   const surface =
     variant === "bare"
-      ? "bg-transparent text-slate-200"
+      ? "bg-transparent text-foreground"
       : variant === "subtle"
-        ? "bg-slate-800 text-slate-300 group-hover:bg-blue-600 group-hover:text-white"
-        : "bg-slate-800 text-slate-200 group-hover:bg-blue-600 group-hover:text-white";
+        ? "bg-muted text-foreground group-hover:bg-primary group-hover:text-primary-foreground"
+        : "bg-muted text-foreground group-hover:bg-primary group-hover:text-primary-foreground";
 
   // Sector glyph uses the sector's tinted background; fall back to slate if
   // the profile sector didn't match our map (shouldn't happen given the

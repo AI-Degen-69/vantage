@@ -258,35 +258,35 @@ export default function Portfolio() {
             <select
               value={selectedPortfolioId}
               onChange={(e) => setSelectedPortfolioId(e.target.value)}
-              className="appearance-none bg-slate-800 border border-slate-700 text-lg font-bold py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-blue-500 cursor-pointer text-foreground"
+              className="appearance-none bg-muted border border-border text-lg font-bold py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-ring cursor-pointer text-foreground"
             >
               {portfolios.map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-foreground/80 pointer-events-none" />
           </div>
 
           <div className="relative">
             <select
               value={currency}
               onChange={(e) => setCurrency(e.target.value as Currency)}
-              className="appearance-none bg-slate-800 border border-slate-700 text-sm py-2.5 pl-4 pr-10 rounded-lg focus:outline-none focus:border-blue-500 cursor-pointer text-foreground"
+              className="appearance-none bg-muted border border-border text-sm py-2.5 pl-4 pr-10 rounded-lg focus:outline-none focus:border-ring cursor-pointer text-foreground"
             >
               {CURRENCY_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.symbol} {opt.value}</option>
               ))}
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/80 pointer-events-none" />
           </div>
 
-          <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer px-3 py-2 bg-slate-800/40 rounded-md border border-slate-700/50">
-            <Calendar className="w-4 h-4 text-slate-400" />
+          <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer px-3 py-2 bg-muted/40 rounded-md border border-border/50">
+            <Calendar className="w-4 h-4 text-foreground/80" />
             <input
               type="checkbox"
               checked={divOverlay}
               onChange={(e) => setDivOverlay(e.target.checked)}
-              className="rounded border-slate-700 bg-slate-800 focus:ring-blue-500 cursor-pointer"
+              className="rounded border-border bg-muted focus:ring-ring cursor-pointer"
             />
             {t("portfolio.divOverlay")}
           </label>
@@ -299,7 +299,7 @@ export default function Portfolio() {
             </span>
           )}
           {liveCount > 0 && liveCount < symbols.length && (
-            <span className="text-xs uppercase tracking-wide px-2 py-1 rounded text-amber-300 bg-amber-500/10">
+            <span className="text-xs uppercase tracking-wide px-2 py-1 rounded text-chart-amber bg-chart-amber/10">
               {t("portfolio.partial")} {liveCount}/{symbols.length}
             </span>
           )}
@@ -308,7 +308,7 @@ export default function Portfolio() {
               [MOCK] {t("portfolio.noPrice")}
             </span>
           )}
-          <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+          <button className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium py-2 px-4 rounded-lg transition-colors">
             <RefreshCw className="w-4 h-4" />
             {t("portfolio.updatePortfolio")}
           </button>
@@ -318,32 +318,32 @@ export default function Portfolio() {
       {/* ---- Top KPI strip (currency-converted) ---- */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-card border border-border rounded-xl p-6">
-          <p className="text-sm text-slate-400 mb-2">{t("portfolio.currentValue")}</p>
+          <p className="text-sm text-foreground/80 mb-2">{t("portfolio.currentValue")}</p>
           <p className="text-2xl font-bold text-foreground" dir="ltr">
             {fmtMoney(currentValueDisplay, currency, true)}
           </p>
         </div>
         <div className="bg-card border border-border rounded-xl p-6">
-          <p className="text-sm text-slate-400 mb-2 whitespace-nowrap">{t("portfolio.gainLoss")}</p>
-          <p className={`text-2xl font-bold ${(gainLossFxAware ?? 0) >= 0 ? "text-green-400" : "text-red-400"}`} dir="ltr">
+          <p className="text-sm text-foreground/80 mb-2 whitespace-nowrap">{t("portfolio.gainLoss")}</p>
+          <p className={`text-2xl font-bold ${(gainLossFxAware ?? 0) >= 0 ? "text-chart-positive" : "text-chart-negative"}`} dir="ltr">
             {gainLossFxAware === null ? "\u2014" : fmtMoney(gainLossFxAware, currency, false)}
           </p>
         </div>
         <div className="bg-card border border-border rounded-xl p-6">
-          <p className="text-sm text-slate-400 mb-2 whitespace-nowrap">{t("portfolio.gainLossPct")}</p>
-          <p className={`text-2xl font-bold ${gainLossPct >= 0 ? "text-green-400" : "text-red-400"}`} dir="ltr">
+          <p className="text-sm text-foreground/80 mb-2 whitespace-nowrap">{t("portfolio.gainLossPct")}</p>
+          <p className={`text-2xl font-bold ${gainLossPct >= 0 ? "text-chart-positive" : "text-chart-negative"}`} dir="ltr">
             {gainLossPct >= 0 ? "+" : ""}{gainLossPct.toFixed(2)}%
           </p>
         </div>
         <div className="bg-card border border-border rounded-xl p-6">
-          <p className="text-sm text-slate-400 mb-2">{t("portfolio.annualIncome")}</p>
-          <p className="text-2xl font-bold text-blue-400" dir="ltr">
+          <p className="text-sm text-foreground/80 mb-2">{t("portfolio.annualIncome")}</p>
+          <p className="text-2xl font-bold text-chart-blue" dir="ltr">
             {fmtMoney(annualIncomeDisplay, currency, false)}
           </p>
         </div>
         <div className="bg-card border border-border rounded-xl p-6">
-          <p className="text-sm text-slate-400 mb-2 whitespace-nowrap">{t("portfolio.dividendYield")}</p>
-          <p className="text-2xl font-bold text-blue-400" dir="ltr">
+          <p className="text-sm text-foreground/80 mb-2 whitespace-nowrap">{t("portfolio.dividendYield")}</p>
+          <p className="text-2xl font-bold text-chart-blue" dir="ltr">
             {activePortfolio.dividendYield.toFixed(2)}%
           </p>
         </div>
@@ -353,51 +353,51 @@ export default function Portfolio() {
       <div className="bg-card border border-border rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-foreground">{t("portfolio.analyticsTitle")}</h3>
-          <span className="text-xs uppercase tracking-wide px-2 py-1 rounded text-amber-300 bg-amber-500/10">
+          <span className="text-xs uppercase tracking-wide px-2 py-1 rounded text-chart-amber bg-chart-amber/10">
             {t("portfolio.derived")}
           </span>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div>
-            <p className="text-xs text-slate-400 mb-1">{t("portfolio.irr")}</p>
-            <p className={`text-xl font-bold ${(portfolioMetrics.irr ?? -1) >= 0 ? "text-green-400" : "text-red-400"}`} dir="ltr">
+            <p className="text-xs text-foreground/80 mb-1">{t("portfolio.irr")}</p>
+            <p className={`text-xl font-bold ${(portfolioMetrics.irr ?? -1) >= 0 ? "text-chart-positive" : "text-chart-negative"}`} dir="ltr">
               {portfolioMetrics.irr === null ? "\u2014" : fmtPct(portfolioMetrics.irr)}
             </p>
-            <p className="text-xs text-slate-500 mt-1">{t("portfolio.synthCashflows")}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("portfolio.synthCashflows")}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-400 mb-1">{t("portfolio.cagr")}</p>
-            <p className={`text-xl font-bold ${(portfolioMetrics.cagr ?? -1) >= 0 ? "text-green-400" : "text-red-400"}`} dir="ltr">
+            <p className="text-xs text-foreground/80 mb-1">{t("portfolio.cagr")}</p>
+            <p className={`text-xl font-bold ${(portfolioMetrics.cagr ?? -1) >= 0 ? "text-chart-positive" : "text-chart-negative"}`} dir="ltr">
               {fmtPct(portfolioMetrics.cagr)}
             </p>
-            <p className="text-xs text-slate-500 mt-1">{t("portfolio.oneYearBasis")}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("portfolio.oneYearBasis")}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-400 mb-1">{t("portfolio.volatility")}</p>
-            <p className="text-xl font-bold text-amber-400" dir="ltr">
+            <p className="text-xs text-foreground/80 mb-1">{t("portfolio.volatility")}</p>
+            <p className="text-xl font-bold text-chart-amber" dir="ltr">
               {fmtPct(sortedHoldings.reduce((s, h) => s + (h.volatility ?? 0) * (h.weight / 100), 0))}
             </p>
-            <p className="text-xs text-slate-500 mt-1">{t("portfolio.weightedAvg")}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("portfolio.weightedAvg")}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-400 mb-1">{t("portfolio.sharpe")}</p>
-            <p className="text-xl font-bold text-blue-400" dir="ltr">
+            <p className="text-xs text-foreground/80 mb-1">{t("portfolio.sharpe")}</p>
+            <p className="text-xl font-bold text-chart-blue" dir="ltr">
               {(() => {
                 const ws = sortedHoldings.reduce((s, h) => s + (h.sharpe ?? 0) * (h.weight / 100), 0);
                 return Number.isFinite(ws) ? ws.toFixed(2) : "\u2014";
               })()}
             </p>
-            <p className="text-xs text-slate-500 mt-1">rf 4.5%</p>
+            <p className="text-xs text-muted-foreground mt-1">rf 4.5%</p>
           </div>
           <div>
-            <p className="text-xs text-slate-400 mb-1">{t("portfolio.sortino")}</p>
-            <p className="text-xl font-bold text-blue-400" dir="ltr">
+            <p className="text-xs text-foreground/80 mb-1">{t("portfolio.sortino")}</p>
+            <p className="text-xl font-bold text-chart-blue" dir="ltr">
               {(() => {
                 const ws = sortedHoldings.reduce((s, h) => s + (h.sortino ?? 0) * (h.weight / 100), 0);
                 return Number.isFinite(ws) ? ws.toFixed(2) : "\u2014";
               })()}
             </p>
-            <p className="text-xs text-slate-500 mt-1">{t("portfolio.downsideOnly")}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("portfolio.downsideOnly")}</p>
           </div>
         </div>
       </div>
@@ -406,21 +406,21 @@ export default function Portfolio() {
       <div className="bg-card border border-border rounded-xl p-6 relative">
         <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
           <h3 className="text-xl font-bold">{t("portfolio.holdings")}</h3>
-          <div className="flex items-center gap-2 text-xs text-slate-400">
+          <div className="flex items-center gap-2 text-xs text-foreground/80">
             <BatchQuoteFallbackHint />
             <span>{t("portfolio.sortBy")}:</span>
             <div className="relative">
               <select
                 value={sortKey}
                 onChange={(e) => setSortKey(e.target.value as SortKey)}
-                className="appearance-none bg-slate-800 border border-slate-700 text-xs font-medium py-1.5 pl-3 pr-8 rounded-md focus:outline-none focus:border-blue-500 cursor-pointer text-foreground"
+                className="appearance-none bg-muted border border-border text-xs font-medium py-1.5 pl-3 pr-8 rounded-md focus:outline-none focus:border-ring cursor-pointer text-foreground"
               >
                 <option value="weight">{t("portfolio.weight")}</option>
                 <option value="gainLoss">{t("portfolio.gainLoss")}</option>
                 <option value="volatility">{t("portfolio.volatility")}</option>
                 <option value="sharpe">{t("portfolio.sharpe")}</option>
               </select>
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-foreground/80 pointer-events-none" />
             </div>
           </div>
         </div>
@@ -446,30 +446,30 @@ export default function Portfolio() {
                 const eventSoon =
                   eventDate && eventDate >= todayStr && eventDate <= plusEightWeeks;
                 return (
-                  <tr key={h.ticker + i} className="hover:bg-slate-800/30 transition-colors border-b border-border last:border-0">
+                  <tr key={h.ticker + i} className="hover:bg-muted/30 transition-colors border-b border-border last:border-0">
                     <td className="py-4 font-bold text-base">{h.ticker}</td>
                     <td className="py-4 text-right font-medium" dir="ltr">
                       {h.livePrice !== null
                         ? fmtMoney(usd2display(h.livePrice), currency, false)
                         : "\u2014"}
                     </td>
-                    <td className={`py-4 text-right font-medium ${(h.liveChange ?? 0) >= 0 ? "text-green-400" : "text-red-400"}`} dir="ltr">
+                    <td className={`py-4 text-right font-medium ${(h.liveChange ?? 0) >= 0 ? "text-chart-positive" : "text-chart-negative"}`} dir="ltr">
                       {h.liveChange === null || h.liveChange === undefined
                         ? "\u2014"
                         : `${h.liveChange >= 0 ? "+" : ""}${h.liveChange.toFixed(2)}%`}
                     </td>
                     <td className="py-4 text-right font-medium" dir="ltr">{h.weight.toFixed(1)}%</td>
-                    <td className={`py-4 text-right font-medium whitespace-nowrap ${h.gainLoss >= 0 ? "text-green-400" : "text-red-400"}`} dir="ltr">
+                    <td className={`py-4 text-right font-medium whitespace-nowrap ${h.gainLoss >= 0 ? "text-chart-positive" : "text-chart-negative"}`} dir="ltr">
                       {h.gainLoss >= 0 ? "+" : ""}{h.gainLoss.toFixed(2)}%
                     </td>
-                    <td className="py-4 text-right font-medium text-amber-400" dir="ltr">
+                    <td className="py-4 text-right font-medium text-chart-amber" dir="ltr">
                       {fmtPct(h.volatility)}
                     </td>
-                    <td className="py-4 text-right font-medium text-blue-400" dir="ltr">
+                    <td className="py-4 text-right font-medium text-chart-blue" dir="ltr">
                       {h.sharpe !== null && Number.isFinite(h.sharpe) ? h.sharpe.toFixed(2) : "\u2014"}
                     </td>
                     {divOverlay && (
-                      <td className="py-4 text-right text-xs text-slate-300" dir="ltr">
+                      <td className="py-4 text-right text-xs text-foreground" dir="ltr">
                         {eventSoon
                           ? `${eventDate} (${nextEarning!.time === "bmo" ? "BMO" : "AMC"})`
                           : "\u2014"}
@@ -484,14 +484,14 @@ export default function Portfolio() {
       </div>
 
       {/* --- Below-the-fold: plain-language analytics paragraphs ------------- */}
-      <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-6 text-sm text-slate-300 space-y-2">
+      <div className="bg-card/40 border border-border/70 rounded-xl p-6 text-sm text-foreground space-y-2">
         <p>
-          <span className="text-slate-200 font-semibold">{t("portfolio.irrExplainTitle")}:</span>{" "}
+          <span className="text-foreground font-semibold">{t("portfolio.irrExplainTitle")}:</span>{" "}
           {t("portfolio.irrExplainBody", {
             rate: portfolioMetrics.irr === null ? "—" : fmtPct(portfolioMetrics.irr),
           })}
         </p>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-muted-foreground">
           {t("portfolio.reviewReminder")}
         </p>
       </div>

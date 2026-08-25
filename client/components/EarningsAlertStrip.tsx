@@ -61,10 +61,10 @@ export function EarningsAlertStrip() {
             <div
               className={`p-1.5 rounded-md shrink-0 ${
                 alert.event.time === "bmo"
-                  ? "bg-amber-500/20 text-amber-400"
+                  ? "bg-chart-amber/20 text-chart-amber"
                   : alert.event.time === "amc"
-                  ? "bg-purple-500/20 text-purple-400"
-                  : "bg-slate-700/30 text-slate-300"
+                  ? "bg-chart-purple/20 text-chart-purple"
+                  : "bg-accent/30 text-foreground"
               }`}
             >
               {alert.event.time === "bmo" ? (
@@ -83,10 +83,10 @@ export function EarningsAlertStrip() {
                 <span
                   className={`text-xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded ${
                     alert.event.time === "bmo"
-                      ? "bg-amber-500/15 text-amber-300"
+                      ? "bg-chart-amber/15 text-chart-amber"
                       : alert.event.time === "amc"
-                      ? "bg-purple-500/15 text-purple-300"
-                      : "bg-slate-700 text-slate-300"
+                      ? "bg-chart-purple/15 text-chart-purple"
+                      : "bg-accent text-foreground"
                   }`}
                 >
                   {alert.event.time === "bmo"
@@ -95,11 +95,11 @@ export function EarningsAlertStrip() {
                     ? t("earnings.amc")
                     : t("earnings.midday")}
                 </span>
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-muted-foreground">
                   {formatTimeUntil(alert.event, t)}
                 </span>
               </div>
-              <div className="text-xs text-slate-400 mt-0.5" dir="ltr">
+              <div className="text-xs text-foreground/80 mt-0.5" dir="ltr">
                 {t("earnings.eps_est")} $
                 {(alert.event.epsEstimated ?? 0).toFixed(2)}
               </div>
@@ -112,7 +112,7 @@ export function EarningsAlertStrip() {
                     const date = encodeURIComponent(alert.event.date);
                     navigate(`/earnings?focus=${focus}&date=${date}`);
                   }}
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1 rounded transition-colors"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold px-3 py-1 rounded transition-colors"
                 >
                   {t("earningsAlerts.open")}
                 </button>
@@ -121,7 +121,7 @@ export function EarningsAlertStrip() {
                     snooze(alert.key);
                     toast.dismiss(id);
                   }}
-                  className="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-3 py-1 rounded transition-colors"
+                  className="bg-accent hover:bg-foreground/10 text-foreground text-xs px-3 py-1 rounded transition-colors"
                 >
                   {t("earningsAlerts.snooze")}
                 </button>
@@ -130,7 +130,7 @@ export function EarningsAlertStrip() {
                     acknowledge(alert.key, "dismissed");
                     toast.dismiss(id);
                   }}
-                  className="ms-auto text-slate-500 hover:text-slate-200 text-lg leading-none px-1"
+                  className="ms-auto text-muted-foreground hover:text-foreground text-lg leading-none px-1"
                   aria-label={t("earningsAlerts.dismiss")}
                   title={t("earningsAlerts.dismiss")}
                 >
@@ -145,7 +145,7 @@ export function EarningsAlertStrip() {
           unstyled: true,
           classNames: {
             toast:
-              "bg-slate-900 border border-slate-700 text-foreground shadow-lg rounded-lg p-3 flex min-w-[320px] max-w-[420px]",
+              "bg-card border border-border text-foreground shadow-lg rounded-lg p-3 flex min-w-[320px] max-w-[420px]",
           },
         },
       );

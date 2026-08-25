@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 /**
  * Per-row deferred renderer for the Insights grid. Below the fold we render a
  * static skeleton matched to the project's loading-row style (`h-[150px]`,
- * `bg-card rounded-lg p-4 border border-slate-700`). Once the row enters
+ * `bg-card rounded-lg p-4 border border-border`). Once the row enters
  * the viewport — including a 200px preheat margin so tightly-grouped
  * scroll-spurts don't reveal a flash of skeleton — we swap in the real
  * children. The IntersectionObserver for each row disconnects after the
@@ -125,7 +125,7 @@ export function DeferredInsightsCard({
         // the conditional render hides the skeleton entirely on swap,
         // so the announcement lifecycle is clean.
         <div
-          className={`bg-card rounded-lg p-4 border border-slate-700 ${skeletonHeight} motion-safe:animate-pulse`}
+          className={`bg-card rounded-lg p-4 border border-border ${skeletonHeight} motion-safe:animate-pulse`}
           aria-label="loading"
         />
       )}

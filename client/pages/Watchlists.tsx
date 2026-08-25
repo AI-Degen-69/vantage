@@ -164,17 +164,17 @@ export default function Watchlists() {
                 onClick={() => wl.setActiveId(list.id)}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-md border text-sm font-medium transition-colors ${
                   isActive
-                    ? "bg-blue-500/15 border-blue-500/40 text-blue-300"
-                    : "bg-slate-800/30 border-slate-700 text-slate-300 hover:border-slate-600 hover:text-foreground"
+                    ? "bg-chart-blue/15 border-chart-blue/40 text-chart-blue"
+                    : "bg-muted/30 border-border text-foreground hover:border-foreground/20 hover:text-foreground"
                 }`}
               >
                 <span>{list.name}</span>
                 {list.isSystem && (
-                  <span className="text-xs uppercase tracking-wide text-slate-500 bg-slate-700/50 px-1.5 py-0.5 rounded">
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground bg-accent/50 px-1.5 py-0.5 rounded">
                     {t("watchlists.systemBadge")}
                   </span>
                 )}
-                <span className="text-xs text-slate-500" dir="ltr">
+                <span className="text-xs text-muted-foreground" dir="ltr">
                   {list.symbols.length}
                 </span>
               </button>
@@ -211,7 +211,7 @@ export default function Watchlists() {
                   <button
                     onClick={rename.beginEdit}
                     title={t("watchlists.renameButton")}
-                    className="text-slate-400 hover:text-blue-400 transition-colors"
+                    className="text-foreground/80 hover:text-primary transition-colors"
                     aria-label="rename"
                   >
                     <Pencil className="w-4 h-4" />
@@ -220,7 +220,7 @@ export default function Watchlists() {
                 {active.isSystem && (
                   <span
                     title={t("watchlists.cannotRenameSystem")}
-                    className="text-xs uppercase tracking-wide text-slate-500 bg-slate-700/50 px-1.5 py-1 rounded"
+                    className="text-xs uppercase tracking-wide text-muted-foreground bg-accent/50 px-1.5 py-1 rounded"
                   >
                     {t("watchlists.systemBadge")}
                   </span>
@@ -232,7 +232,7 @@ export default function Watchlists() {
                       variant="ghost"
                       onClick={handleDeleteActive}
                       title={t("watchlists.deleteButton")}
-                      className="text-red-400 hover:text-red-300"
+                      className="text-chart-negative hover:text-chart-negative/80"
                     >
                       <Trash2 className="w-4 h-4 me-1.5" />
                       {t("watchlists.deleteButton")}
@@ -256,7 +256,7 @@ export default function Watchlists() {
           </div>
           {symbols.length === 0 ? (
             <div className="text-center py-16">
-              <p className="text-slate-400 text-sm mb-4">{t("watchlists.empty")}</p>
+              <p className="text-foreground/80 text-sm mb-4">{t("watchlists.empty")}</p>
               <Button onClick={() => setAddOpen(true)} size="sm" variant="outline">
                 <Plus className="w-4 h-4 me-1.5" />
                 {t("watchlists.addButton")}
@@ -264,7 +264,7 @@ export default function Watchlists() {
             </div>
           ) : (
             <table className="w-full text-sm text-start">
-              <thead className="bg-slate-900/50 text-xs text-muted-foreground uppercase border-b border-border">
+              <thead className="bg-card/50 text-xs text-muted-foreground uppercase border-b border-border">
                 <tr>
                   <th className="px-3 py-3 w-8" aria-label="grip" />
                   <th className="px-6 py-3 font-medium">{t("common.symbol")}</th>
@@ -279,7 +279,7 @@ export default function Watchlists() {
                   const price = quote?.price;
                   const change = quote?.changesPercentage;
                   const cls =
-                    change === undefined ? "text-slate-500" : change >= 0 ? "text-green-400" : "text-red-400";
+                    change === undefined ? "text-muted-foreground" : change >= 0 ? "text-chart-positive" : "text-chart-negative";
                   const sign = change === undefined || change < 0 ? "" : "+";
                   const isDragged = pendingDragIndex === index;
                   const isHover = hoverIndex === index && pendingDragIndex !== null && pendingDragIndex !== index;
@@ -292,16 +292,16 @@ export default function Watchlists() {
                       onDrop={handleDrop(index)}
                       onDragEnd={handleDragEnd}
                       className={`border-b border-border last:border-0 transition-colors ${
-                        isDragged ? "opacity-50" : isHover ? "bg-blue-500/10" : "hover:bg-slate-800/30"
+                        isDragged ? "opacity-50" : isHover ? "bg-chart-blue/10" : "hover:bg-muted/30"
                       }`}
                     >
-                      <td className="px-3 py-3 cursor-grab text-slate-500 hover:text-slate-300 select-none">
+                      <td className="px-3 py-3 cursor-grab text-muted-foreground hover:text-foreground select-none">
                         <GripVertical className="w-4 h-4" />
                       </td>
                       <td className="px-6 py-3 font-bold">
                         <Link
                           to={`/stock/${entry.symbol}`}
-                          className="hover:text-blue-400 transition-colors"
+                          className="hover:text-primary transition-colors"
                         >
                           {entry.symbol}
                         </Link>
@@ -322,7 +322,7 @@ export default function Watchlists() {
                       <td className="px-3 py-3 text-end">
                         <button
                           onClick={() => wl.removeSymbol(active!.id, entry.symbol)}
-                          className="text-slate-500 hover:text-red-400 transition-colors"
+                          className="text-muted-foreground hover:text-chart-negative transition-colors"
                           title="Remove"
                           aria-label="remove symbol"
                         >
@@ -337,7 +337,7 @@ export default function Watchlists() {
           )}
         </div>
 
-        <p className="text-xs text-slate-500 text-center" dir="ltr">
+        <p className="text-xs text-muted-foreground text-center" dir="ltr">
           {t("watchlists.dropToReorder")}
         </p>
 
@@ -395,8 +395,8 @@ export default function Watchlists() {
                   <div className="space-y-3">
                     {Array.from({ length: 3 }).map((_, i) => (
                       <div key={i} className="space-y-1.5">
-                        <div className="h-3 bg-slate-800/60 rounded animate-pulse w-11/12" />
-                        <div className="h-2.5 bg-slate-800/40 rounded animate-pulse w-1/2" />
+                        <div className="h-3 bg-muted/60 rounded animate-pulse w-11/12" />
+                        <div className="h-2.5 bg-muted/40 rounded animate-pulse w-1/2" />
                       </div>
                     ))}
                   </div>
@@ -413,7 +413,7 @@ export default function Watchlists() {
                         rel="noopener noreferrer"
                         className="block group border-b border-border last:border-0 pb-4 last:pb-0"
                       >
-                        <p className="text-sm font-medium group-hover:text-blue-400 transition-colors line-clamp-2 mb-1">
+                        <p className="text-sm font-medium group-hover:text-primary transition-colors line-clamp-2 mb-1">
                           {n.title}
                         </p>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -423,7 +423,7 @@ export default function Watchlists() {
                           {n.symbol && (
                             <>
                               <span>•</span>
-                              <span className="text-slate-500">{n.symbol}</span>
+                              <span className="text-muted-foreground">{n.symbol}</span>
                             </>
                           )}
                         </div>

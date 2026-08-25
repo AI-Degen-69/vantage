@@ -17,9 +17,9 @@ export function Skeleton({ className, rounded = "rounded-md", style }: SkeletonP
   return (
     <div
       className={cn(
-        "relative overflow-hidden bg-slate-800/60",
+        "relative overflow-hidden bg-muted/60",
         rounded,
-        "before:absolute before:inset-0 before:-translate-x-full before:animate-shimmer before:bg-gradient-to-r before:from-transparent before:via-slate-700/40 before:to-transparent",
+        "before:absolute before:inset-0 before:-translate-x-full before:animate-shimmer before:bg-gradient-to-r before:from-transparent before:via-accent/40 before:to-transparent",
         className
       )}
       style={style}

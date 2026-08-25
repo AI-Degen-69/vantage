@@ -3,7 +3,7 @@ import { cn } from "./utils";
 
 describe("cn function", () => {
   it("should merge classes correctly", () => {
-    expect(cn("text-red-500", "bg-blue-500")).toBe("text-red-500 bg-blue-500");
+    expect(cn("text-chart-negative", "bg-chart-blue")).toBe("text-chart-negative bg-chart-blue");
   });
 
   it("should handle conditional classes", () => {

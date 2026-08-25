@@ -114,7 +114,7 @@ function availabilityBadge({
     },
     notFound: {
       icon: CircleX,
-      cls: "border-red-500/30 bg-red-500/5 text-red-500",
+      cls: "border-chart-negative/30 bg-chart-negative/5 text-chart-negative",
       textKey: "availability.notFound",
       titleKey: "availability.notFoundTitle",
     },

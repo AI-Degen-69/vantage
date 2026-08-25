@@ -40,6 +40,8 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
 
+    --progress: 215.4 16.3% 46.9%; /* Progress bar fill — replaces hardcoded slate-500 */
+
     --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;
@@ -81,6 +83,8 @@
 
     --accent: 250 33% 12%;
     --accent-foreground: 210 20% 95%;
+
+    --progress: 220 10% 45%; /* Progress bar fill — replaces hardcoded slate-500 */
 
     --destructive: 350 75% 60%; /* form/system errors — distinct from Ember Red (loss semantics) */
     --destructive-foreground: 0 0% 100%;

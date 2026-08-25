@@ -391,7 +391,7 @@ export default function Index() {
                     dir="ltr"
                   >
                     <span
-                      className={`text-lg font-semibold leading-none ${quoteData.change >= 0 ? "text-chart-green" : "text-red-400"}`}
+                      className={`text-lg font-semibold leading-none ${quoteData.change >= 0 ? "text-chart-green" : "text-chart-negative"}`}
                     >
                       <AnimatedNumber
                         value={quoteData.change ?? null}
@@ -400,7 +400,7 @@ export default function Index() {
                       />
                     </span>
                     <span
-                      className={`text-lg font-semibold leading-none ${quoteData.changesPercentage >= 0 ? "text-chart-green" : "text-red-400"}`}
+                      className={`text-lg font-semibold leading-none ${quoteData.changesPercentage >= 0 ? "text-chart-green" : "text-chart-negative"}`}
                     >
                       <AnimatedNumber
                         value={quoteData.changesPercentage ?? null}
@@ -411,7 +411,7 @@ export default function Index() {
                   </div>
                 </div>
               ) : (
-                <div className="text-center text-slate-400 text-xl">
+                <div className="text-center text-foreground/80 text-xl">
                   {t("index.unavailableApi")}
                 </div>
               )}
@@ -419,11 +419,11 @@ export default function Index() {
                 <span>
                   {t("index.earnings")}{" "}
                   {earningsDate ? (
-                    <span className="text-blue-400" dir="ltr">
+                    <span className="text-chart-blue" dir="ltr">
                       {earningsDate}
                     </span>
                   ) : (
-                    <span className="text-slate-500" dir="ltr">
+                    <span className="text-muted-foreground" dir="ltr">
                       —
                     </span>
                   )}
@@ -507,13 +507,13 @@ export default function Index() {
               <div>
                 <div className="flex items-center justify-between gap-3 mb-4">
                   <h2 className="font-display text-xs font-semibold uppercase tracking-[0.14em] text-foreground/90 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-blue-400" />
+                    <span className="w-2 h-2 rounded-full bg-chart-blue" />
                     Analyst Outlook & Range
                   </h2>
                   <span
                     className={`shrink-0 text-xs font-mono font-medium px-2 py-0.5 rounded border whitespace-nowrap tabular-nums ${
                       targetEps != null
-                        ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                                              ? "bg-chart-blue/10 text-chart-blue border-chart-blue/20"
                         : "bg-muted/40 text-muted-foreground/70 border-border/40"
                     }`}
                   >
@@ -567,23 +567,23 @@ export default function Index() {
                           ),
                         );
                         const barColor =
-                          finalPct > 66
-                            ? "bg-chart-green"
-                            : finalPct >= 33
-                              ? "bg-amber-400"
-                              : "bg-red-400";
-                        const textColor =
-                          finalPct > 66
-                            ? "text-chart-green"
-                            : finalPct >= 33
-                              ? "text-amber-400"
-                              : "text-red-400";
-                        const arrowColor =
-                          finalPct > 66
-                            ? "text-chart-green"
-                            : finalPct >= 33
-                              ? "text-amber-400"
-                              : "text-red-400";
+                                                  finalPct > 66
+                                                    ? "bg-chart-green"
+                                                    : finalPct >= 33
+                                                      ? "bg-chart-amber"
+                                                      : "bg-chart-negative";
+                                                const textColor =
+                                                  finalPct > 66
+                                                    ? "text-chart-green"
+                                                    : finalPct >= 33
+                                                      ? "text-chart-amber"
+                                                      : "text-chart-negative";
+                                                const arrowColor =
+                                                  finalPct > 66
+                                                    ? "text-chart-green"
+                                                    : finalPct >= 33
+                                                      ? "text-chart-amber"
+                                                      : "text-chart-negative";
                         const pctOf = (price: number) =>
                           Math.max(
                             0,

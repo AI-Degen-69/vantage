@@ -96,7 +96,7 @@ export default function DipFinder() {
           <select
             value={smaWindow}
             onChange={(e) => setSmaWindow(e.target.value as SmaWindow)}
-            className="appearance-none bg-slate-800 border border-slate-700 text-sm font-medium py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-blue-500 cursor-pointer text-foreground"
+            className="appearance-none bg-muted border border-border text-sm font-medium py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-ring cursor-pointer text-foreground"
           >
             <option value="20day">{t("dipFinder.20day")}</option>
             <option value="50day">{t("dipFinder.50day")}</option>
@@ -104,7 +104,7 @@ export default function DipFinder() {
             <option value="150day">{t("dipFinder.150day")}</option>
             <option value="200day">{t("dipFinder.200day")}</option>
           </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/80 pointer-events-none" />
         </div>
       </div>
 
@@ -113,9 +113,9 @@ export default function DipFinder() {
         <div className="w-20 shrink-0" />
         <div className="flex-1 flex items-center gap-2">
           <div className="flex-1 flex justify-between relative px-1">
-            <span className="text-red-400/50">-{Math.round(maxDistance)}%</span>
-            <span className="absolute left-1/2 -translate-x-1/2 text-slate-400">0%</span>
-            <span className="text-green-400/50">+{Math.round(maxDistance)}%</span>
+            <span className="text-chart-negative/50">-{Math.round(maxDistance)}%</span>
+            <span className="absolute left-1/2 -translate-x-1/2 text-foreground/80">0%</span>
+            <span className="text-chart-positive/50">+{Math.round(maxDistance)}%</span>
           </div>
           <div className="w-20 shrink-0" />
         </div>
@@ -129,7 +129,7 @@ export default function DipFinder() {
             row.state === "live"
               ? "bg-emerald-500"
               : row.state === "partial"
-              ? "bg-amber-500"
+              ? "bg-chart-amber"
               : "bg-yellow-500";
           return (
             <div
@@ -142,17 +142,17 @@ export default function DipFinder() {
                   className={`inline-block w-1.5 h-1.5 rounded-full ${dot}`}
                   aria-label={row.state}
                 />
-                <span className="font-semibold text-sm group-hover:text-blue-400 transition-colors">
+                <span className="font-semibold text-sm group-hover:text-primary transition-colors">
                   {row.symbol}
                 </span>
               </div>
               <div className="flex-1 flex items-center gap-2">
-                <div className="flex-1 h-3 bg-slate-800/50 rounded-full overflow-hidden flex relative">
-                  <div className="absolute left-1/2 top-0 bottom-0 w-[2px] bg-slate-500 z-10" />
+                <div className="flex-1 h-3 bg-muted/50 rounded-full overflow-hidden flex relative">
+                  <div className="absolute left-1/2 top-0 bottom-0 w-[2px] bg-progress z-10" />
                   <div className="w-1/2 h-full flex justify-end">
                     {isNegative && (
                       <div
-                        className="h-full bg-red-500 rounded-l-full transition-all duration-500"
+                        className="h-full bg-chart-negative rounded-l-full transition-all duration-500"
                         style={{ width: `${width}%` }}
                       />
                     )}
@@ -160,7 +160,7 @@ export default function DipFinder() {
                   <div className="w-1/2 h-full flex justify-start">
                     {!isNegative && (
                       <div
-                        className="h-full bg-green-500 rounded-r-full transition-all duration-500"
+                        className="h-full bg-chart-positive rounded-r-full transition-all duration-500"
                         style={{ width: `${width}%` }}
                       />
                     )}
@@ -168,7 +168,7 @@ export default function DipFinder() {
                 </div>
                 <div
                   className={`w-20 text-right text-sm font-semibold whitespace-nowrap shrink-0 ${
-                    isNegative ? "text-red-400" : "text-green-400"
+                    isNegative ? "text-chart-negative" : "text-chart-positive"
                   }`}
                   dir="ltr"
                 >
@@ -181,7 +181,7 @@ export default function DipFinder() {
         })}
 
         {isLoading && (
-          <div className="text-center text-xs text-slate-500 py-2">
+          <div className="text-center text-xs text-muted-foreground py-2">
             {t("dipFinder.loading")}
           </div>
         )}

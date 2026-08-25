@@ -119,14 +119,14 @@ export default function EarningsPage() {
           <h1 className="text-3xl font-bold text-foreground">{t("nav.earnings")}</h1>
         </div>
 
-        <div className="flex items-center justify-between bg-slate-900/50 p-4 rounded-xl border border-border gap-4 flex-wrap">
+        <div className="flex items-center justify-between bg-card/50 p-4 rounded-xl border border-border gap-4 flex-wrap">
           {/* Week Navigation */}
           <div className="flex items-center gap-2">
             <button
               disabled={!hasPrev}
               onClick={() => setOffset((o) => o - 1)}
               title={t("earningsCalendar.prevWeek")}
-              className="p-2 hover:bg-slate-800 rounded-md transition-colors text-slate-400 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              className="p-2 hover:bg-muted rounded-md transition-colors text-foreground/80 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
@@ -134,8 +134,8 @@ export default function EarningsPage() {
               onClick={() => setOffset(0)}
               className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
                 isThisWeek
-                  ? "bg-blue-600 text-white"
-                  : "bg-slate-800 text-slate-300 hover:text-white"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-foreground hover:text-white"
               }`}
             >
               {t("earningsCalendar.today")}
@@ -144,7 +144,7 @@ export default function EarningsPage() {
               disabled={!hasNext}
               onClick={() => setOffset((o) => o + 1)}
               title={t("earningsCalendar.nextWeek")}
-              className="p-2 hover:bg-slate-800 rounded-md transition-colors text-slate-400 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              className="p-2 hover:bg-muted rounded-md transition-colors text-foreground/80 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
@@ -155,8 +155,8 @@ export default function EarningsPage() {
 
           {/* Filters */}
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-md text-sm border border-slate-700">
-              <span className="text-slate-400">{t("earningsCalendar.marketCap")}</span>
+            <div className="flex items-center gap-2 bg-muted px-3 py-1.5 rounded-md text-sm border border-border">
+              <span className="text-foreground/80">{t("earningsCalendar.marketCap")}</span>
               <select
                 value={marketCap}
                 onChange={(e) => setMarketCap(e.target.value as MarketCapFilter)}
@@ -168,12 +168,12 @@ export default function EarningsPage() {
                 <option value="small">{t("earningsCalendar.marketCapSmall")}</option>
               </select>
             </div>
-            <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
               <input
                 type="checkbox"
                 checked={effectiveWatchlistOnly}
                 onChange={(e) => setWatchlistOnly(e.target.checked)}
-                className="rounded border-slate-700 bg-slate-800 focus:ring-blue-500 cursor-pointer"
+                className="rounded border-border bg-muted focus:ring-ring cursor-pointer"
               />
               {t("earningsCalendar.filterByWatchlist")}
             </label>

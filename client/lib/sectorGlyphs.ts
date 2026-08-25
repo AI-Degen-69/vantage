@@ -38,16 +38,16 @@ export type SectorGlyphEntry = {
  * "two energy stocks row" doesn't blend.
  */
 export const HEBREW_SECTOR_GLYPHS: Record<string, SectorGlyphEntry> = {
-  Technology:                  { letter: "ט", color: "bg-blue-600/30 text-blue-200" },
+  Technology:                  { letter: "ט", color: "bg-chart-blue/30 text-chart-blue" },
   "Financial Services":        { letter: "פ", color: "bg-emerald-600/30 text-emerald-200" },
   Healthcare:                  { letter: "ב", color: "bg-rose-600/30 text-rose-200" },
-  "Consumer Cyclical":         { letter: "צ", color: "bg-amber-600/30 text-amber-200" },
-  "Consumer Defensive":        { letter: "צ", color: "bg-slate-600/30 text-slate-200" },
+  "Consumer Cyclical":         { letter: "צ", color: "bg-chart-amber/30 text-chart-amber" },
+  "Consumer Defensive":        { letter: "צ", color: "bg-accent/30 text-foreground" },
   "Communication Services":    { letter: "ת", color: "bg-indigo-600/30 text-indigo-200" },
   Energy:                      { letter: "א", color: "bg-orange-600/30 text-orange-200" },
-  Industrials:                 { letter: "ת", color: "bg-zinc-600/30 text-zinc-200" },
-  "Real Estate":               { letter: "נ", color: "bg-stone-600/30 text-stone-200" },
-  Utilities:                   { letter: "ש", color: "bg-sky-600/30 text-sky-200" },
+  Industrials:                 { letter: "ת", color: "bg-chart-purple/30 text-chart-purple" },
+  "Real Estate":               { letter: "נ", color: "bg-chart-orange/30 text-chart-orange" },
+  Utilities:                   { letter: "ש", color: "bg-chart-cyan/30 text-chart-cyan" },
   "Basic Materials":           { letter: "ח", color: "bg-yellow-600/30 text-yellow-200" },
 };
 

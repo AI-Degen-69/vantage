@@ -1261,7 +1261,7 @@ export default function ChartModal({
                     type="button"
                     disabled
                     aria-disabled="true"
-                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-blue-500/15 text-blue-400 border-blue-500/30"
+                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-chart-blue/15 text-chart-blue border-chart-blue/30"
                   >
                     {t("revenueSegments.all")}
                   </button>
@@ -1315,7 +1315,7 @@ export default function ChartModal({
                   className={cn(
                     "px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors",
                     hiddenSegments.length === 0
-                      ? "bg-blue-500/15 text-blue-400 border-blue-500/30"
+                      ? "bg-chart-blue/15 text-chart-blue border-chart-blue/30"
                       : "bg-muted/40 text-muted-foreground border-border/40 hover:text-foreground",
                   )}
                 >

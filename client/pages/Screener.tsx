@@ -194,7 +194,7 @@ function FilterCategoryRow({
                     : "bg-muted/40 text-muted-foreground border-dashed border-border hover:bg-muted hover:text-foreground"
               }`}
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <Sparkles className="w-3.5 h-3.5 text-chart-amber" />
               <span>
                 {extraSelectedCount > 0
                   ? `+${extraSelectedCount} More`

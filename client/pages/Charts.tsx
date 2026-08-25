@@ -80,7 +80,7 @@ export default function Charts() {
                 {profileLoading ? "…" : profileData?.companyName ?? ticker}
               </h1>
               <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1 flex-wrap">
-                <span className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-foreground font-bold" dir="ltr">
+                <span className="px-1.5 py-0.5 rounded bg-muted border border-border text-foreground font-bold" dir="ltr">
                   {ticker}
                 </span>
                 {profileData?.exchange && (
@@ -110,7 +110,7 @@ export default function Charts() {
           {quoteLoading ? (
             <HeaderPriceSkeleton />
           ) : !currentPrice ? (
-            <div className="text-center text-slate-400 text-xl">
+            <div className="text-center text-foreground/80 text-xl">
               <BarChart3 className="w-8 h-8 mx-auto mb-2 opacity-50" />
               {t("index.unavailableApi")}
             </div>
@@ -126,7 +126,7 @@ export default function Charts() {
                 </span>
                 <span
                   className={`mt-1 px-2 py-0.5 rounded text-sm font-semibold ${
-                    (quoteData?.change ?? 0) >= 0 ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"
+                    (quoteData?.change ?? 0) >= 0 ? "bg-chart-positive/20 text-chart-positive" : "bg-chart-negative/20 text-chart-negative"
                   }`}
                   dir="ltr"
                 >
@@ -157,7 +157,7 @@ export default function Charts() {
                     )}
                   </>
                 ) : (
-                  <p className="text-sm text-slate-500">—</p>
+                  <p className="text-sm text-muted-foreground">—</p>
                 )}
               </div>
 
@@ -176,7 +176,7 @@ export default function Charts() {
                     />
                   </>
                 ) : (
-                  <p className="text-sm text-slate-500">—</p>
+                  <p className="text-sm text-muted-foreground">—</p>
                 )}
               </div>
             </div>
@@ -192,12 +192,12 @@ export default function Charts() {
 
         {/* Footer hint card */}
         {!quoteLoading && currentPrice && (
-          <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-4 text-xs text-slate-400 flex items-center gap-3">
+          <div className="bg-card/40 border border-border/70 rounded-xl p-4 text-xs text-foreground/80 flex items-center gap-3">
             <Calendar className="w-4 h-4 shrink-0" />
             <span>
               {t("charts.dcfGuidance")}
             </span>
-            <span className="ml-auto inline-flex items-center gap-1 text-slate-500">
+            <span className="ml-auto inline-flex items-center gap-1 text-muted-foreground">
               <TrendingUp className="w-3 h-3" />
               <TrendingDown className="w-3 h-3" />
             </span>
@@ -228,20 +228,20 @@ function DualRange({
     high > low ? Math.min(100, Math.max(0, ((current - low) / (high - low)) * 100)) : 50;
   return (
     <div>
-      <div className="relative h-2 rounded-full bg-slate-800 overflow-visible">
+      <div className="relative h-2 rounded-full bg-muted overflow-visible">
         <div
-          className="absolute -top-1.5 h-5 w-5 rounded-full bg-blue-500 ring-2 ring-blue-500/30 shadow-md transition-all"
+          className="absolute -top-1.5 h-5 w-5 rounded-full bg-chart-blue ring-2 ring-chart-blue/30 shadow-md transition-all"
           style={{ left: `calc(${pct}% - 0.625rem)` }}
         />
       </div>
       <div className="flex justify-between items-center mt-3 text-xs">
-        <span className="text-red-400 font-medium" dir="ltr">
+        <span className="text-chart-negative font-medium" dir="ltr">
           ${low.toFixed(2)}
         </span>
-        <span className="text-slate-300" dir="ltr">
+        <span className="text-foreground" dir="ltr">
           {label}
         </span>
-        <span className="text-green-400 font-medium" dir="ltr">
+        <span className="text-chart-positive font-medium" dir="ltr">
           ${high.toFixed(2)}
         </span>
       </div>

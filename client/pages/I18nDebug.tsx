@@ -36,18 +36,18 @@ export default function I18nDebug() {
   return (
     <div className="w-full bg-background dark min-h-screen">
       {/* Header */}
-      <header className="bg-slate-800/50 border-b border-slate-700 px-8 py-6">
+      <header className="bg-muted/50 border-b border-border px-8 py-6">
         <h1 className="text-2xl font-bold text-foreground">
           i18n Plural QA{" "}
-          <span className="text-slate-500 font-mono text-base">
+          <span className="text-muted-foreground font-mono text-base">
             {lang === "he" ? "(עברית)" : "(English)"}
           </span>
         </h1>
-        <p className="text-xs text-slate-400 mt-1 font-mono">
+        <p className="text-xs text-foreground/80 mt-1 font-mono">
           dev-only — verifies {"{{count}}"} plural pipeline; route is gated
           behind import.meta.env.DEV
         </p>
-        <p className="text-xs text-slate-500 mt-2">
+        <p className="text-xs text-muted-foreground mt-2">
           {baseKeys.length} plural base key{baseKeys.length === 1 ? "" : "s"}{" "}
           · {COUNT_OPTIONS.length} count variants ·{" "}
           {lang === "he"
@@ -57,8 +57,8 @@ export default function I18nDebug() {
       </header>
 
       {/* Count selector chips */}
-      <div className="px-8 py-6 border-b border-slate-700 flex items-center gap-3 flex-wrap">
-        <span className="text-sm text-slate-400 font-medium">Highlight count:</span>
+      <div className="px-8 py-6 border-b border-border flex items-center gap-3 flex-wrap">
+        <span className="text-sm text-foreground/80 font-medium">Highlight count:</span>
         {COUNT_OPTIONS.map((c) => {
           const isActive = activeCount === c;
           return (
@@ -68,8 +68,8 @@ export default function I18nDebug() {
               className={
                 "px-3 py-1.5 rounded font-mono text-sm transition-colors border " +
                 (isActive
-                  ? "bg-blue-600 text-white border-blue-500"
-                  : "bg-slate-800/60 text-slate-300 border-slate-700 hover:bg-slate-700/60")
+                  ? "bg-primary text-primary-foreground border-primary/50"
+                  : "bg-muted/60 text-foreground border-border hover:bg-accent/60")
               }
               aria-pressed={isActive}
             >
@@ -77,7 +77,7 @@ export default function I18nDebug() {
             </button>
           );
         })}
-        <span className="ml-2 text-xs text-slate-500 font-mono">
+        <span className="ml-2 text-xs text-muted-foreground font-mono">
           (active count column highlighted below)
         </span>
       </div>
@@ -87,21 +87,21 @@ export default function I18nDebug() {
         <table className="w-full border-collapse text-sm" dir="ltr">
           <thead>
             <tr>
-              <th className="text-left text-xs uppercase tracking-wider text-slate-500 p-3 border-b border-slate-700 align-bottom">
+              <th className="text-left text-xs uppercase tracking-wider text-muted-foreground p-3 border-b border-border align-bottom">
                 Base key
               </th>
               {COUNT_OPTIONS.map((c) => (
                 <th
                   key={c}
                   className={
-                    "p-3 border-b border-slate-700 align-bottom " +
-                    (c === activeCount ? "bg-blue-900/20" : "")
+                    "p-3 border-b border-border align-bottom " +
+                    (c === activeCount ? "bg-chart-blue/10" : "")
                   }
                 >
                   <div
                     className={
                       "text-xs uppercase tracking-wider font-mono " +
-                      (c === activeCount ? "text-blue-300" : "text-slate-500")
+                      (c === activeCount ? "text-chart-blue" : "text-muted-foreground")
                     }
                   >
                     count={c}
@@ -109,7 +109,7 @@ export default function I18nDebug() {
                   <div
                     className={
                       "text-xs uppercase tracking-wider font-mono mt-1 " +
-                      (c === activeCount ? "text-blue-400" : "text-slate-600")
+                      (c === activeCount ? "text-primary" : "text-muted-foreground/80")
                     }
                   >
                     ({getPluralCategory(lang, c)})
@@ -123,23 +123,23 @@ export default function I18nDebug() {
               <tr>
                 <td
                   colSpan={COUNT_OPTIONS.length + 1}
-                  className="p-6 text-center text-slate-500 italic"
+                  className="p-6 text-center text-muted-foreground italic"
                 >
                   No plural-form keys defined in the {lang} dictionary. Add
                   {" "}
-                  <code className="font-mono text-slate-300">
+                  <code className="font-mono text-foreground">
                     some.key_one
                   </code>{" "}
                   /{" "}
-                  <code className="font-mono text-slate-300">
+                  <code className="font-mono text-foreground">
                     some.key_two
                   </code>{" "}
                   /{" "}
-                  <code className="font-mono text-slate-300">
+                  <code className="font-mono text-foreground">
                     some.key_other
                   </code>{" "}
-                  (and optionally <code className="font-mono text-slate-300">_few</code> /{" "}
-                  <code className="font-mono text-slate-300">_many</code>) to populate this grid.
+                  (and optionally <code className="font-mono text-foreground">_few</code> /{" "}
+                  <code className="font-mono text-foreground">_many</code>) to populate this grid.
                 </td>
               </tr>
             ) : (
@@ -157,7 +157,7 @@ export default function I18nDebug() {
         </table>
       </div>
 
-      <footer className="px-8 py-6 border-t border-slate-700 text-xs text-slate-500 font-mono">
+      <footer className="px-8 py-6 border-t border-border text-xs text-muted-foreground font-mono">
         <p>
           Tip: switch language via the top-right selector to flip en ↔ he.
           The key_*(category) column picks come straight from{" "}
@@ -183,9 +183,9 @@ interface PluralRowProps {
 function PluralRow({ baseKey, lang, activeCount, t }: PluralRowProps) {
   const dict = getDictionaryForLang(lang);
   return (
-    <tr className="border-b border-slate-800/50">
+    <tr className="border-b border-border/40">
       <td className="p-3 align-top">
-        <code className="text-sm text-slate-300 font-mono break-words">
+        <code className="text-sm text-foreground font-mono break-words">
           {baseKey}
         </code>
       </td>
@@ -209,7 +209,7 @@ function PluralRow({ baseKey, lang, activeCount, t }: PluralRowProps) {
             key={c}
             className={
               "p-3 align-top max-w-xs align-text-top " +
-              (isActive ? "bg-blue-900/20" : "")
+              (isActive ? "bg-chart-blue/10" : "")
             }
           >
             <div
@@ -219,11 +219,11 @@ function PluralRow({ baseKey, lang, activeCount, t }: PluralRowProps) {
               {resolved}
             </div>
             <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-              <span className="text-xs uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-800/80 border border-slate-700 text-slate-400 font-mono">
+              <span className="text-xs uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted/80 border border-border text-foreground/80 font-mono">
                 {category}
               </span>
               {fallback && (
-                <span className="text-xs uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 text-amber-300">
+                <span className="text-xs uppercase tracking-wider px-1.5 py-0.5 rounded bg-chart-amber/10 border border-chart-amber/30 text-chart-amber">
                   missing
                 </span>
               )}

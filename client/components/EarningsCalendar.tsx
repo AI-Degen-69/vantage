@@ -24,17 +24,17 @@ interface EventCardProps {
 const EventCard = ({ ev, t, isFocus }: EventCardProps) => (
   <div
     data-focus-event={`${ev.ticker}-${ev.date}`}
-    className={`bg-slate-800/50 rounded-lg p-3 border transition-colors ${
+    className={`bg-muted/50 rounded-lg p-3 border transition-colors ${
       isFocus
-        ? "border-blue-500 ring-2 ring-blue-500/40 shadow-lg shadow-blue-500/20"
-        : "border-slate-700/50 hover:border-slate-600"
+        ? "border-ring ring-2 ring-ring/40 shadow-lg shadow-ring/20"
+        : "border-border/50 hover:border-foreground/20"
     }`}
   >
     <div className="flex justify-between items-start mb-2">
       <div className="font-bold text-foreground text-lg">{ev.ticker}</div>
       <div
         className={`p-1.5 rounded-md ${
-          ev.time === "Before Open" ? "bg-amber-500/20 text-amber-400" : "bg-purple-500/20 text-purple-400"
+          ev.time === "Before Open" ? "bg-chart-amber/20 text-chart-amber" : "bg-chart-purple/20 text-chart-purple"
         }`}
         title={ev.time === "Before Open" ? t("earningsCalendar.beforeOpen") : t("earningsCalendar.afterClose")}
       >
@@ -43,7 +43,7 @@ const EventCard = ({ ev, t, isFocus }: EventCardProps) => (
     </div>
 
     <div className="space-y-1 text-xs">
-      <div className="flex justify-between text-slate-400">
+      <div className="flex justify-between text-foreground/80">
         <span>{t("earningsCalendar.epsEst")}</span>
         <span dir="ltr">${ev.epsEst.toFixed(2)}</span>
       </div>
@@ -51,14 +51,14 @@ const EventCard = ({ ev, t, isFocus }: EventCardProps) => (
         <div className="flex justify-between font-medium">
           <span>{t("earningsCalendar.actual")}</span>
           <span
-            className={ev.surprise === "beat" ? "text-green-400" : ev.surprise === "miss" ? "text-red-400" : ""}
+            className={ev.surprise === "beat" ? "text-chart-positive" : ev.surprise === "miss" ? "text-chart-negative" : ""}
             dir="ltr"
           >
             ${ev.epsActual.toFixed(2)}
           </span>
         </div>
       )}
-      <div className="flex justify-between text-slate-400 pt-1">
+      <div className="flex justify-between text-foreground/80 pt-1">
         <span>{t("earningsCalendar.revEst")}</span>
         <span dir="ltr">${ev.revEst.toFixed(2)}B</span>
       </div>
@@ -260,7 +260,7 @@ export default function EarningsCalendar({
     <div className="bg-card border border-border rounded-xl overflow-hidden relative">
       <div className="absolute top-2 right-2 flex items-center gap-2 z-10">
         {!isLoading && (
-          <span className="text-xs text-slate-400 bg-slate-800/60 px-2 py-1 rounded">
+          <span className="text-xs text-foreground/80 bg-muted/60 px-2 py-1 rounded">
             {t("earningsCalendar.showing", { count: eventCount })}
           </span>
         )}
@@ -271,7 +271,7 @@ export default function EarningsCalendar({
         )}
       </div>
       {empty && !isLoading ? (
-        <div className="p-12 text-center text-slate-400">
+        <div className="p-12 text-center text-foreground/80">
           {t("earningsCalendar.noEventsThisWeek")}
         </div>
       ) : (
@@ -280,7 +280,7 @@ export default function EarningsCalendar({
             const events = eventsList.filter((e: any) => e.weekday === dayObj.wd);
             return (
               <div key={dayObj.wd} className="min-h-[400px]">
-                <div className="bg-slate-900/50 p-4 border-b border-border text-center">
+                <div className="bg-card/50 p-4 border-b border-border text-center">
                   <span className="font-semibold text-foreground">{t(dayObj.i18nKey)}</span>
                 </div>
                 <div className="p-4 flex flex-col gap-4">
@@ -295,7 +295,7 @@ export default function EarningsCalendar({
 
                   {events.some((e: any) => e.time === "Before Open") &&
                     events.some((e: any) => e.time === "After Close") && (
-                      <div className="border-t-2 border-dashed border-slate-700/50" />
+                      <div className="border-t-2 border-dashed border-border/50" />
                     )}
 
                   {events.filter((e: any) => e.time === "After Close").map((ev: any, i: number) => (

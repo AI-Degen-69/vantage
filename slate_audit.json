@@ -1,0 +1,1826 @@
+[
+  {
+    "file": "client/components/AddWatchlistSheet.tsx",
+    "line": 220,
+    "class": "bg-slate-900/40",
+    "component": "AddWatchlistSheet",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/AddWatchlistSheet.tsx",
+    "line": 220,
+    "class": "border-slate-700",
+    "component": "AddWatchlistSheet",
+    "element": "unknown",
+    "category": "border"
+  },
+  {
+    "file": "client/components/AddWatchlistSheet.tsx",
+    "line": 220,
+    "class": "placeholder-slate-500",
+    "component": "AddWatchlistSheet",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/components/AddWatchlistSheet.tsx",
+    "line": 230,
+    "class": "text-slate-400",
+    "component": "AddWatchlistSheet",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/components/AddWatchlistSheet.tsx",
+    "line": 258,
+    "class": "text-slate-500",
+    "component": "AddWatchlistSheet",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/components/AddWatchlistSheet.tsx",
+    "line": 275,
+    "class": "text-slate-400",
+    "component": "AddWatchlistSheet",
+    "element": "div",
+    "category": "text"
+  },
+  {
+    "file": "client/components/AddWatchlistSheet.tsx",
+    "line": 289,
+    "class": "text-slate-500",
+    "component": "AddWatchlistSheet",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 54,
+    "class": "bg-slate-900/50",
+    "component": "DCFWidget",
+    "element": "div",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 57,
+    "class": "bg-slate-800",
+    "component": "DCFWidget",
+    "element": "div",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 59,
+    "class": "text-slate-400",
+    "component": "DCFWidget",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 65,
+    "class": "text-slate-400",
+    "component": "DCFWidget",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 74,
+    "class": "text-slate-400",
+    "component": "DCFWidget",
+    "element": "label",
+    "category": "text"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 76,
+    "class": "text-slate-500",
+    "component": "DCFWidget",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 81,
+    "class": "bg-slate-800",
+    "component": "DCFWidget",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 81,
+    "class": "border-slate-700",
+    "component": "DCFWidget",
+    "element": "unknown",
+    "category": "border"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 89,
+    "class": "text-slate-400",
+    "component": "DCFWidget",
+    "element": "label",
+    "category": "text"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 90,
+    "class": "text-slate-500",
+    "component": "DCFWidget",
+    "element": "Info",
+    "category": "text"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 96,
+    "class": "bg-slate-800",
+    "component": "DCFWidget",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 96,
+    "class": "border-slate-700",
+    "component": "DCFWidget",
+    "element": "unknown",
+    "category": "border"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 103,
+    "class": "text-slate-400",
+    "component": "DCFWidget",
+    "element": "label",
+    "category": "text"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 104,
+    "class": "text-slate-500",
+    "component": "DCFWidget",
+    "element": "Info",
+    "category": "text"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 110,
+    "class": "bg-slate-800",
+    "component": "DCFWidget",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 110,
+    "class": "border-slate-700",
+    "component": "DCFWidget",
+    "element": "unknown",
+    "category": "border"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 120,
+    "class": "bg-slate-800/50",
+    "component": "DCFWidget",
+    "element": "div",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 120,
+    "class": "border-slate-700",
+    "component": "DCFWidget",
+    "element": "div",
+    "category": "border"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 121,
+    "class": "text-slate-400",
+    "component": "DCFWidget",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 125,
+    "class": "text-slate-500",
+    "component": "DCFWidget",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 127,
+    "class": "bg-slate-800/50",
+    "component": "DCFWidget",
+    "element": "div",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 127,
+    "class": "border-slate-700",
+    "component": "DCFWidget",
+    "element": "div",
+    "category": "border"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 129,
+    "class": "text-slate-400",
+    "component": "DCFWidget",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 134,
+    "class": "bg-slate-900",
+    "component": "DCFWidget",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 134,
+    "class": "border-slate-700",
+    "component": "DCFWidget",
+    "element": "unknown",
+    "category": "border"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 141,
+    "class": "text-slate-500",
+    "component": "DCFWidget",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 145,
+    "class": "bg-slate-900/30",
+    "component": "DCFWidget",
+    "element": "div",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/DCFWidget.tsx",
+    "line": 145,
+    "class": "border-slate-800",
+    "component": "DCFWidget",
+    "element": "div",
+    "category": "border"
+  },
+  {
+    "file": "client/components/DeferredInsightsCard.tsx",
+    "line": 6,
+    "class": "border-slate-700",
+    "component": "DeferredInsightsCard",
+    "element": "unknown",
+    "category": "border"
+  },
+  {
+    "file": "client/components/DeferredInsightsCard.tsx",
+    "line": 128,
+    "class": "border-slate-700",
+    "component": "DeferredInsightsCard",
+    "element": "unknown",
+    "category": "border"
+  },
+  {
+    "file": "client/components/DipFinder.tsx",
+    "line": 99,
+    "class": "bg-slate-800",
+    "component": "DipFinder",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/DipFinder.tsx",
+    "line": 99,
+    "class": "border-slate-700",
+    "component": "DipFinder",
+    "element": "unknown",
+    "category": "border"
+  },
+  {
+    "file": "client/components/DipFinder.tsx",
+    "line": 107,
+    "class": "text-slate-400",
+    "component": "DipFinder",
+    "element": "ChevronDown",
+    "category": "text"
+  },
+  {
+    "file": "client/components/DipFinder.tsx",
+    "line": 117,
+    "class": "text-slate-400",
+    "component": "DipFinder",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/components/DipFinder.tsx",
+    "line": 150,
+    "class": "bg-slate-800/50",
+    "component": "DipFinder",
+    "element": "div",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/DipFinder.tsx",
+    "line": 151,
+    "class": "bg-slate-500",
+    "component": "DipFinder",
+    "element": "div",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/DipFinder.tsx",
+    "line": 184,
+    "class": "text-slate-500",
+    "component": "DipFinder",
+    "element": "div",
+    "category": "text"
+  },
+  {
+    "file": "client/components/EarningsAlertHistoryPanel.tsx",
+    "line": 33,
+    "class": "text-slate-300",
+    "component": "EarningsAlertHistoryPanel",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/components/EarningsAlertHistoryPanel.tsx",
+    "line": 52,
+    "class": "border-slate-700",
+    "component": "EarningsAlertHistoryPanel",
+    "element": "unknown",
+    "category": "border"
+  },
+  {
+    "file": "client/components/EarningsAlertHistoryPanel.tsx",
+    "line": 52,
+    "class": "bg-slate-900/95",
+    "component": "EarningsAlertHistoryPanel",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/EarningsAlertHistoryPanel.tsx",
+    "line": 54,
+    "class": "border-slate-800",
+    "component": "EarningsAlertHistoryPanel",
+    "element": "div",
+    "category": "border"
+  },
+  {
+    "file": "client/components/EarningsAlertHistoryPanel.tsx",
+    "line": 54,
+    "class": "bg-slate-900/95",
+    "component": "EarningsAlertHistoryPanel",
+    "element": "div",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/EarningsAlertHistoryPanel.tsx",
+    "line": 56,
+    "class": "text-slate-500",
+    "component": "EarningsAlertHistoryPanel",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/components/EarningsAlertHistoryPanel.tsx",
+    "line": 64,
+    "class": "text-slate-500",
+    "component": "EarningsAlertHistoryPanel",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/EarningsAlertHistoryPanel.tsx",
+    "line": 69,
+    "class": "divide-slate-800",
+    "component": "EarningsAlertHistoryPanel",
+    "element": "ul",
+    "category": "border"
+  },
+  {
+    "file": "client/components/EarningsAlertHistoryPanel.tsx",
+    "line": 80,
+    "class": "text-slate-500",
+    "component": "EarningsAlertHistoryPanel",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/components/EarningsAlertHistoryPanel.tsx",
+    "line": 88,
+    "class": "bg-slate-700",
+    "component": "EarningsAlertHistoryPanel",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/EarningsAlertHistoryPanel.tsx",
+    "line": 88,
+    "class": "text-slate-300",
+    "component": "EarningsAlertHistoryPanel",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/components/EarningsAlertStrip.tsx",
+    "line": 67,
+    "class": "bg-slate-700/30",
+    "component": "EarningsAlertStrip",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/EarningsAlertStrip.tsx",
+    "line": 67,
+    "class": "text-slate-300",
+    "component": "EarningsAlertStrip",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/components/EarningsAlertStrip.tsx",
+    "line": 89,
+    "class": "bg-slate-700",
+    "component": "EarningsAlertStrip",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/EarningsAlertStrip.tsx",
+    "line": 89,
+    "class": "text-slate-300",
+    "component": "EarningsAlertStrip",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/components/EarningsAlertStrip.tsx",
+    "line": 98,
+    "class": "text-slate-500",
+    "component": "EarningsAlertStrip",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/components/EarningsAlertStrip.tsx",
+    "line": 102,
+    "class": "text-slate-400",
+    "component": "EarningsAlertStrip",
+    "element": "div",
+    "category": "text"
+  },
+  {
+    "file": "client/components/EarningsAlertStrip.tsx",
+    "line": 124,
+    "class": "bg-slate-700",
+    "component": "EarningsAlertStrip",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/EarningsAlertStrip.tsx",
+    "line": 124,
+    "class": "text-slate-200",
+    "component": "EarningsAlertStrip",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/components/EarningsAlertStrip.tsx",
+    "line": 133,
+    "class": "text-slate-500",
+    "component": "EarningsAlertStrip",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/components/EarningsAlertStrip.tsx",
+    "line": 148,
+    "class": "bg-slate-900",
+    "component": "EarningsAlertStrip",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/EarningsAlertStrip.tsx",
+    "line": 148,
+    "class": "border-slate-700",
+    "component": "EarningsAlertStrip",
+    "element": "unknown",
+    "category": "border"
+  },
+  {
+    "file": "client/components/EarningsCalendar.tsx",
+    "line": 27,
+    "class": "bg-slate-800/50",
+    "component": "EarningsCalendar",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/EarningsCalendar.tsx",
+    "line": 30,
+    "class": "border-slate-700/50",
+    "component": "EarningsCalendar",
+    "element": "unknown",
+    "category": "border"
+  },
+  {
+    "file": "client/components/EarningsCalendar.tsx",
+    "line": 46,
+    "class": "text-slate-400",
+    "component": "EarningsCalendar",
+    "element": "div",
+    "category": "text"
+  },
+  {
+    "file": "client/components/EarningsCalendar.tsx",
+    "line": 61,
+    "class": "text-slate-400",
+    "component": "EarningsCalendar",
+    "element": "div",
+    "category": "text"
+  },
+  {
+    "file": "client/components/EarningsCalendar.tsx",
+    "line": 263,
+    "class": "text-slate-400",
+    "component": "EarningsCalendar",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/components/EarningsCalendar.tsx",
+    "line": 263,
+    "class": "bg-slate-800/60",
+    "component": "EarningsCalendar",
+    "element": "span",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/EarningsCalendar.tsx",
+    "line": 274,
+    "class": "text-slate-400",
+    "component": "EarningsCalendar",
+    "element": "div",
+    "category": "text"
+  },
+  {
+    "file": "client/components/EarningsCalendar.tsx",
+    "line": 283,
+    "class": "bg-slate-900/50",
+    "component": "EarningsCalendar",
+    "element": "div",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/EarningsCalendar.tsx",
+    "line": 298,
+    "class": "border-slate-700/50",
+    "component": "EarningsCalendar",
+    "element": "div",
+    "category": "border"
+  },
+  {
+    "file": "client/components/LanguageSwitcher.tsx",
+    "line": 16,
+    "class": "bg-slate-950/50",
+    "component": "LanguageSwitcher",
+    "element": "div",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/LanguageSwitcher.tsx",
+    "line": 16,
+    "class": "border-slate-800",
+    "component": "LanguageSwitcher",
+    "element": "div",
+    "category": "border"
+  },
+  {
+    "file": "client/components/LanguageSwitcher.tsx",
+    "line": 23,
+    "class": "text-slate-400",
+    "component": "LanguageSwitcher",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/components/LanguageSwitcher.tsx",
+    "line": 38,
+    "class": "text-slate-400",
+    "component": "LanguageSwitcher",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 261,
+    "class": "bg-slate-800",
+    "component": "Portfolio",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 261,
+    "class": "border-slate-700",
+    "component": "Portfolio",
+    "element": "unknown",
+    "category": "border"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 267,
+    "class": "text-slate-400",
+    "component": "Portfolio",
+    "element": "ChevronDown",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 274,
+    "class": "bg-slate-800",
+    "component": "Portfolio",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 274,
+    "class": "border-slate-700",
+    "component": "Portfolio",
+    "element": "unknown",
+    "category": "border"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 280,
+    "class": "text-slate-400",
+    "component": "Portfolio",
+    "element": "ChevronDown",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 283,
+    "class": "text-slate-300",
+    "component": "Portfolio",
+    "element": "label",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 283,
+    "class": "bg-slate-800/40",
+    "component": "Portfolio",
+    "element": "label",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 283,
+    "class": "border-slate-700/50",
+    "component": "Portfolio",
+    "element": "label",
+    "category": "border"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 284,
+    "class": "text-slate-400",
+    "component": "Portfolio",
+    "element": "Calendar",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 289,
+    "class": "border-slate-700",
+    "component": "Portfolio",
+    "element": "unknown",
+    "category": "border"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 289,
+    "class": "bg-slate-800",
+    "component": "Portfolio",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 321,
+    "class": "text-slate-400",
+    "component": "Portfolio",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 327,
+    "class": "text-slate-400",
+    "component": "Portfolio",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 333,
+    "class": "text-slate-400",
+    "component": "Portfolio",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 339,
+    "class": "text-slate-400",
+    "component": "Portfolio",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 345,
+    "class": "text-slate-400",
+    "component": "Portfolio",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 362,
+    "class": "text-slate-400",
+    "component": "Portfolio",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 366,
+    "class": "text-slate-500",
+    "component": "Portfolio",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 369,
+    "class": "text-slate-400",
+    "component": "Portfolio",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 373,
+    "class": "text-slate-500",
+    "component": "Portfolio",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 376,
+    "class": "text-slate-400",
+    "component": "Portfolio",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 380,
+    "class": "text-slate-500",
+    "component": "Portfolio",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 383,
+    "class": "text-slate-400",
+    "component": "Portfolio",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 390,
+    "class": "text-slate-500",
+    "component": "Portfolio",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 393,
+    "class": "text-slate-400",
+    "component": "Portfolio",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 400,
+    "class": "text-slate-500",
+    "component": "Portfolio",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 409,
+    "class": "text-slate-400",
+    "component": "Portfolio",
+    "element": "div",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 416,
+    "class": "bg-slate-800",
+    "component": "Portfolio",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 416,
+    "class": "border-slate-700",
+    "component": "Portfolio",
+    "element": "unknown",
+    "category": "border"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 423,
+    "class": "text-slate-400",
+    "component": "Portfolio",
+    "element": "ChevronDown",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 472,
+    "class": "text-slate-300",
+    "component": "Portfolio",
+    "element": "td",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 487,
+    "class": "bg-slate-900/40",
+    "component": "Portfolio",
+    "element": "div",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 487,
+    "class": "border-slate-800",
+    "component": "Portfolio",
+    "element": "div",
+    "category": "border"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 487,
+    "class": "text-slate-300",
+    "component": "Portfolio",
+    "element": "div",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 489,
+    "class": "text-slate-200",
+    "component": "Portfolio",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/components/Portfolio.tsx",
+    "line": 494,
+    "class": "text-slate-500",
+    "component": "Portfolio",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/ProviderHealthIndicator.tsx",
+    "line": 42,
+    "class": "bg-slate-900/70",
+    "component": "ProviderHealthIndicator",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/ProviderHealthIndicator.tsx",
+    "line": 42,
+    "class": "border-slate-700/60",
+    "component": "ProviderHealthIndicator",
+    "element": "unknown",
+    "category": "border"
+  },
+  {
+    "file": "client/components/ProviderHealthIndicator.tsx",
+    "line": 42,
+    "class": "text-slate-300",
+    "component": "ProviderHealthIndicator",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/components/ProviderHealthIndicator.tsx",
+    "line": 43,
+    "class": "bg-slate-500",
+    "component": "ProviderHealthIndicator",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/Skeleton.tsx",
+    "line": 20,
+    "class": "bg-slate-800/60",
+    "component": "Skeleton",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 84,
+    "class": "bg-slate-900",
+    "component": "StockSlideOver",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 84,
+    "class": "border-slate-700",
+    "component": "StockSlideOver",
+    "element": "unknown",
+    "category": "border"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 88,
+    "class": "bg-slate-900",
+    "component": "StockSlideOver",
+    "element": "div",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 88,
+    "class": "border-slate-700",
+    "component": "StockSlideOver",
+    "element": "div",
+    "category": "border"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 96,
+    "class": "text-slate-500",
+    "component": "StockSlideOver",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 104,
+    "class": "text-slate-400",
+    "component": "StockSlideOver",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 115,
+    "class": "text-slate-400",
+    "component": "StockSlideOver",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 120,
+    "class": "text-slate-500",
+    "component": "StockSlideOver",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 126,
+    "class": "bg-slate-800/50",
+    "component": "StockSlideOver",
+    "element": "div",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 126,
+    "class": "border-slate-700",
+    "component": "StockSlideOver",
+    "element": "div",
+    "category": "border"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 151,
+    "class": "text-slate-400",
+    "component": "StockSlideOver",
+    "element": "div",
+    "category": "text"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 163,
+    "class": "border-slate-700",
+    "component": "StockSlideOver",
+    "element": "div",
+    "category": "border"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 166,
+    "class": "text-slate-500",
+    "component": "StockSlideOver",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 174,
+    "class": "text-slate-500",
+    "component": "StockSlideOver",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 182,
+    "class": "text-slate-500",
+    "component": "StockSlideOver",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 196,
+    "class": "text-slate-500",
+    "component": "StockSlideOver",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 208,
+    "class": "bg-slate-800/30",
+    "component": "StockSlideOver",
+    "element": "div",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 208,
+    "class": "border-slate-700/50",
+    "component": "StockSlideOver",
+    "element": "div",
+    "category": "border"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 209,
+    "class": "text-slate-500",
+    "component": "StockSlideOver",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 222,
+    "class": "text-slate-500",
+    "component": "StockSlideOver",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 228,
+    "class": "bg-slate-800/30",
+    "component": "StockSlideOver",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 228,
+    "class": "border-slate-700/50",
+    "component": "StockSlideOver",
+    "element": "unknown",
+    "category": "border"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 231,
+    "class": "text-slate-500",
+    "component": "StockSlideOver",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 235,
+    "class": "text-slate-500",
+    "component": "StockSlideOver",
+    "element": "ChevronDown",
+    "category": "text"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 239,
+    "class": "bg-slate-800/20",
+    "component": "StockSlideOver",
+    "element": "div",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 239,
+    "class": "border-slate-700/30",
+    "component": "StockSlideOver",
+    "element": "div",
+    "category": "border"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 242,
+    "class": "text-slate-500",
+    "component": "StockSlideOver",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 257,
+    "class": "text-slate-500",
+    "component": "StockSlideOver",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/StockSlideOver.tsx",
+    "line": 258,
+    "class": "text-slate-400",
+    "component": "StockSlideOver",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/components/TickerLogo.tsx",
+    "line": 229,
+    "class": "text-slate-200",
+    "component": "TickerLogo",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/components/TickerLogo.tsx",
+    "line": 231,
+    "class": "bg-slate-800",
+    "component": "TickerLogo",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/TickerLogo.tsx",
+    "line": 231,
+    "class": "text-slate-300",
+    "component": "TickerLogo",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/components/TickerLogo.tsx",
+    "line": 232,
+    "class": "bg-slate-800",
+    "component": "TickerLogo",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/components/TickerLogo.tsx",
+    "line": 232,
+    "class": "text-slate-200",
+    "component": "TickerLogo",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/lib/sectorGlyphs.ts",
+    "line": 45,
+    "class": "bg-slate-600/30",
+    "component": "sectorGlyphs (lib)",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/lib/sectorGlyphs.ts",
+    "line": 45,
+    "class": "text-slate-200",
+    "component": "sectorGlyphs (lib)",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Charts.tsx",
+    "line": 83,
+    "class": "bg-slate-800",
+    "component": "Charts",
+    "element": "span",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/pages/Charts.tsx",
+    "line": 83,
+    "class": "border-slate-700",
+    "component": "Charts",
+    "element": "span",
+    "category": "border"
+  },
+  {
+    "file": "client/pages/Charts.tsx",
+    "line": 113,
+    "class": "text-slate-400",
+    "component": "Charts",
+    "element": "div",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Charts.tsx",
+    "line": 160,
+    "class": "text-slate-500",
+    "component": "Charts",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Charts.tsx",
+    "line": 179,
+    "class": "text-slate-500",
+    "component": "Charts",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Charts.tsx",
+    "line": 195,
+    "class": "bg-slate-900/40",
+    "component": "Charts",
+    "element": "div",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/pages/Charts.tsx",
+    "line": 195,
+    "class": "border-slate-800",
+    "component": "Charts",
+    "element": "div",
+    "category": "border"
+  },
+  {
+    "file": "client/pages/Charts.tsx",
+    "line": 195,
+    "class": "text-slate-400",
+    "component": "Charts",
+    "element": "div",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Charts.tsx",
+    "line": 200,
+    "class": "text-slate-500",
+    "component": "Charts",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Charts.tsx",
+    "line": 231,
+    "class": "bg-slate-800",
+    "component": "Charts",
+    "element": "div",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/pages/Charts.tsx",
+    "line": 241,
+    "class": "text-slate-300",
+    "component": "Charts",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Earnings.tsx",
+    "line": 122,
+    "class": "bg-slate-900/50",
+    "component": "Earnings",
+    "element": "div",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/pages/Earnings.tsx",
+    "line": 129,
+    "class": "text-slate-400",
+    "component": "Earnings",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Earnings.tsx",
+    "line": 138,
+    "class": "bg-slate-800",
+    "component": "Earnings",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/pages/Earnings.tsx",
+    "line": 138,
+    "class": "text-slate-300",
+    "component": "Earnings",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Earnings.tsx",
+    "line": 147,
+    "class": "text-slate-400",
+    "component": "Earnings",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Earnings.tsx",
+    "line": 158,
+    "class": "bg-slate-800",
+    "component": "Earnings",
+    "element": "div",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/pages/Earnings.tsx",
+    "line": 158,
+    "class": "border-slate-700",
+    "component": "Earnings",
+    "element": "div",
+    "category": "border"
+  },
+  {
+    "file": "client/pages/Earnings.tsx",
+    "line": 159,
+    "class": "text-slate-400",
+    "component": "Earnings",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Earnings.tsx",
+    "line": 171,
+    "class": "text-slate-300",
+    "component": "Earnings",
+    "element": "label",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Earnings.tsx",
+    "line": 176,
+    "class": "border-slate-700",
+    "component": "Earnings",
+    "element": "unknown",
+    "category": "border"
+  },
+  {
+    "file": "client/pages/Earnings.tsx",
+    "line": 176,
+    "class": "bg-slate-800",
+    "component": "Earnings",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 39,
+    "class": "bg-slate-800/50",
+    "component": "I18nDebug",
+    "element": "header",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 39,
+    "class": "border-slate-700",
+    "component": "I18nDebug",
+    "element": "header",
+    "category": "border"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 42,
+    "class": "text-slate-500",
+    "component": "I18nDebug",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 46,
+    "class": "text-slate-400",
+    "component": "I18nDebug",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 50,
+    "class": "text-slate-500",
+    "component": "I18nDebug",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 60,
+    "class": "border-slate-700",
+    "component": "I18nDebug",
+    "element": "div",
+    "category": "border"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 61,
+    "class": "text-slate-400",
+    "component": "I18nDebug",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 72,
+    "class": "bg-slate-800/60",
+    "component": "I18nDebug",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 72,
+    "class": "text-slate-300",
+    "component": "I18nDebug",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 72,
+    "class": "border-slate-700",
+    "component": "I18nDebug",
+    "element": "unknown",
+    "category": "border"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 80,
+    "class": "text-slate-500",
+    "component": "I18nDebug",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 90,
+    "class": "text-slate-500",
+    "component": "I18nDebug",
+    "element": "th",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 90,
+    "class": "border-slate-700",
+    "component": "I18nDebug",
+    "element": "th",
+    "category": "border"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 97,
+    "class": "border-slate-700",
+    "component": "I18nDebug",
+    "element": "unknown",
+    "category": "border"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 104,
+    "class": "text-slate-500",
+    "component": "I18nDebug",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 112,
+    "class": "text-slate-600",
+    "component": "I18nDebug",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 126,
+    "class": "text-slate-500",
+    "component": "I18nDebug",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 130,
+    "class": "text-slate-300",
+    "component": "I18nDebug",
+    "element": "code",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 134,
+    "class": "text-slate-300",
+    "component": "I18nDebug",
+    "element": "code",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 138,
+    "class": "text-slate-300",
+    "component": "I18nDebug",
+    "element": "code",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 141,
+    "class": "text-slate-300",
+    "component": "I18nDebug",
+    "element": "code",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 142,
+    "class": "text-slate-300",
+    "component": "I18nDebug",
+    "element": "code",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 160,
+    "class": "border-slate-700",
+    "component": "I18nDebug",
+    "element": "footer",
+    "category": "border"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 160,
+    "class": "text-slate-500",
+    "component": "I18nDebug",
+    "element": "footer",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 186,
+    "class": "border-slate-800/50",
+    "component": "I18nDebug",
+    "element": "tr",
+    "category": "border"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 188,
+    "class": "text-slate-300",
+    "component": "I18nDebug",
+    "element": "code",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 222,
+    "class": "bg-slate-800/80",
+    "component": "I18nDebug",
+    "element": "span",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 222,
+    "class": "border-slate-700",
+    "component": "I18nDebug",
+    "element": "span",
+    "category": "border"
+  },
+  {
+    "file": "client/pages/I18nDebug.tsx",
+    "line": 222,
+    "class": "text-slate-400",
+    "component": "I18nDebug",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Index.tsx",
+    "line": 414,
+    "class": "text-slate-400",
+    "component": "Index",
+    "element": "div",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Index.tsx",
+    "line": 426,
+    "class": "text-slate-500",
+    "component": "Index",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Watchlists.tsx",
+    "line": 168,
+    "class": "bg-slate-800/30",
+    "component": "Watchlists",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/pages/Watchlists.tsx",
+    "line": 168,
+    "class": "border-slate-700",
+    "component": "Watchlists",
+    "element": "unknown",
+    "category": "border"
+  },
+  {
+    "file": "client/pages/Watchlists.tsx",
+    "line": 168,
+    "class": "text-slate-300",
+    "component": "Watchlists",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Watchlists.tsx",
+    "line": 173,
+    "class": "text-slate-500",
+    "component": "Watchlists",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Watchlists.tsx",
+    "line": 173,
+    "class": "bg-slate-700/50",
+    "component": "Watchlists",
+    "element": "span",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/pages/Watchlists.tsx",
+    "line": 177,
+    "class": "text-slate-500",
+    "component": "Watchlists",
+    "element": "span",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Watchlists.tsx",
+    "line": 214,
+    "class": "text-slate-400",
+    "component": "Watchlists",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Watchlists.tsx",
+    "line": 223,
+    "class": "text-slate-500",
+    "component": "Watchlists",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Watchlists.tsx",
+    "line": 223,
+    "class": "bg-slate-700/50",
+    "component": "Watchlists",
+    "element": "unknown",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/pages/Watchlists.tsx",
+    "line": 259,
+    "class": "text-slate-400",
+    "component": "Watchlists",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Watchlists.tsx",
+    "line": 267,
+    "class": "bg-slate-900/50",
+    "component": "Watchlists",
+    "element": "thead",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/pages/Watchlists.tsx",
+    "line": 282,
+    "class": "text-slate-500",
+    "component": "Watchlists",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Watchlists.tsx",
+    "line": 298,
+    "class": "text-slate-500",
+    "component": "Watchlists",
+    "element": "td",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Watchlists.tsx",
+    "line": 325,
+    "class": "text-slate-500",
+    "component": "Watchlists",
+    "element": "unknown",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Watchlists.tsx",
+    "line": 340,
+    "class": "text-slate-500",
+    "component": "Watchlists",
+    "element": "p",
+    "category": "text"
+  },
+  {
+    "file": "client/pages/Watchlists.tsx",
+    "line": 398,
+    "class": "bg-slate-800/60",
+    "component": "Watchlists",
+    "element": "div",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/pages/Watchlists.tsx",
+    "line": 399,
+    "class": "bg-slate-800/40",
+    "component": "Watchlists",
+    "element": "div",
+    "category": "surface/background"
+  },
+  {
+    "file": "client/pages/Watchlists.tsx",
+    "line": 426,
+    "class": "text-slate-500",
+    "component": "Watchlists",
+    "element": "span",
+    "category": "text"
+  }
+]

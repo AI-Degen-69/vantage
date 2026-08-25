@@ -217,7 +217,7 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
               value={rawSymbols}
               onChange={(e) => setRawSymbols(e.target.value)}
               placeholder={t("watchlists.symbolsPlaceholder")}
-              className="w-full h-40 bg-slate-900/40 border border-slate-700 rounded-md p-3 text-sm font-mono text-foreground placeholder-slate-500 outline-none focus:border-blue-500 transition-colors resize-none"
+              className="w-full h-40 bg-card/40 border border-border rounded-md p-3 text-sm font-mono text-foreground placeholder-muted-foreground outline-none focus:border-ring transition-colors resize-none"
             />
           </div>
 
@@ -227,11 +227,11 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
           {(truncatedPreview.length > 0 || invalidSymbols.length > 0 || tooManySymbols) && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-400 font-medium">
+                <span className="text-xs text-foreground/80 font-medium">
                   {t("watchlists.validCount", { count: visibleValidCount })}
                 </span>
                 {validated.isValidating && (
-                  <span className="text-xs text-amber-300" dir="ltr">
+                  <span className="text-xs text-chart-amber" dir="ltr">
                     ● {t("watchlists.validatingLabel")}
                   </span>
                 )}
@@ -244,10 +244,10 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
                       p.state === "valid"
                         ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
                         : p.state === "invalid"
-                          ? "bg-red-500/15 text-red-300 border-red-500/30"
+                          ? "bg-chart-negative/15 text-chart-negative border-chart-negative/30"
                           : p.state === "unavailable"
-                            ? "bg-amber-500/15 text-amber-300 border-amber-500/30"
-                            : "bg-blue-500/15 text-blue-300 border-blue-500/30"
+                            ? "bg-chart-amber/15 text-chart-amber border-chart-amber/30"
+                            : "bg-chart-blue/15 text-chart-blue border-chart-blue/30"
                     }`}
                     title={p.displayName ?? p.symbol}
                   >
@@ -255,38 +255,38 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
                   </span>
                 ))}
                 {preview.length > truncatedPreview.length && (
-                  <span className="text-xs text-slate-500 px-2 py-0.5">
+                  <span className="text-xs text-muted-foreground px-2 py-0.5">
                     +{preview.length - truncatedPreview.length}
                   </span>
                 )}
               </div>
               {tooManySymbols && (
-                <div className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2">
+                <div className="text-xs text-chart-amber bg-chart-amber/10 border border-chart-amber/30 rounded-md px-3 py-2">
                   {t("watchlists.tooManySymbols", { max: MAX_WATCHLIST_SYMBOLS })}
                 </div>
               )}
               {unavailableCount > 0 && (
-                <div className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2">
+                <div className="text-xs text-chart-amber bg-chart-amber/10 border border-chart-amber/30 rounded-md px-3 py-2">
                   {t("watchlists.validationUnavailable")}
                 </div>
               )}
               {invalidSymbols.length > 0 && (
                 <>
-                  <div className="text-xs text-slate-400 font-medium" dir="ltr">
+                  <div className="text-xs text-foreground/80 font-medium" dir="ltr">
                     {t("watchlists.invalidCount", { count: visibleInvalidCount })}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {invalidSymbols.slice(0, 24).map((s) => (
                       <span
                         key={s}
-                        className="text-xs font-bold px-2 py-0.5 rounded border bg-red-500/15 text-red-300 border-red-500/30"
+                        className="text-xs font-bold px-2 py-0.5 rounded border bg-chart-negative/15 text-chart-negative border-chart-negative/30"
                         title={t("watchlists.invalidChip")}
                       >
                         {s} <X className="w-3 h-3 inline-block -mt-0.5" />
                       </span>
                     ))}
                     {invalidSymbols.length > 24 && (
-                      <span className="text-xs text-slate-500 px-2 py-0.5" dir="ltr">
+                      <span className="text-xs text-muted-foreground px-2 py-0.5" dir="ltr">
                         +{invalidSymbols.length - 24}
                       </span>
                     )}
@@ -297,7 +297,7 @@ export function AddWatchlistSheet({ open, onOpenChange, onCreate }: AddWatchlist
           )}
 
           {error && (
-            <div className="text-xs text-red-300 bg-red-500/10 border border-red-500/30 rounded-md px-3 py-2">
+            <div className="text-xs text-chart-negative bg-chart-negative/10 border border-chart-negative/30 rounded-md px-3 py-2">
               {error}
             </div>
           )}
