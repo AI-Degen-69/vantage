@@ -47,13 +47,22 @@ export function formatMoneyCompact(
   const abs = Math.abs(n);
   const sign = n < 0 ? "-" : "";
   if (abs < 1e3) return `${sign}$${Math.round(abs).toLocaleString()}`;
-  const tier =
-    abs >= 1e12
-      ? ([1e12, "T"] as const)
-      : abs >= 1e9
-        ? ([1e9, "B"] as const)
-        : abs >= 1e6
-          ? ([1e6, "M"] as const)
-          : ([1e3, "K"] as const);
-  return `${sign}$${(abs / tier[0]).toFixed(decimals)}${tier[1]}`;
+  const tiers = [
+    [1e3, "K"],
+    [1e6, "M"],
+    [1e9, "B"],
+    [1e12, "T"],
+  ] as const;
+  let tierIdx = abs >= 1e12 ? 3 : abs >= 1e9 ? 2 : abs >= 1e6 ? 1 : 0;
+  let scaled = abs / tiers[tierIdx][0];
+  // Rounding can push a value past its tier boundary (999_999 →
+  // "1000.00K"); promote until the rendered magnitude fits the tier.
+  while (
+    Number(scaled.toFixed(decimals)) >= 1000 &&
+    tierIdx < tiers.length - 1
+  ) {
+    tierIdx += 1;
+    scaled = abs / tiers[tierIdx][0];
+  }
+  return `${sign}$${scaled.toFixed(decimals)}${tiers[tierIdx][1]}`;
 }

@@ -60,6 +60,12 @@ describe("formatMoneyCompact", () => {
     expect(formatMoneyCompact(52_340_000, 0)).toBe("$52M");
   });
 
+  it("promotes the tier when rounding crosses the boundary", () => {
+    expect(formatMoneyCompact(999_999)).toBe("$1.00M");
+    expect(formatMoneyCompact(999_999_999)).toBe("$1.00B");
+    expect(formatMoneyCompact(949_999)).toBe("$950.00K");
+  });
+
   it("returns null for missing or non-finite input so callers render em-dashes", () => {
     expect(formatMoneyCompact(undefined)).toBeNull();
     expect(formatMoneyCompact(null)).toBeNull();
