@@ -125,9 +125,32 @@ export const kvJsonCache = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 let _lastWarned = {};
+let _lastWarnSweepAt = 0;
+const WARN_THROTTLE_MS = 60000;
+const WARN_MAP_SOFT_CAP = 512;
 function throttledWarn(key, ...args) {
   const now = Date.now();
-  if (_lastWarned[key] && now - _lastWarned[key] < 60000) return;
+  // Keys embed dynamic ids (symbol, pair), so the map is bounded two
+  // ways: an amortized sweep (at most once per window) drops expired
+  // entries, and a hard cap evicts oldest-inserted keys — a sustained
+  // sweep of unique non-expired keys can neither grow this map
+  // unboundedly nor pay per-write full scans.
+  if (now - _lastWarnSweepAt >= WARN_THROTTLE_MS) {
+    _lastWarnSweepAt = now;
+    for (const k of Object.keys(_lastWarned)) {
+      if (now - _lastWarned[k] >= WARN_THROTTLE_MS) delete _lastWarned[k];
+    }
+  }
+  // Throttle check BEFORE eviction: a repeated-but-throttled key must
+  // not make room it doesn't need — otherwise sustained repeats drain
+  // fresh guards from other keys (or its own).
+  if (_lastWarned[key] && now - _lastWarned[key] < WARN_THROTTLE_MS) return;
+  const keys = Object.keys(_lastWarned);
+  while (keys.length >= WARN_MAP_SOFT_CAP) {
+    const oldest = keys[0];
+    delete _lastWarned[oldest];
+    keys.shift();
+  }
   _lastWarned[key] = now;
   console.warn(...args);
 }
@@ -185,7 +208,12 @@ async function getYahooQuote(symbol) {
     const result = normalizeQuote(q, symbol);
     cache.set(cacheKey, result, QUOTE_TTL);
     return result;
-  } catch {
+  } catch (e) {
+    throttledWarn(
+      `yahoo_quote_js:${symbol}`,
+      `[router] yahoo quote failed for ${symbol}:`,
+      e?.message,
+    );
     return null;
   }
 }
@@ -1451,7 +1479,12 @@ export async function handleSmaDistances(req, res) {
           sampleSize: tail.length,
           price,
         };
-      } catch {
+      } catch (e) {
+        throttledWarn(
+          `sma:${sym}`,
+          `[router] sma history failed for ${sym}:`,
+          e?.message,
+        );
         return {
           symbol: sym,
           sma200: null,
@@ -1787,7 +1820,12 @@ export async function handleFxRates(req, res) {
         return Number.isFinite(px) && px > 0
           ? [sym.replace("=X", ""), px]
           : null;
-      } catch {
+      } catch (e) {
+        throttledWarn(
+          `fx_pair:${sym}`,
+          `[router] fx pair failed for ${sym}:`,
+          e?.message,
+        );
         return null;
       }
     }),
