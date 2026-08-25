@@ -58,6 +58,18 @@ function makeRes() {
 
 const makeReq = (query: Record<string, unknown>) => ({ query }) as any;
 
+/** Unique letters-only symbols (shared route contract: /^[A-Z]{1,5}$/). */
+const letter = (i: number) => String.fromCharCode(65 + (i % 26));
+const cappedSymbols = (prefix: string, count: number) =>
+  Array.from({ length: count }, (_, i) =>
+    [
+      prefix,
+      letter(i),
+      letter(Math.floor(i / 26)),
+      letter(Math.floor(i / 676)),
+    ].join(""),
+  );
+
 describe("per-item failure paths warn instead of vanishing", () => {
   let warnSpy: ReturnType<typeof vi.spyOn>;
 
@@ -77,7 +89,13 @@ describe("per-item failure paths warn instead of vanishing", () => {
     expect(first.statusCalls).toEqual([]);
     expect(first.getJson()).toEqual({
       rows: [
-        { symbol: "AAPL", sma200: null, distancePct: null, sampleSize: 0, price: null },
+        {
+          symbol: "AAPL",
+          sma200: null,
+          distancePct: null,
+          sampleSize: 0,
+          price: null,
+        },
       ],
     });
     // Throttle contract: a second failure for the same key inside the
@@ -133,12 +151,11 @@ describe("per-item failure paths warn instead of vanishing", () => {
 
   it("never silences a first warning, even past the hard map cap", async () => {
     // Sustained sweep of unique, non-expired keys: eviction must keep
-    // memory bounded WITHOUT dropping any first-time warning.
+    // memory bounded WITHOUT dropping any first-time warning. Symbols
+    // must satisfy the shared route contract ([A-Z]{1,5}) — digit-bearing
+    // tickers 400 before ever reaching the warn path.
     const count = 600;
-    const symbols = Array.from(
-      { length: count },
-      (_, i) => `W${i.toString(36).toUpperCase().padStart(3, "0")}`,
-    );
+    const symbols = cappedSymbols("W", count);
     let warned = 0;
     for (const sym of symbols) {
       warnSpy.mockClear();
@@ -161,17 +178,19 @@ describe("per-item failure paths warn instead of vanishing", () => {
       // Fill the map to exactly its hard cap with unique keys.
       for (let i = 0; i < 512; i += 1) {
         await handleSmaDistances(
-          makeReq({ symbols: `F${i.toString(36).toUpperCase().padStart(3, "0")}` }),
+          makeReq({
+            symbols: cappedSymbols("F", 512)[i],
+          }),
           makeRes().res,
         );
       }
       warnSpy.mockClear();
       // Repeat a key that is in-map and still fresh. The throttle check
       // must win over eviction: no new warning AND no collateral eviction.
-      await handleSmaDistances(makeReq({ symbols: "F000" }), makeRes().res);
+      await handleSmaDistances(makeReq({ symbols: "FAAA" }), makeRes().res);
       expect(
         warnSpy.mock.calls.filter((c) =>
-          String(c[0]).includes("sma history failed for F000"),
+          String(c[0]).includes("sma history failed for FAAA"),
         ),
       ).toHaveLength(0);
     } finally {

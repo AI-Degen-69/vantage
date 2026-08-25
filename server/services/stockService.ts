@@ -37,10 +37,7 @@ import {
   YahooFallbackFinancials,
   AvailabilityState,
 } from "../../shared/api";
-import {
-  insightsTabLabels,
-  insightsTabUniverses,
-} from "./insightsUniverses";
+import { insightsTabLabels, insightsTabUniverses } from "./insightsUniverses";
 import {
   normalizeDividendYield,
   normalizeYahooPercentage,
@@ -866,7 +863,9 @@ async function fetchProfileWithAvailability(
           symbol,
           companyName: String(yahooName),
           description: String(
-            assetProfile?.longBusinessSummary ?? yahoo?.longBusinessSummary ?? "",
+            assetProfile?.longBusinessSummary ??
+              yahoo?.longBusinessSummary ??
+              "",
           ),
           sector: String(assetProfile?.sector ?? yahoo?.sector ?? ""),
           industry: String(assetProfile?.industry ?? yahoo?.industry ?? ""),
@@ -1040,7 +1039,9 @@ export async function fetchTrendingMovers(): Promise<TrendingMoversResult> {
     if (!Array.isArray(list)) return;
     for (const row of list) {
       if (!row || typeof row !== "object") continue;
-      const symbol = String(row.symbol ?? "").trim().toUpperCase();
+      const symbol = String(row.symbol ?? "")
+        .trim()
+        .toUpperCase();
       if (!symbol || seen.has(symbol)) continue;
       const name = String(row.name ?? row.companyName ?? "").trim() || symbol;
       seen.add(symbol);
@@ -1056,7 +1057,8 @@ export async function fetchTrendingMovers(): Promise<TrendingMoversResult> {
   // worth serving normally, and a lone 429 beside healthy 200s shouldn't
   // back off the whole tab.
   const rateLimited =
-    out.length === 0 && [gainers, losers, actives].some((r) => r.status === 429);
+    out.length === 0 &&
+    [gainers, losers, actives].some((r) => r.status === 429);
 
   return { entries: out.slice(0, TRENDING_MOVERS_MAX), rateLimited };
 }
@@ -1114,7 +1116,10 @@ export function normalizeRevenueSegmentationRows(
       reportedCurrency: String(row.reportedCurrency ?? "USD"),
       fiscalYear,
       period,
-      totalRevenue: products.length > 0 ? products.reduce((acc, p) => acc + p.revenue, 0) : null,
+      totalRevenue:
+        products.length > 0
+          ? products.reduce((acc, p) => acc + p.revenue, 0)
+          : null,
       products,
     });
   }
@@ -1628,7 +1633,12 @@ export const stockService = {
     const getYahooMetrics = async (): Promise<StockMetrics> => {
       try {
         const raw: any = await yahooFinance.quoteSummary(symbol, {
-          modules: ["defaultKeyStatistics", "financialData", "summaryDetail", "price"],
+          modules: [
+            "defaultKeyStatistics",
+            "financialData",
+            "summaryDetail",
+            "price",
+          ],
         });
         const dks = raw?.defaultKeyStatistics ?? {};
         const fd = raw?.financialData ?? {};
@@ -1642,33 +1652,32 @@ export const stockService = {
         const freeCashFlow = extract(fd.freeCashflow) ?? null;
         const pcf =
           operatingCashFlow && marketCap ? marketCap / operatingCashFlow : null;
-        const pfcf = freeCashFlow && marketCap ? marketCap / freeCashFlow : null;
+        const pfcf =
+          freeCashFlow && marketCap ? marketCap / freeCashFlow : null;
         const fcfYield =
           freeCashFlow && marketCap ? (freeCashFlow / marketCap) * 100 : null;
         const metrics: KeyMetricsTTM = {
           revenuePerShareTTM: extract(fd.revenuePerShare),
           netIncomePerShareTTM: extract(dks.trailingEps),
-          peRatioTTM: extract(sd.trailingPE) ?? extract(dks.forwardPE),
+          peRatioTTM: extract(sd.trailingPE),
           dividendYieldTTM: normalizeYahooPercentage(
             extract(sd.dividendYield) ??
               extract(sd.trailingAnnualDividendYield),
           ),
-          priceToSalesRatioTTM:
-            extract(sd.priceToSalesTrailing12Months) ??
-            extract(dks.enterpriseToRevenue),
+          // EV/Revenue is a different ratio (mapped to evToSalesTTM
+          // below) — it must not masquerade as price-to-sales.
+          priceToSalesRatioTTM: extract(sd.priceToSalesTrailing12Months),
           priceToBookRatioTTM: extract(dks.priceToBook),
           evToSalesTTM: extract(dks.enterpriseToRevenue),
           evToEBITDATTM: extract(dks.enterpriseToEbitda),
-          returnOnEquityTTM: extract(fd.returnOnEquity),
-          returnOnAssetsTTM: extract(fd.returnOnAssets),
+          returnOnEquityTTM: fmpToPercent(extract(fd.returnOnEquity)),
+          returnOnAssetsTTM: fmpToPercent(extract(fd.returnOnAssets)),
           freeCashFlowYieldTTM: fcfYield ?? undefined,
         };
         const ratios: RatiosTTM = {
           priceEarningsRatioTTM: extract(sd.trailingPE),
           priceToBookRatioTTM: extract(dks.priceToBook),
-          priceToSalesRatioTTM:
-            extract(sd.priceToSalesTrailing12Months) ??
-            extract(dks.enterpriseToRevenue),
+          priceToSalesRatioTTM: extract(sd.priceToSalesTrailing12Months),
           priceToEarningsGrowthRatioTTM: extract(dks.pegRatio),
           priceToOperatingCashFlowRatioTTM: pcf ?? undefined,
           priceToFreeCashFlowRatioTTM: pfcf ?? undefined,
@@ -1725,7 +1734,10 @@ export const stockService = {
         tickerUrl("key-metrics-ttm", symbol),
         `metrics/${symbol}`,
       ),
-      fetchJSONStatus<any[]>(tickerUrl("ratios-ttm", symbol), `ratios/${symbol}`),
+      fetchJSONStatus<any[]>(
+        tickerUrl("ratios-ttm", symbol),
+        `ratios/${symbol}`,
+      ),
       fetchJSONStatus<any[]>(
         tickerUrl("financial-scores", symbol),
         `scores/${symbol}`,
@@ -1793,9 +1805,7 @@ export const stockService = {
     const ratios: RatiosTTM = {
       ...(rRaw as RatiosTTM),
       netProfitMargin: fmpToPercent(rRaw.netProfitMargin),
-      operatingProfitMarginTTM: fmpToPercent(
-        rRaw.operatingProfitMarginTTM,
-      ),
+      operatingProfitMarginTTM: fmpToPercent(rRaw.operatingProfitMarginTTM),
       grossProfitMarginTTM: fmpToPercent(rRaw.grossProfitMarginTTM),
       dividendPayoutRatioTTM: fmpToPercent(rRaw.dividendPayoutRatioTTM),
     };
@@ -2311,11 +2321,12 @@ export const stockService = {
       // Transient failures recover quickly, but an explicit 429 means the
       // daily quota is exhausted — back off hard so we stop re-firing the
       // three movers calls into an already-throttled key.
-      const ttl = entries.length > 0
-        ? TRENDING_MOVERS_TTL
-        : rateLimited
-          ? TRENDING_MOVERS_RATE_LIMIT_TTL
-          : QUOTE_NEGATIVE_TTL;
+      const ttl =
+        entries.length > 0
+          ? TRENDING_MOVERS_TTL
+          : rateLimited
+            ? TRENDING_MOVERS_RATE_LIMIT_TTL
+            : QUOTE_NEGATIVE_TTL;
       cache.set(cacheKey, result, ttl);
       return result;
     });
@@ -2335,7 +2346,7 @@ export const stockService = {
     const entries =
       validKey === "trending"
         ? await this.getTrendingUniverse()
-        : insightsTabUniverses[validKey] ?? insightsTabUniverses.sp500;
+        : (insightsTabUniverses[validKey] ?? insightsTabUniverses.sp500);
     return {
       tab: validKey,
       label: insightsTabLabels[validKey],
