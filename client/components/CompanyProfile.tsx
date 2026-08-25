@@ -9,6 +9,7 @@ import {
   useScreenerAsset,
 } from "@/hooks/useStockData";
 import { formatTradeDateLocale, parseTradeDateMs } from "@/lib/finance";
+import { formatMoneyCompact } from "@/lib/format";
 import type { InsiderTransactionCategory } from "@shared/api";
 import { SectionCardSkeleton } from "@/components/Skeleton";
 import DataStatusBadge from "@/components/DataStatusBadge";
@@ -346,9 +347,7 @@ export default function CompanyProfile({
                         {price}
                       </td>
                       <td className="py-3 font-mono tabular-nums" dir="ltr">
-                        {trade.value !== null
-                          ? `$${formatCompactUsd(trade.value)}`
-                          : "—"}
+                        {formatMoneyCompact(trade.value) ?? "—"}
                       </td>
                       <td
                         className="py-3 text-right font-mono tabular-nums text-muted-foreground"
@@ -666,10 +665,3 @@ function i18nInsiderCategory(
   }
 }
 
-function formatCompactUsd(value: number): string {
-  const abs = Math.abs(value);
-  if (abs >= 1e9) return `${(value / 1e9).toFixed(2)}B`;
-  if (abs >= 1e6) return `${(value / 1e6).toFixed(2)}M`;
-  if (abs >= 1e3) return `${(value / 1e3).toFixed(1)}K`;
-  return value.toFixed(0);
-}
