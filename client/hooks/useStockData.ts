@@ -27,7 +27,7 @@ import type {
 import type { QuickStat } from "@/lib/mockData";
 import { serializeSectorMeta } from "@shared/sectorMeta";
 import type { CompanyProfile as ApiCompanyProfile } from "@shared/api";
-import { chunkSymbols } from "@/lib/batchQuotes";
+import { chunkSymbols, mergeBatchQuoteResponses } from "@/lib/batchQuotes";
 
 interface IndexQuotesResponse {
   dow: IndexQuote | null;
@@ -87,19 +87,7 @@ export function useBatchQuotes(tickers: string[]) {
           ),
         ),
       );
-      const successful = responses.filter(
-        (response): response is PromiseFulfilledResult<BatchQuoteResponse> =>
-          response.status === "fulfilled",
-      );
-      if (successful.length === 0) {
-        const firstFailure = responses.find(
-          (response): response is PromiseRejectedResult => response.status === "rejected",
-        );
-        throw firstFailure?.reason ?? new Error("All quote batches failed");
-      }
-      return {
-        quotes: successful.flatMap((response) => response.value.quotes),
-      } satisfies BatchQuoteResponse;
+      return mergeBatchQuoteResponses(responses);
     },
     enabled: tickers.length > 0,
     refetchInterval: 60_000,

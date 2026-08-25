@@ -41,6 +41,13 @@ import {
   insightsTabLabels,
   insightsTabUniverses,
 } from "./insightsUniverses";
+import {
+  normalizeDividendYield,
+  normalizeYahooPercentage,
+  normalizeYahooQuote,
+} from "./yahooQuoteShape";
+
+export { normalizeYahooPercentage };
 // Relative path (not `@shared/...`) so the helper resolves cleanly under Vite's
 // config-file resolver, which doesn't apply its own `resolve.alias` map when
 // bundling vite.config.ts at startup. The TS path alias still works — this is
@@ -130,6 +137,8 @@ const PROVIDER_HEALTH_TIMEOUT_MS = 8_000; // per-provider probe timeout
 // ---- Warn throttling --------------------------------------
 const lastWarnAt = new Map<string, number>();
 const WARN_THROTTLE_MS = 60_000;
+const WARN_MAP_SOFT_CAP = 512;
+let lastWarnSweepAt = 0;
 
 const quoteInFlight = createInFlightRegistry();
 const batchQuoteInFlight = createInFlightRegistry();
@@ -145,11 +154,22 @@ const yahooFallbackInFlight = createInFlightRegistry();
 // biggest-losers / most-actives) behind one upstream round-trip.
 const trendingMoversInFlight = createInFlightRegistry();
 
-/** Throttle to once-per-key per minute. Logs once per (function, symbol) per minute. */
+/** Throttle to once-per-key per minute. Logs once per (function, symbol) per minute. Keys embed dynamic ids (symbol, label), so the map is bounded two ways: an amortized sweep (at most once per window) drops expired entries, and a hard cap evicts oldest-inserted keys. The throttle check runs BEFORE eviction — a repeated-but-throttled key must not make room it doesn't need, or sustained repeats drain fresh guards from other keys. Mirrors the bounded throttle in api/_router.js. */
 function throttledWarn(key: string, ...args: unknown[]): void {
   const now = Date.now();
+  if (now - lastWarnSweepAt >= WARN_THROTTLE_MS) {
+    lastWarnSweepAt = now;
+    for (const [k, at] of lastWarnAt) {
+      if (now - at >= WARN_THROTTLE_MS) lastWarnAt.delete(k);
+    }
+  }
   const last = lastWarnAt.get(key);
   if (last !== undefined && now - last < WARN_THROTTLE_MS) return;
+  while (lastWarnAt.size >= WARN_MAP_SOFT_CAP) {
+    const oldest = lastWarnAt.keys().next().value;
+    if (oldest === undefined) break;
+    lastWarnAt.delete(oldest);
+  }
   lastWarnAt.set(key, now);
   console.warn(...args);
 }
@@ -479,13 +499,6 @@ function normalizeProfile(raw: any): CompanyProfile {
   };
 }
 
-export function normalizeYahooPercentage(value: unknown): number | undefined {
-  if (value === undefined || value === null || value === "") return undefined;
-  const n = Number(value);
-  if (!Number.isFinite(n)) return undefined;
-  return Math.abs(n) <= 1 ? n * 100 : n;
-}
-
 /**
  * FMP's percentage metrics arrive as decimal fractions (0.269 = 26.9%)
  * and can exceed 1 — AAPL ROE ≈ 1.52 = 152%. Convert to percent units
@@ -498,30 +511,6 @@ export function fmpToPercent(value: unknown): number | undefined {
   if (value === undefined || value === null || value === "") return undefined;
   const n = Number(value);
   return Number.isFinite(n) ? n * 100 : undefined;
-}
-
-function normalizeDividendYield(
-  rawYield: unknown,
-  dividendRate: unknown,
-  price: unknown,
-): number | undefined {
-  const direct = Number(rawYield);
-  const rate = Number(dividendRate);
-  const currentPrice = Number(price);
-  if (
-    Number.isFinite(rate) &&
-    rate >= 0 &&
-    Number.isFinite(currentPrice) &&
-    currentPrice > 0
-  ) {
-    const derived = (rate / currentPrice) * 100;
-    // A declared rate and current price are auditable; prefer them over
-    // Yahoo's version-dependent dividendYield field.
-    return derived <= 20 ? derived : undefined;
-  }
-  if (!Number.isFinite(direct) || direct < 0 || direct > 20) return undefined;
-  // QuoteSummary's decimal form (0.0004 = 0.04%) is normalized here too.
-  return direct <= 1 ? direct * 100 : direct;
 }
 
 function normalizeQuote(raw: any): StockQuote | null {
@@ -999,57 +988,9 @@ async function yahooQuote(symbol: string): Promise<StockQuote | null> {
   try {
     // yahoo-finance2 v4 returns camelCase already for the regularMarket* fields.
     const q: any = await yahooFinance.quote(symbol);
-    if (!q) return null;
-    const toFinite = (value: unknown): number | undefined => {
-      if (value === null || value === undefined || value === "")
-        return undefined;
-      const number = Number(value);
-      return Number.isFinite(number) ? number : undefined;
-    };
-    const price = toFinite(q.regularMarketPrice);
-    if (price === undefined || price <= 0) return null;
-    const earningsTimestamp = toFinite(q.earningsTimestamp);
-    return {
-      symbol: String(q.symbol ?? symbol),
-      name: q.longName ?? q.shortName ?? q.displayName,
-      price,
-      change: toFinite(q.regularMarketChange) ?? 0,
-      changesPercentage: toFinite(q.regularMarketChangePercent) ?? 0,
-      previousClose: toFinite(q.regularMarketPreviousClose),
-      dayLow: toFinite(q.regularMarketDayLow),
-      dayHigh: toFinite(q.regularMarketDayHigh),
-      yearLow: toFinite(q.fiftyTwoWeekLow),
-      yearHigh: toFinite(q.fiftyTwoWeekHigh),
-      priceAvg50: toFinite(q.fiftyDayAverage),
-      priceAvg200: toFinite(q.twoHundredDayAverage),
-      marketCap: toFinite(q.marketCap),
-      volume: toFinite(q.regularMarketVolume),
-      avgVolume: toFinite(
-        q.averageDailyVolume10Day ?? q.averageDailyVolume3Month,
-      ),
-      exchange: q.exchange,
-      sharesOutstanding: toFinite(q.sharesOutstanding),
-      eps: toFinite(q.epsTrailingTwelveMonths),
-      pe: toFinite(q.trailingPE),
-      earningsAnnouncement: q.earningsTimestamp
-        ? new Date(
-            typeof q.earningsTimestamp === "number" &&
-            q.earningsTimestamp < 1e12
-              ? q.earningsTimestamp * 1000
-              : q.earningsTimestamp,
-          ).toISOString()
-        : null,
-      // Normalize Yahoo's mixed quote conventions into percentage points.
-      // Prefer dividendRate / price because it is auditable and prevents a
-      // decimal-vs-percent mismatch from displaying an impossible yield.
-      dividendRate: toFinite(q.dividendRate),
-      dividendYield: normalizeDividendYield(
-        q.dividendYield,
-        q.dividendRate,
-        price,
-      ),
-      payoutRatio: normalizeYahooPercentage(q.payoutRatio),
-    };
+    // Field mapping lives in the shared `yahooQuoteShape.ts` module so the
+    // Vercel `_router.js` twin cannot drift from this path again.
+    return normalizeYahooQuote(q, symbol);
   } catch (e: any) {
     // Yahoo v4 throws if the symbol is unknown — fall through to MOCK.
     throttledWarn(
