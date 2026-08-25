@@ -28,6 +28,7 @@ import type { QuickStat } from "@/lib/mockData";
 import { serializeSectorMeta } from "@shared/sectorMeta";
 import type { CompanyProfile as ApiCompanyProfile } from "@shared/api";
 import { chunkSymbols, mergeBatchQuoteResponses } from "@/lib/batchQuotes";
+import { isProviderStatus } from "@/lib/providerHealth";
 
 interface IndexQuotesResponse {
   dow: IndexQuote | null;
@@ -194,11 +195,7 @@ export function useProviderHealth() {
  */
 export function useYahooDown() {
   const { data } = useProviderHealth();
-  return (
-    data?.providers?.some(
-      (p) => p.provider === "yahoo" && p.feature === "quote" && p.status === "down",
-    ) ?? false
-  );
+  return isProviderStatus(data?.providers, "yahoo", "quote", "down");
 }
 
 /**
@@ -224,11 +221,7 @@ export function useYahooDown() {
  */
 export function useYahooChartDown() {
   const { data } = useProviderHealth();
-  return (
-    data?.providers?.some(
-      (p) => p.provider === "yahoo" && p.feature === "chart" && p.status === "down",
-    ) ?? false
-  );
+  return isProviderStatus(data?.providers, "yahoo", "chart", "down");
 }
 
 /**
@@ -243,12 +236,7 @@ export function useYahooChartDown() {
  */
 export function useFmpBatchQuoteRestricted() {
   const { data } = useProviderHealth();
-  return (
-    data?.providers?.some(
-      (p) =>
-        p.provider === "fmp" && p.feature === "batch-quote" && p.status === "known_restriction",
-    ) ?? false
-  );
+  return isProviderStatus(data?.providers, "fmp", "batch-quote", "known_restriction");
 }
 
 /**
