@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useScreenerFilter, useScreenerFacets } from "@/hooks/useStockData";
 import { Link } from "react-router-dom";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, translateAssetType, translateCountry, translateMarketCap, translateSector } from "@/lib/i18n";
 import {
   ChevronLeft,
   ChevronRight,
@@ -81,6 +81,7 @@ function FilterCategoryRow({
   onChange: (vals: string[]) => void;
   moreLabel?: string;
 }) {
+  const { t } = useI18n();
   const [popoverOpen, setPopoverOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -139,10 +140,10 @@ function FilterCategoryRow({
           type="button"
           onClick={toggleSelectAll}
           className="inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline px-1.5 py-0.5 rounded bg-primary/5 hover:bg-primary/10 transition-colors"
-          title={isAllSelected ? "Deselect all" : "Select all"}
+          title={isAllSelected ? t("screener.clear") : t("screener.selectAll")}
         >
           <CheckCheck className="w-3 h-3" />
-          {isAllSelected ? "Clear" : "All"}
+          {isAllSelected ? t("screener.clear") : t("screener.selectAll")}
         </button>
       </div>
 
@@ -197,7 +198,7 @@ function FilterCategoryRow({
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
               <span>
                 {extraSelectedCount > 0
-                  ? `+${extraSelectedCount} More`
+                  ? `+${extraSelectedCount}`
                   : `${moreLabel}...`}
               </span>
             </button>
@@ -205,7 +206,7 @@ function FilterCategoryRow({
             {popoverOpen && (
               <div className="absolute top-full left-0 mt-2 z-50 w-64 max-h-64 overflow-y-auto rounded-xl border border-border bg-card p-2 shadow-2xl animate-in fade-in-0 zoom-in-95">
                 <div className="flex items-center justify-between px-2 py-1 mb-1 border-b border-border text-xs font-semibold text-muted-foreground">
-                  <span>More {title}</span>
+                  <span>{title}</span>
                   {extraSelectedCount > 0 && (
                     <button
                       type="button"
@@ -214,7 +215,7 @@ function FilterCategoryRow({
                       }
                       className="text-chart-negative hover:underline text-[11px]"
                     >
-                      Clear
+                      {t("screener.clear")}
                     </button>
                   )}
                 </div>
@@ -315,40 +316,40 @@ export default function Screener() {
 
   // Unrolled lists for Asset Types with Icons
   const allAssetTypeChips: FilterChip[] = [
-    { value: "Equity", label: "Stocks", icon: TrendingUp },
-    { value: "ETF", label: "ETF", icon: Layers },
-    { value: "Index", label: "Index", icon: LineChart },
-    { value: "Crypto", label: "Crypto", icon: Coins },
-    { value: "Fund", label: "Fund", icon: Briefcase },
-    { value: "Currency", label: "Currency", icon: DollarSign },
-    { value: "MoneyMarket", label: "Money Market", icon: Building2 },
+    { value: "Equity", label: t("screener.assetType.stocks"), icon: TrendingUp },
+    { value: "ETF", label: t("screener.assetType.etf"), icon: Layers },
+    { value: "Index", label: t("screener.assetType.index"), icon: LineChart },
+    { value: "Crypto", label: t("screener.assetType.crypto"), icon: Coins },
+    { value: "Fund", label: t("screener.assetType.fund"), icon: Briefcase },
+    { value: "Currency", label: t("screener.assetType.currency"), icon: DollarSign },
+    { value: "MoneyMarket", label: t("screener.assetType.moneyMarket"), icon: Building2 },
   ];
 
   // Alphabetically sorted Sector Chips with Icons
   const sortedSectorChips: FilterChip[] = [
-    { value: "Communication Services", label: "Communication", icon: Radio },
-    { value: "Consumer Discretionary", label: "Consumer Disc.", icon: ShoppingBag },
-    { value: "Consumer Staples", label: "Consumer Staples", icon: ShoppingCart },
-    { value: "Energy", label: "Energy", icon: Flame },
-    { value: "Financials", label: "Finance", icon: Landmark },
-    { value: "Health Care", label: "Healthcare", icon: HeartPulse },
-    { value: "Industrials", label: "Industrials", icon: Factory },
-    { value: "Information Technology", label: "Tech", icon: Cpu },
-    { value: "Materials", label: "Materials", icon: Boxes },
-    { value: "Real Estate", label: "Real Estate", icon: Building },
-    { value: "Utilities", label: "Utilities", icon: Zap },
+    { value: "Communication Services", label: t("sector.communicationServices"), icon: Radio },
+    { value: "Consumer Discretionary", label: t("sector.consumerDiscretionary"), icon: ShoppingBag },
+    { value: "Consumer Staples", label: t("sector.consumerStaples"), icon: ShoppingCart },
+    { value: "Energy", label: t("sector.energy"), icon: Flame },
+    { value: "Financials", label: t("sector.financials"), icon: Landmark },
+    { value: "Health Care", label: t("sector.healthCare"), icon: HeartPulse },
+    { value: "Industrials", label: t("sector.industrials"), icon: Factory },
+    { value: "Information Technology", label: t("sector.informationTechnology"), icon: Cpu },
+    { value: "Materials", label: t("sector.materials"), icon: Boxes },
+    { value: "Real Estate", label: t("sector.realEstate"), icon: Building },
+    { value: "Utilities", label: t("sector.utilities"), icon: Zap },
   ];
 
   // Popular Countries with Flag Codes
   const popularCountryChips: FilterChip[] = [
-    { value: "United States", label: "US", flagCode: "us" },
-    { value: "Canada", label: "Canada", flagCode: "ca" },
-    { value: "Japan", label: "Japan", flagCode: "jp" },
-    { value: "Germany", label: "Germany", flagCode: "de" },
-    { value: "United Kingdom", label: "UK", flagCode: "gb" },
-    { value: "China", label: "China", flagCode: "cn" },
-    { value: "India", label: "India", flagCode: "in" },
-    { value: "Israel", label: "Israel", flagCode: "il" },
+    { value: "United States", label: t("screener.country.us"), flagCode: "us" },
+    { value: "Canada", label: t("screener.country.canada"), flagCode: "ca" },
+    { value: "Japan", label: t("screener.country.japan"), flagCode: "jp" },
+    { value: "Germany", label: t("screener.country.germany"), flagCode: "de" },
+    { value: "United Kingdom", label: t("screener.country.uk"), flagCode: "gb" },
+    { value: "China", label: t("screener.country.china"), flagCode: "cn" },
+    { value: "India", label: t("screener.country.india"), flagCode: "in" },
+    { value: "Israel", label: t("screener.country.israel"), flagCode: "il" },
   ];
 
   const hasActiveFilters =
@@ -363,13 +364,12 @@ export default function Screener() {
     <div className="flex flex-col h-full overflow-hidden p-6 gap-5 max-w-[1600px] mx-auto w-full">
       {/* Page Title */}
       <div className="flex flex-col gap-1 shrink-0">
-        <h1 className="text-3xl font-bold tracking-tight">Market Screener</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{t("screener.title")}</h1>
         <p className="text-muted-foreground text-sm">
-          Discover and filter over{" "}
-          <span className="font-semibold text-foreground">
-            {total > 0 ? total.toLocaleString() : "300,000+"}
-          </span>{" "}
-          assets across global markets.
+          {t("screener.subtitle", {
+            total:
+              total > 0 ? total.toLocaleString() : "300,000+",
+          })}
         </p>
       </div>
 
@@ -377,7 +377,7 @@ export default function Screener() {
       <div className="flex flex-col gap-2 shrink-0 bg-card p-4 rounded-xl border border-border shadow-sm">
         {/* Row 1: Asset Type */}
         <FilterCategoryRow
-          title="Asset Type"
+          title={t("screener.assetType")}
           chips={allAssetTypeChips}
           allOptions={facets?.asset_types}
           selected={filters.asset_type}
@@ -386,7 +386,7 @@ export default function Screener() {
 
         {/* Row 2: Sector (Alphabetically sorted with Sector Icons) */}
         <FilterCategoryRow
-          title="Sector"
+          title={t("screener.sector")}
           chips={sortedSectorChips}
           allOptions={facets?.sectors}
           selected={filters.sector}
@@ -395,24 +395,24 @@ export default function Screener() {
 
         {/* Row 3: Country (With flag icons) */}
         <FilterCategoryRow
-          title="Country"
+          title={t("screener.country")}
           chips={popularCountryChips}
           allOptions={facets?.countries}
           selected={filters.country}
           onChange={(vals) => setFilter("country", vals)}
-          moreLabel="More Countries"
+          moreLabel={t("screener.moreCountries")}
         />
 
         {/* Controls Row: Primary Listings Toggle Switch & Reset */}
         <div className="flex items-center justify-between pt-2.5 border-t border-border/40 mt-1">
           <div className="flex items-center gap-3">
             <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Scope:
+              {t("screener.scope")}
             </span>
             {/* Visual Toggle Switch UI for Primary Listings */}
             <div className="flex items-center gap-2.5 bg-muted/40 px-3 py-1.5 rounded-full border border-border">
               <span className="text-xs font-semibold text-foreground select-none">
-                Primary Listings Only
+                {t("screener.primaryListingsOnly")}
               </span>
               <button
                 type="button"
@@ -422,7 +422,7 @@ export default function Screener() {
                 className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
                   filters.exclude_dots ? "bg-primary" : "bg-muted-foreground/30"
                 }`}
-                title="Toggle ON to exclude secondary exchange duplicates (e.g. AAPL.BA, TSLA.MI)"
+                title={t("screener.primaryListingsTooltip")}
               >
                 <span
                   className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
@@ -435,7 +435,7 @@ export default function Screener() {
                   filters.exclude_dots ? "text-primary" : "text-muted-foreground"
                 }`}
               >
-                {filters.exclude_dots ? "ON" : "OFF"}
+                {filters.exclude_dots ? t("screener.on") : t("screener.off")}
               </span>
             </div>
           </div>
@@ -458,7 +458,7 @@ export default function Screener() {
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium text-chart-negative hover:bg-chart-negative/10 transition-colors"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              Reset All
+              {t("screener.resetFilters")}
             </button>
           )}
         </div>
@@ -471,13 +471,12 @@ export default function Screener() {
             <thead className="text-xs text-muted-foreground uppercase bg-muted/60 border-b border-border sticky top-0 z-10 backdrop-blur">
               <tr>
                 {[
-                  { key: "symbol", label: "Symbol", align: "left" },
-                  { key: "name", label: "Company Name", align: "left" },
-                  { key: "asset_type", label: "Type", align: "left" },
-                  { key: "sector", label: "Sector", align: "left" },
-                  { key: "industry", label: "Industry", align: "left" },
-                  { key: "country", label: "Country", align: "left" },
-                  { key: "market_cap", label: "Market Cap", align: "right" },
+                  { key: "symbol", label: t("screener.col.symbol"), align: "left" },
+                  { key: "name", label: t("screener.col.name"), align: "left" },
+                  { key: "asset_type", label: t("screener.assetType"), align: "left" },
+                  { key: "sector", label: t("screener.col.sector"), align: "left" },
+                  { key: "country", label: t("screener.col.country"), align: "left" },
+                  { key: "market_cap", label: t("metrics.marketCap"), align: "right" },
                 ].map((col) => {
                   const isSorted = sortBy === col.key;
                   return (
@@ -513,19 +512,19 @@ export default function Screener() {
               {isLoading && results.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={6}
                     className="px-6 py-12 text-center text-muted-foreground"
                   >
-                    Loading assets...
+                    {t("screener.loading")}
                   </td>
                 </tr>
               ) : results.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={6}
                     className="px-6 py-12 text-center text-muted-foreground"
                   >
-                    No assets found matching the criteria.
+                    {t("screener.noResults")}
                   </td>
                 </tr>
               ) : (
@@ -553,19 +552,15 @@ export default function Screener() {
                         {asset.name}
                       </td>
                       <td className="px-6 py-3 text-muted-foreground whitespace-nowrap">
-                        {asset.asset_type || "—"}
+                        {asset.asset_type
+                          ? translateAssetType(t, asset.asset_type)
+                          : "—"}
                       </td>
                       <td
                         className="px-6 py-3 text-muted-foreground max-w-[150px] truncate"
                         title={asset.sector}
                       >
-                        {asset.sector || "—"}
-                      </td>
-                      <td
-                        className="px-6 py-3 text-muted-foreground max-w-[200px] truncate"
-                        title={asset.industry}
-                      >
-                        {asset.industry || "—"}
+                        {asset.sector ? translateSector(t, asset.sector) : "—"}
                       </td>
                       <td className="px-6 py-3 text-muted-foreground whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
@@ -577,23 +572,11 @@ export default function Screener() {
                               loading="lazy"
                             />
                           )}
-                          <span>{asset.country || "—"}</span>
+                          <span>{asset.country ? translateCountry(t, asset.country) || "—" : "—"}</span>
                         </div>
                       </td>
                       <td className="px-6 py-3 font-mono text-right tabular-nums">
-                        {asset.market_cap ? (
-                          typeof asset.market_cap === "number" ? (
-                            asset.market_cap >= 1e9
-                              ? `$${(asset.market_cap / 1e9).toFixed(2)}B`
-                              : asset.market_cap >= 1e6
-                                ? `$${(asset.market_cap / 1e6).toFixed(2)}M`
-                                : `$${asset.market_cap.toLocaleString()}`
-                          ) : (
-                            asset.market_cap
-                          )
-                        ) : (
-                          "—"
-                        )}
+                        {translateMarketCap(t, asset.market_cap)}
                       </td>
                     </tr>
                   );
@@ -606,19 +589,11 @@ export default function Screener() {
         {/* Pagination Footer */}
         <div className="flex items-center justify-between px-6 py-3 border-t border-border bg-card shrink-0">
           <span className="text-sm text-muted-foreground">
-            Showing{" "}
-            <span className="font-medium text-foreground">
-              {results.length > 0 ? page * limit + 1 : 0}
-            </span>{" "}
-            to{" "}
-            <span className="font-medium text-foreground">
-              {Math.min((page + 1) * limit, total)}
-            </span>{" "}
-            of{" "}
-            <span className="font-medium text-foreground">
-              {total.toLocaleString()}
-            </span>{" "}
-            assets
+            {t("screener.showingResults", {
+              start: results.length > 0 ? page * limit + 1 : 0,
+              end: Math.min((page + 1) * limit, total),
+              total: total.toLocaleString(),
+            })}
           </span>
 
           <div className="flex items-center gap-2">
@@ -630,7 +605,7 @@ export default function Screener() {
               <ChevronLeft className="w-5 h-5" />
             </button>
             <span className="text-sm font-medium px-2">
-              Page {page + 1} of {maxPages || 1}
+              {t("screener.pageOf", { page: page + 1, totalPages: maxPages || 1 })}
             </span>
             <button
               onClick={() => setPage((p) => Math.min(maxPages - 1, p + 1))}
