@@ -1497,15 +1497,11 @@ async function aggregateFallbackHeatmap(symbols, days, curated) {
 }
 
 export async function handleSectorHeatmap(req, res) {
-  const symbolsRaw = String(req.query?.symbols || "");
-  if (!symbolsRaw)
-    return res.status(400).json({ error: "symbols parameter required" });
-  const symbols = symbolsRaw
-    .split(",")
-    .map((s) => s.trim().toUpperCase())
-    .filter(Boolean);
-  if (symbols.length > 50)
-    return res.status(400).json({ error: "Too many symbols. Max 50." });
+  // Identical symbols-query validation to the Express twin (same cap,
+  // ticker contract, dedupe, and error bodies).
+  const parsed = parseSymbolsQuery(req.query?.symbols);
+  if (parsed.ok === false) return res.status(parsed.status).json(parsed.body);
+  const { symbols } = parsed;
   const days = Math.max(
     3,
     Math.min(10, Math.floor(Number(req.query?.days ?? 5)) || 5),
