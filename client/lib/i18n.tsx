@@ -217,6 +217,16 @@ const en = {
   "dcf.tooltip.trajectoryChart": "Year-by-year projected expansion path showing operational cash flow / earnings growth and implied milestone stock prices.",
   "dcf.tooltip.terminalExitPrice": "Implied stock price in Year 5 calculated by multiplying Year 5 projected metric by your terminal exit multiple.",
 
+  // Sensitivity Matrix
+  "dcf.sensitivityTitle": "2D Valuation Sensitivity Matrix",
+  "dcf.sensitivitySubtitle": "Institutional stress-test matrix comparing 25 valuation scenarios against current market price.",
+  "dcf.sensitivityTooltip": "Evaluates intrinsic fair value across varying cost of capital (WACC) and terminal growth/exit assumptions. Click any cell to apply those parameters.",
+  "dcf.dimensionGrowth": "WACC × Growth Rate",
+  "dcf.dimensionMultiple": "WACC × Exit Multiple",
+  "dcf.marketPrice": "Market Price",
+  "dcf.sensitivityClickHint": "Click any cell to apply that valuation scenario to the sandbox.",
+  "dcf.viewSensitivityMatrix": "Sensitivity Matrix",
+
   // Charts page
   "charts.dayRange": "Day Range",
   "charts.weekRange": "52-Week Range",
@@ -1291,6 +1301,16 @@ const he: Record<string, string> = {
   "dcf.tooltip.targetBuyPrice": "מחיר הקנייה המרבי המומלץ היום כדי להגיע ליעד התשואה השנתי שהגדרת.",
   "dcf.tooltip.trajectoryChart": "מסלול צמיחה שנתי המציג את הגידול בתזרים/רווח ואת מחירי המניה המשוערים לכל שנה.",
   "dcf.tooltip.terminalExitPrice": "מחיר מניה משוער בשנה 5 לפי מכפיל היציאה והתזרים החזוי.",
+
+  // Sensitivity Matrix
+  "dcf.sensitivityTitle": "מטריצת רגישות שווי דו-ממדית",
+  "dcf.sensitivitySubtitle": "מטריצת מבחן לחץ מוסדית המשווה 25 תרחישי תמחור מול מחיר השוק הנוכחי.",
+  "dcf.sensitivityTooltip": "מעריכה שווי הוגן פנימי מול שילובי עלות הון (WACC) והנחות צמיחה/מכפיל יציאה. לחיצה על תא מעדכנת את הסליידרים מיד.",
+  "dcf.dimensionGrowth": "WACC × שיעור צמיחה",
+  "dcf.dimensionMultiple": "WACC × מכפיל יציאה",
+  "dcf.marketPrice": "מחיר שוק",
+  "dcf.sensitivityClickHint": "לחץ על כל תא כדי להחיל את תרחיש התמחור על מחשבון ה-DCF.",
+  "dcf.viewSensitivityMatrix": "מטריצת רגישות",
 
   // Charts page
   "charts.dayRange": "טווח יומי",
