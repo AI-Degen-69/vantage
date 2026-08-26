@@ -140,7 +140,8 @@ export function Charts() {
                   }
                 }}
                 placeholder={t("charts.searchPlaceholder")}
-                className="w-full pl-9 pr-8 py-1.5 text-xs bg-muted/50 border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+                aria-label={t("charts.searchPlaceholder")}
+                className="w-full pl-9 pr-8 py-1.5 text-sm sm:text-xs bg-muted/50 border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary font-mono"
               />
               {searchQuery && (
                 <button
