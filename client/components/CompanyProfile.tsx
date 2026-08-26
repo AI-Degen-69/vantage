@@ -313,7 +313,7 @@ export default function CompanyProfile({
           <div className="flex items-center justify-between pb-3.5 border-b border-border/50 mb-4">
             <div className="flex items-center gap-2">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
               </span>
               <h3 id="company-profile-card-title" className="font-display text-xs font-bold uppercase tracking-[0.14em] text-foreground flex items-center gap-1.5">

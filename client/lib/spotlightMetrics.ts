@@ -35,7 +35,8 @@ export function deriveSpotlightMetrics(params: {
   quarterlyFinancials?: FinancialStatements | null;
   fallback?: YahooFallbackFinancials | null;
 }): SpotlightMetricsResult {
-  const { quote, profile, metrics, annualFinancials, fallback } = params;
+  const { quote, profile, metrics, annualFinancials, quarterlyFinancials, fallback } =
+    params;
 
   // 1. Market Cap
   const mktCapVal = finite(quote?.marketCap) ?? finite(profile?.marketCap);
@@ -51,7 +52,10 @@ export function deriveSpotlightMetrics(params: {
   const pe = peVal !== null && peVal > 0 ? `${peVal.toFixed(1)}x` : "—";
 
   // 3. 3Y Rev CAGR
-  const inc = annualFinancials?.income ?? [];
+  const inc =
+    annualFinancials?.income && annualFinancials.income.length > 0
+      ? annualFinancials.income
+      : quarterlyFinancials?.income ?? [];
   const incAsc = [...inc].sort((a, b) => (a.date < b.date ? -1 : 1));
   const granularity = detectPeriodGranularity(incAsc);
   const cagrVal =
@@ -65,16 +69,20 @@ export function deriveSpotlightMetrics(params: {
   const revenue = revVal !== null ? (formatMoney(revVal) ?? "—") : "—";
 
   // 5. Free Cash Flow
-  const cash = annualFinancials?.cash ?? [];
+  const cash =
+    annualFinancials?.cash && annualFinancials.cash.length > 0
+      ? annualFinancials.cash
+      : quarterlyFinancials?.cash ?? [];
   const cashAsc = [...cash].sort((a, b) => (a.date < b.date ? -1 : 1));
   const latestCash = cashAsc.length > 0 ? cashAsc[cashAsc.length - 1] : null;
   const fcfVal =
     finite(latestCash?.freeCashFlow) ??
     (finite(latestCash?.operatingCashFlow) !== null &&
     finite(latestCash?.capitalExpenditure) !== null
-      ? (latestCash!.operatingCashFlow - latestCash!.capitalExpenditure!)
-      : null) ??
-    null;
+      ? latestCash!.capitalExpenditure! < 0
+        ? latestCash!.operatingCashFlow + latestCash!.capitalExpenditure!
+        : latestCash!.operatingCashFlow - latestCash!.capitalExpenditure!
+      : null);
   const fcf = fcfVal !== null ? (formatMoney(fcfVal) ?? "—") : "—";
 
   // 6. Gross Margin

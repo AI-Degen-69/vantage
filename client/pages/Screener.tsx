@@ -777,8 +777,16 @@ export default function Screener() {
               return (
                 <div
                   key={asset.symbol}
+                  role="link"
+                  tabIndex={0}
                   onClick={() => navigate(`/stock/${asset.symbol}`)}
-                  className="bg-card rounded-panel p-4 border border-border hover:border-primary/40 hover:bg-card/80 transition-all cursor-pointer group flex flex-col justify-between"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      navigate(`/stock/${asset.symbol}`);
+                    }
+                  }}
+                  className="bg-card rounded-panel p-4 border border-border hover:border-primary/40 hover:bg-card/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-all cursor-pointer group flex flex-col justify-between"
                 >
                   <div>
                     {/* Top Row: Logo + Symbol + Price + Change */}
@@ -859,13 +867,15 @@ export default function Screener() {
                       return (
                         <th
                           key={col.key}
-                          onClick={() => handleSort(col.key)}
-                          className={`px-5 py-3.5 font-semibold cursor-pointer select-none hover:text-foreground transition-colors ${
+                          aria-sort={isSorted ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+                          className={`px-5 py-3.5 font-semibold select-none hover:text-foreground transition-colors ${
                             col.align === "right" ? "text-right" : ""
                           } ${isSorted ? "text-primary font-bold" : ""}`}
                         >
-                          <div
-                            className={`inline-flex items-center gap-1.5 ${
+                          <button
+                            type="button"
+                            onClick={() => handleSort(col.key)}
+                            className={`inline-flex items-center gap-1.5 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded cursor-pointer ${
                               col.align === "right" ? "flex-row-reverse" : ""
                             }`}
                           >
@@ -879,7 +889,7 @@ export default function Screener() {
                             ) : (
                               <ArrowUpDown className="w-3 h-3 opacity-30 group-hover:opacity-100" />
                             )}
-                          </div>
+                          </button>
                         </th>
                       );
                     })}

@@ -86,4 +86,62 @@ describe("deriveSpotlightMetrics", () => {
     expect(result.revenue).toBe("$50.00B");
     expect(result.grossMargin).toBe("38.5%");
   });
+
+  it("calculates FCF from operatingCashFlow and negative capitalExpenditure outflow when freeCashFlow is missing", () => {
+    const annualFinancials: FinancialStatements = {
+      income: [],
+      balance: [],
+      cash: [
+        {
+          date: "2024-09-30",
+          calendarYear: "2024",
+          period: "FY",
+          operatingCashFlow: 100e9,
+          capitalExpenditure: -20e9,
+          symbol: "TEST",
+          reportedCurrency: "USD",
+        },
+      ],
+    };
+    const result = deriveSpotlightMetrics({
+      annualFinancials,
+    });
+    expect(result.fcf).toBe("$80.00B");
+  });
+
+  it("uses quarterlyFinancials when annualFinancials is omitted", () => {
+    const quarterlyFinancials: FinancialStatements = {
+      income: [
+        {
+          date: "2024-09-30",
+          calendarYear: "2024",
+          period: "Q3",
+          revenue: 25e9,
+          grossProfit: 10e9,
+          ebitda: 8e9,
+          netIncome: 5e9,
+          eps: 1.0,
+          symbol: "TEST",
+          reportedCurrency: "USD",
+        },
+      ],
+      balance: [],
+      cash: [
+        {
+          date: "2024-09-30",
+          calendarYear: "2024",
+          period: "Q3",
+          freeCashFlow: 6e9,
+          symbol: "TEST",
+          reportedCurrency: "USD",
+        },
+      ],
+    };
+    const result = deriveSpotlightMetrics({
+      quarterlyFinancials,
+    });
+    expect(result.revenue).toBe("$25.00B");
+    expect(result.fcf).toBe("$6.00B");
+    expect(result.grossMargin).toBe("40.0%");
+  });
 });

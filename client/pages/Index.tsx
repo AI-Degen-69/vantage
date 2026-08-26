@@ -534,7 +534,7 @@ export default function Index() {
           <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-border">
             <div className="flex items-center gap-2">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-chart-positive opacity-75" />
+                <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-chart-positive opacity-75" />
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-chart-positive" />
               </span>
               <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground font-semibold">
@@ -910,7 +910,7 @@ export default function Index() {
                   <div className="flex items-center justify-between pb-3.5 border-b border-border/50">
                     <div className="flex items-center gap-2">
                       <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
+                        <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-400" />
                       </span>
                       <h3 className="font-display text-xs font-bold uppercase tracking-[0.14em] text-foreground flex items-center gap-1.5">
@@ -1073,7 +1073,7 @@ export default function Index() {
                 <div className="flex items-center justify-between pb-3.5 border-b border-border/50 mb-4">
                   <div className="flex items-center gap-2">
                     <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-chart-positive opacity-75" />
+                      <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-chart-positive opacity-75" />
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-chart-positive" />
                     </span>
                     <h3 className="font-display text-xs font-bold uppercase tracking-[0.14em] text-foreground flex items-center gap-1.5">
