@@ -169,12 +169,12 @@ export function Charts() {
         ) : (() => {
           const mktCap = profileData?.mktCap ?? (profileData as any)?.marketCap ?? null;
           const derivedShares =
-            mktCap != null && currentPrice > 0
-              ? Number(((mktCap / currentPrice) / 1e9).toFixed(2))
+            mktCap != null && currentPrice > 0 && mktCap / currentPrice > 0
+              ? (mktCap / currentPrice) / 1e9
               : 15.2;
           const derivedFcf =
             mktCap != null
-              ? Math.max(1, Number(((mktCap / 1e9) / 25).toFixed(1)))
+              ? Math.max(1, (mktCap / 1e9) / 25)
               : 108.8;
 
           return (

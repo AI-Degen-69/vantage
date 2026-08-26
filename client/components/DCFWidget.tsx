@@ -22,6 +22,7 @@ export interface DCFWidgetProps {
   initialMultiple?: number;
   initialDiscount?: number;
   sharesOutstanding?: number;
+  initialTargetReturn?: number;
 }
 
 /**
@@ -35,6 +36,7 @@ export interface DCFWidgetProps {
  * @param initialMultiple - Terminal exit multiple (P/FCF)
  * @param initialDiscount - Target discount / hurdle rate percentage
  * @param sharesOutstanding - Diluted shares outstanding in billions
+ * @param initialTargetReturn - Initial target annual return percentage
  * @returns The rendered DCF Sandbox component.
  */
 export function DCFWidget({
@@ -46,6 +48,7 @@ export function DCFWidget({
   initialMultiple = 25.0,
   initialDiscount = 9.0,
   sharesOutstanding = 15.2,
+  initialTargetReturn = 15.0,
 }: DCFWidgetProps) {
   const { t } = useI18n();
 
@@ -58,7 +61,7 @@ export function DCFWidget({
   const [growthRate, setGrowthRate] = useState<number>(initialGrowth);
   const [multiple, setMultiple] = useState<number>(initialMultiple);
   const [discountRate, setDiscountRate] = useState<number>(initialDiscount);
-  const [targetReturn, setTargetReturn] = useState<number>(15.0);
+  const [targetReturn, setTargetReturn] = useState<number>(initialTargetReturn);
 
   // Sync inputs when ticker or initial props change
   useEffect(() => {
@@ -66,7 +69,8 @@ export function DCFWidget({
     setGrowthRate(initialGrowth);
     setMultiple(initialMultiple);
     setDiscountRate(initialDiscount);
-  }, [ticker, initialFcf, initialGrowth, initialMultiple, initialDiscount]);
+    setTargetReturn(initialTargetReturn);
+  }, [ticker, initialFcf, initialGrowth, initialMultiple, initialDiscount, initialTargetReturn]);
 
   // --------------------------------------------------------------------------
   // DCF Calculations
@@ -122,10 +126,11 @@ export function DCFWidget({
   // 5-Year Trajectory Recharts Data
   const chartData = useMemo(() => {
     const currentYr = new Date().getFullYear();
+    const shares = sharesOutstanding > 0 ? sharesOutstanding : 15.2;
     const data = [];
     for (let i = 0; i <= 5; i++) {
       const fcf = baseFcf * Math.pow(1 + growthRate / 100, i);
-      const impliedPrice = (fcf / (sharesOutstanding / 10)) * multiple;
+      const impliedPrice = (fcf / (shares / 10)) * multiple;
       data.push({
         year: (currentYr + i).toString(),
         fcf: Number(fcf.toFixed(1)),
