@@ -187,10 +187,13 @@ export function EarningsCalendar({
   const [activeDayTab, setActiveDayTab] = useState<DayTabFilter>(initialDay);
   const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
 
-  const watchlistSymbols = useMemo(
-    () => defaultWatchlist.map((w) => w.symbol.toUpperCase()),
-    []
-  );
+  const watchlistSymbols = useMemo(() => {
+    const list = defaultWatchlist.map((w) => w.symbol.toUpperCase());
+    if (focusSymbol && !list.includes(focusSymbol.toUpperCase())) {
+      list.push(focusSymbol.toUpperCase());
+    }
+    return list;
+  }, [focusSymbol]);
 
   const { data, isLoading } = useEarningsCalendar(from, to);
 
@@ -208,9 +211,13 @@ export function EarningsCalendar({
       let filtered = data.filter((e: any) => inMarketCapBucket(e.marketCap, marketCap));
 
       if (watchlistOnly) {
-        filtered = filtered.filter((e: any) =>
-          watchlistSymbols.includes((e.symbol ?? "").toUpperCase())
-        );
+        filtered = filtered.filter((e: any) => {
+          const sym = (e.symbol ?? "").toUpperCase();
+          return (
+            watchlistSymbols.includes(sym) ||
+            (focusSymbol && sym === focusSymbol.toUpperCase())
+          );
+        });
       } else if (marketCap === "all") {
         // When viewing all caps, prioritize significant stocks and watchlist members
         filtered = filtered.filter(
@@ -268,14 +275,41 @@ export function EarningsCalendar({
     }
 
     // Mock fallback matching showcase events
-    let mockFiltered = mockEarningsEvents.map((e) => ({
-      ...e,
-      dateFull: formatHumanDate(e.dateFull || e.date, lang),
-      isWatchlist: watchlistSymbols.includes(e.ticker) || e.isWatchlist,
-    }));
+    let mockFiltered = mockEarningsEvents.map((e) => {
+      let eventDate = e.date;
+      if (from) {
+        const parts = from.split("-").map(Number);
+        if (parts.length === 3 && parts.every((n) => Number.isFinite(n))) {
+          const fromDate = new Date(parts[0], parts[1] - 1, parts[2]);
+          const targetDate = new Date(fromDate);
+          targetDate.setDate(fromDate.getDate() + ((e.weekday ?? 1) - 1));
+          const y = targetDate.getFullYear();
+          const m = String(targetDate.getMonth() + 1).padStart(2, "0");
+          const d = String(targetDate.getDate()).padStart(2, "0");
+          eventDate = `${y}-${m}-${d}`;
+        }
+      }
+      return {
+        ...e,
+        date: eventDate,
+        dateFull: formatHumanDate(eventDate, lang),
+        isWatchlist:
+          watchlistSymbols.includes(e.ticker.toUpperCase()) ||
+          e.isWatchlist ||
+          (focusSymbol ? e.ticker.toUpperCase() === focusSymbol.toUpperCase() : false),
+      };
+    });
+
+    if (from && to) {
+      mockFiltered = mockFiltered.filter((e) => e.date >= from && e.date <= to);
+    }
 
     if (watchlistOnly) {
-      mockFiltered = mockFiltered.filter((e) => e.isWatchlist);
+      mockFiltered = mockFiltered.filter(
+        (e) =>
+          e.isWatchlist ||
+          (focusSymbol && e.ticker.toUpperCase() === focusSymbol.toUpperCase())
+      );
     }
     mockFiltered = mockFiltered.filter((e) =>
       typeof e.marketCap === "number" ? inMarketCapBucket(e.marketCap, marketCap) : true
@@ -289,7 +323,7 @@ export function EarningsCalendar({
       ...e,
       weekday: typeof e.weekday === "number" ? e.weekday : mockNameToWd[e.date] ?? 1,
     }));
-  }, [data, marketCap, watchlistOnly, watchlistSymbols, lang]);
+  }, [data, marketCap, watchlistOnly, watchlistSymbols, lang, from, to, focusSymbol]);
 
   // Filter by active day tab if in Grid Mode
   const displayedGridEvents = useMemo(() => {

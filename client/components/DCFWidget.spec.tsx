@@ -48,4 +48,21 @@ describe("DCFWidget", () => {
     expect(html).toContain("400.00");
     expect(html).toContain("ESTIMATED FAIR VALUE");
   });
+
+  it("handles extreme target return bounds safely without throwing or producing NaN/Infinity", () => {
+    const html = renderToString(
+      withContext(
+        <DCFWidget
+          ticker="GOOGL"
+          currentPrice={180.0}
+          initialFcf={70.0}
+          initialGrowth={15.0}
+          initialMultiple={22.0}
+        />
+      )
+    );
+
+    expect(html).not.toContain("Infinity");
+    expect(html).not.toContain("NaN");
+  });
 });

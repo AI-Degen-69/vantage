@@ -179,7 +179,7 @@ export function Charts() {
 
           return (
             <DCFWidget
-              key={`${ticker}-${currentPrice}`}
+              key={ticker}
               ticker={ticker}
               companyName={profileData?.companyName}
               currentPrice={currentPrice}
