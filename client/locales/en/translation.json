@@ -376,6 +376,7 @@
   },
   "portfolio": {
     "title": "Portfolio",
+    "description": "Track asset allocation, risk-adjusted returns, and dividend income across portfolios.",
     "currentValue": "Current Value",
     "gainLoss": "Gain/Loss",
     "gainLossPct": "Gain/Loss (%)",

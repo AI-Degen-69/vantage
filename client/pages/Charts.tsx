@@ -4,7 +4,7 @@ import DCFWidget from "@/components/DCFWidget";
 import { SectionCardSkeleton, HeaderPriceSkeleton } from "@/components/Skeleton";
 import TickerLogo from "@/components/TickerLogo";
 import { useStockQuote, useStockProfile, useYahooChartDown } from "@/hooks/useStockData";
-import { TrendingUp, TrendingDown, BarChart3, Calendar, Building2 } from "lucide-react";
+import { TrendingUp, TrendingDown, BarChart3, Calendar } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import DataLegend from "@/components/DataLegend";
 import DataStatusBadge from "@/components/DataStatusBadge";
@@ -58,52 +58,32 @@ export default function Charts() {
   return (
     <div className="w-full bg-background dark min-h-screen p-8">
       <div className="max-w-5xl mx-auto space-y-8">
-        {/* Header strip — ticker + company + price + day/year range */}
-        <div className="flex flex-col gap-4">
-          <PageHeader
-            eyebrow={t("nav.charts")}
-            title={profileLoading ? "…" : profileData?.companyName ?? ticker}
-            description={profileData?.exchange ? `${ticker} · ${profileData.exchange}` : ticker}
-            status={currentPrice != null ? "live" : undefined}
-            source={currentPrice != null ? "Yahoo Finance" : undefined}
-            actions={
-              <>
-                {yahooChartDown && <DataStatusBadge status="mock" source="Chart fallback" />}
-                <DataLegend />
-              </>
-            }
-          />
-          <div className="flex items-center gap-4 min-w-0">
-            <TickerLogo ticker={ticker} size="md" />
-            <div className="min-w-0">
-              <h1 className="text-2xl font-bold text-foreground truncate">
-                {profileLoading ? "…" : profileData?.companyName ?? ticker}
-              </h1>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1 flex-wrap">
-                <span className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-foreground font-bold" dir="ltr">
-                  {ticker}
-                </span>
-                {profileData?.exchange && (
-                  <>
-                    <span>&bull;</span>
-                    <span dir="ltr">{profileData.exchange}</span>
-                  </>
-                )}
-                {profileData?.sector && (
-                  <>
-                    <span>&bull;</span>
-                    <span className="inline-flex items-center gap-1">
-                      <Building2 className="w-3.5 h-3.5" />
-                      {profileData.sector}
-                    </span>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col items-end gap-1" aria-hidden="true" />
-        </div>
+        <PageHeader
+          eyebrow={t("nav.charts")}
+          title={profileLoading ? "…" : profileData?.companyName ?? ticker}
+          titleLeadingAdornment={<TickerLogo ticker={ticker} size="md" />}
+          titleAdornment={
+            <span className="px-2 py-0.5 rounded bg-muted border border-border text-foreground text-xs font-mono font-bold" dir="ltr">
+              {ticker}
+            </span>
+          }
+          description={
+            [
+              profileData?.exchange,
+              profileData?.sector,
+            ]
+              .filter(Boolean)
+              .join(" · ") || undefined
+          }
+          status={currentPrice != null ? "live" : undefined}
+          source={currentPrice != null ? "Yahoo Finance" : undefined}
+          actions={
+            <>
+              {yahooChartDown && <DataStatusBadge status="mock" source="Chart fallback" />}
+              <DataLegend />
+            </>
+          }
+        />
 
         {/* Price + range card */}
         <div className="bg-card border border-border rounded-xl p-6">
