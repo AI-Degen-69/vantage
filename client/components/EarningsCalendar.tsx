@@ -3,6 +3,7 @@ import { defaultWatchlist } from "@/lib/mockData";
 import { useEarningsCalendar } from "@/hooks/useStockData";
 import { useEffect, useMemo, useRef, useState } from "react";
 import EarningsCard, { type EarningsEventData } from "@/components/EarningsCard";
+import DataStatusBadge from "@/components/DataStatusBadge";
 import { LayoutGrid, CalendarDays, Sun, Moon, Clock, Database, Sparkles } from "lucide-react";
 
 export type MarketCapFilter = "all" | "large" | "mid" | "small";
@@ -418,7 +419,6 @@ export function EarningsCalendar({
         <div className="flex items-center gap-2 text-muted-foreground">
           <Database className="w-3.5 h-3.5 text-primary" />
           <span>{t("earningsCalendar.dataSource")}</span>
-          <span className="w-1.5 h-1.5 rounded-full bg-chart-positive motion-safe:animate-pulse" />
         </div>
         <div className="flex items-center gap-2">
           {!isLoading && (
@@ -426,10 +426,11 @@ export function EarningsCalendar({
               {t("earningsCalendar.showing", { count: displayedCount })}
             </span>
           )}
-          {isMock && !isLoading && (
-            <span className="text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded text-[11px] font-semibold">
-              [MOCK VERIFIED]
-            </span>
+          {!isLoading && (
+            <DataStatusBadge
+              status={isMock ? "mock" : "live"}
+              source={isMock ? (lang === "he" ? "נתוני הדגמה" : "Sample Data") : (lang === "he" ? "זמן אמת" : "Real-time Feed")}
+            />
           )}
         </div>
       </div>
