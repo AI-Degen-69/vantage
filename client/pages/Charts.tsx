@@ -39,7 +39,11 @@ export function Charts() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const { data: searchData, isLoading: searchLoading } = useScreenerSearch(debouncedQuery, 8);
+  const {
+    data: searchData,
+    isLoading: searchLoading,
+    isError: searchError,
+  } = useScreenerSearch(debouncedQuery, 8);
   const searchResults = searchData?.results ?? [];
 
   // Close search dropdown on click outside
@@ -144,7 +148,7 @@ export function Charts() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && searchQuery.trim()) {
                     const trimmed = searchQuery.trim();
-                    if (debouncedQuery !== trimmed || searchLoading) return;
+                    if (debouncedQuery !== trimmed || searchLoading || searchError) return;
                     handleSelectTicker(searchResults[0]?.symbol ?? trimmed);
                   }
                 }}
@@ -169,6 +173,10 @@ export function Charts() {
                 {searchLoading ? (
                   <div className="p-3 text-xs text-muted-foreground text-center">
                     {t("charts.searchingStocks")}
+                  </div>
+                ) : searchError ? (
+                  <div className="p-3 text-xs text-chart-negative text-center">
+                    {t("charts.searchError")}
                   </div>
                 ) : searchResults.length === 0 ? (
                   <div className="p-3 text-xs text-muted-foreground text-center">
@@ -349,8 +357,19 @@ export function Charts() {
               ? (mktCap / currentPrice) / 1e9
               : 15.2;
 
-          const latestCash = financialsData?.cash?.[0];
-          const latestIncome = financialsData?.income?.[0];
+          const sortedCash = financialsData?.cash
+            ? financialsData.cash
+                .slice()
+                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            : [];
+          const sortedIncome = financialsData?.income
+            ? financialsData.income
+                .slice()
+                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            : [];
+
+          const latestCash = sortedCash[0];
+          const latestIncome = sortedIncome[0];
 
           const rawFcf = latestCash?.freeCashFlow;
           const derivedFcf =
@@ -423,7 +442,7 @@ function DualRange({
     high > low ? Math.min(100, Math.max(0, ((current - low) / (high - low)) * 100)) : 50;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" dir="ltr">
       {/* Track container */}
       <div className="relative h-2 w-full rounded-full bg-muted/60 border border-border/40 overflow-visible my-3">
         {/* Midpoint marker line */}

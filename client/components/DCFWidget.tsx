@@ -79,15 +79,17 @@ export function DCFWidget({
 
   // Sync inputs when ticker or initial props change
   useEffect(() => {
+    setValuationMode(initialValuationMode);
     setBaseFcf(initialFcf);
     setBaseEarnings(initialEarnings);
     setGrowthRate(initialGrowth);
     setMultiple(initialMultiple);
     setDiscountRate(initialDiscount);
     setTargetReturn(clampTargetReturn(initialTargetReturn));
-  }, [ticker, initialFcf, initialEarnings, initialGrowth, initialMultiple, initialDiscount, initialTargetReturn]);
+  }, [ticker, initialFcf, initialEarnings, initialGrowth, initialMultiple, initialDiscount, initialTargetReturn, initialValuationMode]);
 
   const handleResetDefaults = () => {
+    setValuationMode(initialValuationMode);
     setBaseFcf(initialFcf);
     setBaseEarnings(initialEarnings);
     setGrowthRate(initialGrowth);
