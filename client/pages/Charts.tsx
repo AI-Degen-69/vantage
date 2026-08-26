@@ -4,7 +4,14 @@ import { useI18n } from "@/lib/i18n";
 import DCFWidget from "@/components/DCFWidget";
 import { SectionCardSkeleton, HeaderPriceSkeleton } from "@/components/Skeleton";
 import TickerLogo from "@/components/TickerLogo";
-import { useStockQuote, useStockProfile, useYahooChartDown, useScreenerSearch } from "@/hooks/useStockData";
+import {
+  useStockQuote,
+  useStockProfile,
+  useStockFinancials,
+  useStockMetrics,
+  useYahooChartDown,
+  useScreenerSearch,
+} from "@/hooks/useStockData";
 import { TrendingUp, TrendingDown, BarChart3, Calendar, Search, X } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import DataStatusBadge from "@/components/DataStatusBadge";
@@ -54,8 +61,12 @@ export function Charts() {
 
   // DCF math depends on the live quote — never feed a hardcoded number.
   const { data: quoteData, isLoading: quoteLoading } = useStockQuote(ticker);
-  // Profile gives us a friendly company name for the page header.
+  // Profile gives us a friendly company name and market cap for the page header.
   const { data: profileData, isLoading: profileLoading } = useStockProfile(ticker);
+  // Financial statements provide actual Free Cash Flow and Net Income.
+  const { data: financialsData } = useStockFinancials(ticker);
+  // Valuation metrics provide P/E and other TTM ratios.
+  const { data: metricsData } = useStockMetrics(ticker);
 
   // DCF + ranges are quote-driven, but the page is the charts surface — when
   // Yahoo chart history is down, badge [MOCK] so stale bars can't read as live.
@@ -337,10 +348,28 @@ export function Charts() {
             isFinitePositiveMktCap && currentPrice > 0
               ? (mktCap / currentPrice) / 1e9
               : 15.2;
+
+          const latestCash = financialsData?.cash?.[0];
+          const latestIncome = financialsData?.income?.[0];
+
+          const rawFcf = latestCash?.freeCashFlow;
           const derivedFcf =
-            isFinitePositiveMktCap
+            rawFcf != null && Number.isFinite(rawFcf) && rawFcf > 0
+              ? rawFcf / 1e9
+              : isFinitePositiveMktCap
               ? Math.max(1, (mktCap / 1e9) / 25)
               : 108.8;
+
+          const rawNetIncome = latestIncome?.netIncome;
+          const derivedEarnings =
+            rawNetIncome != null && Number.isFinite(rawNetIncome) && rawNetIncome > 0
+              ? rawNetIncome / 1e9
+              : isFinitePositiveMktCap
+              ? Math.max(1, (mktCap / 1e9) / (profileData?.peRatio || 25))
+              : 100.9;
+
+          const stockPe = profileData?.peRatio ?? metricsData?.keyMetricsTTM?.peRatioTTM ?? 25;
+          const initialMultiple = stockPe > 0 && stockPe < 150 ? Math.round(stockPe) : 25;
 
           return (
             <DCFWidget
@@ -350,6 +379,8 @@ export function Charts() {
               currentPrice={currentPrice}
               sharesOutstanding={derivedShares}
               initialFcf={derivedFcf}
+              initialEarnings={derivedEarnings}
+              initialMultiple={initialMultiple}
             />
           );
         })()}

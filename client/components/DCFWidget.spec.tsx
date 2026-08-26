@@ -31,6 +31,23 @@ describe("DCFWidget", () => {
     expect(html).toContain("231.42");
   });
 
+  it("renders in Earnings Mode with Base Net Income and P/E multiple", () => {
+    const html = renderToString(
+      withContext(
+        <DCFWidget
+          ticker="AAPL"
+          currentPrice={231.42}
+          initialEarnings={100.9}
+          initialValuationMode="earnings"
+        />
+      )
+    );
+
+    expect(html).toContain("Base Net Income ($B)");
+    expect(html).toContain("Terminal Exit Multiple (P/E)");
+    expect(html).toContain("100.9");
+  });
+
   it("renders correctly with custom assumptions and computes intrinsic fair value", () => {
     const html = renderToString(
       withContext(
@@ -40,6 +57,7 @@ describe("DCFWidget", () => {
           initialFcf={80.0}
           initialGrowth={12.0}
           initialMultiple={30.0}
+          sharesOutstanding={7.5}
         />
       )
     );

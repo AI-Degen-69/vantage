@@ -18,11 +18,20 @@ export interface DCFWidgetProps {
   currentPrice?: number;
   companyName?: string;
   initialFcf?: number;
+  initialEarnings?: number;
   initialGrowth?: number;
   initialMultiple?: number;
   initialDiscount?: number;
   sharesOutstanding?: number;
   initialTargetReturn?: number;
+  initialValuationMode?: "cashFlow" | "earnings";
+}
+
+/**
+ * Clamps target return values to a safe mathematical bound to avoid Infinity/NaN.
+ */
+function clampTargetReturn(val: number): number {
+  return Number.isFinite(val) ? Math.max(-90, Math.min(500, val)) : 15.0;
 }
 
 /**
@@ -32,36 +41,37 @@ export interface DCFWidgetProps {
  * @param ticker - Optional ticker symbol being modeled.
  * @param companyName - Optional friendly company name.
  * @param initialFcf - Base annual free cash flow in billions ($B)
+ * @param initialEarnings - Base annual net income in billions ($B)
  * @param initialGrowth - Projected 5-year growth rate percentage
- * @param initialMultiple - Terminal exit multiple (P/FCF)
+ * @param initialMultiple - Terminal exit multiple (P/FCF or P/E)
  * @param initialDiscount - Target discount / hurdle rate percentage
  * @param sharesOutstanding - Diluted shares outstanding in billions
  * @param initialTargetReturn - Initial target annual return percentage
+ * @param initialValuationMode - Initial mode: "cashFlow" | "earnings"
  * @returns The rendered DCF Sandbox component.
  */
-function clampTargetReturn(val: number): number {
-  return Number.isFinite(val) ? Math.max(-90, Math.min(500, val)) : 15.0;
-}
-
 export function DCFWidget({
   ticker = "AAPL",
   currentPrice = 231.42,
   companyName,
   initialFcf = 108.8,
+  initialEarnings = 100.9,
   initialGrowth = 10.0,
   initialMultiple = 25.0,
   initialDiscount = 9.0,
   sharesOutstanding = 15.2,
   initialTargetReturn = 15.0,
+  initialValuationMode = "cashFlow",
 }: DCFWidgetProps) {
   const { t } = useI18n();
 
-  // Active view tab: Interactive Sandbox (Image 1) or 5Y Trajectory Chart
+  // Active view tab: Interactive Sandbox or 5Y Trajectory Chart
   const [activeTab, setActiveTab] = useState<"sandbox" | "trajectory">("sandbox");
-  const [valuationMode, setValuationMode] = useState<"cashFlow" | "earnings">("cashFlow");
+  const [valuationMode, setValuationMode] = useState<"cashFlow" | "earnings">(initialValuationMode);
 
   // Inputs
   const [baseFcf, setBaseFcf] = useState<number>(initialFcf);
+  const [baseEarnings, setBaseEarnings] = useState<number>(initialEarnings);
   const [growthRate, setGrowthRate] = useState<number>(initialGrowth);
   const [multiple, setMultiple] = useState<number>(initialMultiple);
   const [discountRate, setDiscountRate] = useState<number>(initialDiscount);
@@ -70,55 +80,81 @@ export function DCFWidget({
   // Sync inputs when ticker or initial props change
   useEffect(() => {
     setBaseFcf(initialFcf);
+    setBaseEarnings(initialEarnings);
     setGrowthRate(initialGrowth);
     setMultiple(initialMultiple);
     setDiscountRate(initialDiscount);
     setTargetReturn(clampTargetReturn(initialTargetReturn));
-  }, [ticker, initialFcf, initialGrowth, initialMultiple, initialDiscount, initialTargetReturn]);
+  }, [ticker, initialFcf, initialEarnings, initialGrowth, initialMultiple, initialDiscount, initialTargetReturn]);
+
+  // Active base financial metric according to mode
+  const isCashFlowMode = valuationMode === "cashFlow";
+  const activeBase = isCashFlowMode ? baseFcf : baseEarnings;
+  const setActiveBase = isCashFlowMode ? setBaseFcf : setBaseEarnings;
 
   // --------------------------------------------------------------------------
   // DCF Calculations
   // --------------------------------------------------------------------------
   // 5-year discounted cash flow + terminal value computation:
-  // Fair Value = (Sum of discounted FCFs over 5 years + Discounted Terminal Value) / Shares Outstanding
-  const { fairValue, year5Fcf, year5Price, forwardReturn, reverseEntryPrice, marginOfSafety } =
-    useMemo(() => {
-      const g = growthRate / 100;
-      const d = discountRate / 100;
-      let sumPv = 0;
+  // Fair Value = (Sum of discounted future flows + Discounted Terminal Value) / Shares Outstanding
+  const {
+    fairValue,
+    year5Value,
+    year5Price,
+    forwardReturn,
+    targetBuyPrice,
+    requiredMultiple,
+    marginOfSafety,
+  } = useMemo(() => {
+    const g = growthRate / 100;
+    const d = discountRate / 100;
+    let sumPv = 0;
 
-      for (let yr = 1; yr <= 5; yr++) {
-        const fcfYr = baseFcf * Math.pow(1 + g, yr);
-        const pv = fcfYr / Math.pow(1 + d, yr);
-        sumPv += pv;
-      }
+    for (let yr = 1; yr <= 5; yr++) {
+      const valYr = activeBase * Math.pow(1 + g, yr);
+      const pv = valYr / Math.pow(1 + d, yr);
+      sumPv += pv;
+    }
 
-      const y5Fcf = baseFcf * Math.pow(1 + g, 5);
-      const terminalVal = y5Fcf * multiple;
-      const pvTerminal = terminalVal / Math.pow(1 + d, 5);
-      const totalEnterprisePv = sumPv + pvTerminal;
+    const y5Val = activeBase * Math.pow(1 + g, 5);
+    const terminalVal = y5Val * multiple;
+    const pvTerminal = terminalVal / Math.pow(1 + d, 5);
+    const totalEnterprisePv = sumPv + pvTerminal;
 
-      // Intrinsic fair value per share (assuming shares in billions, FCF in billions)
-      const shares = sharesOutstanding > 0 ? sharesOutstanding : 15.2;
-      const computedFairValue = totalEnterprisePv / (shares / 10); // normalized valuation index per share
+    // Intrinsic fair value per share (activeBase in $B, shares in billions)
+    const shares = sharesOutstanding > 0 ? sharesOutstanding : 15.2;
+    const computedFairValue = totalEnterprisePv / shares;
 
-      const y5Price = (y5Fcf / (shares / 10)) * multiple;
-      const fwd = currentPrice > 0 ? (Math.pow(y5Price / currentPrice, 1 / 5) - 1) * 100 : 0;
-      const revEntry =
-        targetReturn > -99.9 && y5Price > 0
-          ? y5Price / Math.pow(1 + targetReturn / 100, 5)
-          : 0;
-      const mos = currentPrice > 0 ? ((computedFairValue - currentPrice) / currentPrice) * 100 : 0;
+    // Year 5 implied target price per share
+    const y5Price = (y5Val / shares) * multiple;
 
-      return {
-        fairValue: computedFairValue,
-        year5Fcf: y5Fcf,
-        year5Price: y5Price,
-        forwardReturn: fwd,
-        reverseEntryPrice: revEntry,
-        marginOfSafety: mos,
-      };
-    }, [baseFcf, growthRate, multiple, discountRate, sharesOutstanding, currentPrice, targetReturn]);
+    // Forward annualized return from current price to Year 5 implied price
+    const fwd = currentPrice > 0 && y5Price > 0 ? (Math.pow(y5Price / currentPrice, 1 / 5) - 1) * 100 : 0;
+
+    // Target Buy Price to achieve targetReturn% annualized return
+    const buyPrice =
+      targetReturn > -99.9 && y5Price > 0
+        ? y5Price / Math.pow(1 + targetReturn / 100, 5)
+        : 0;
+
+    // Required multiple in Year 5 to achieve targetReturn% return from current market price
+    const reqMultiple =
+      y5Val > 0 && currentPrice > 0 && targetReturn > -99.9
+        ? (currentPrice * Math.pow(1 + targetReturn / 100, 5)) / (y5Val / shares)
+        : 0;
+
+    const mos = currentPrice > 0 ? ((computedFairValue - currentPrice) / currentPrice) * 100 : 0;
+
+    return {
+      fairValue: Math.max(0, computedFairValue),
+      year5Value: y5Val,
+      year5Price: Math.max(0, y5Price),
+      forwardReturn: fwd,
+      targetBuyPrice: Math.max(0, buyPrice),
+      requiredMultiple: Math.max(0, reqMultiple),
+      marginOfSafety: mos,
+    };
+  }, [activeBase, growthRate, multiple, discountRate, sharesOutstanding, currentPrice, targetReturn]);
 
   // Status classification
   const valuationStatus = useMemo(() => {
@@ -133,20 +169,25 @@ export function DCFWidget({
     const shares = sharesOutstanding > 0 ? sharesOutstanding : 15.2;
     const data = [];
     for (let i = 0; i <= 5; i++) {
-      const fcf = baseFcf * Math.pow(1 + growthRate / 100, i);
-      const impliedPrice = (fcf / (shares / 10)) * multiple;
+      const val = activeBase * Math.pow(1 + growthRate / 100, i);
+      const impliedPrice = (val / shares) * multiple;
       data.push({
         year: (currentYr + i).toString(),
-        fcf: Number(fcf.toFixed(1)),
+        metric: Number(val.toFixed(1)),
         price: Number(impliedPrice.toFixed(2)),
       });
     }
     return data;
-  }, [baseFcf, growthRate, multiple, sharesOutstanding]);
+  }, [activeBase, growthRate, multiple, sharesOutstanding]);
+
+  // Dynamic slider upper bound for base financial input
+  const baseSliderMax = useMemo(() => {
+    return Math.max(200, Math.ceil(activeBase * 2.5));
+  }, [activeBase]);
 
   return (
     <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-2xl flex flex-col space-y-0">
-      {/* Top Header matching Image 1 */}
+      {/* Top Header */}
       <div className="p-6 sm:p-8 border-b border-border/80 bg-secondary/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-primary mb-1">
@@ -201,7 +242,7 @@ export function DCFWidget({
         </div>
       </div>
 
-      {/* Main Interactive Valuation Sandbox (Image 1 Design) */}
+      {/* Main Interactive Valuation Sandbox */}
       {activeTab === "sandbox" ? (
         <div className="p-6 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
           {/* Left Controls Column (4 Sliders) */}
@@ -235,29 +276,29 @@ export function DCFWidget({
               </div>
             </div>
 
-            {/* Slider 1: Base FCF */}
+            {/* Slider 1: Base Metric (FCF or Net Income) */}
             <div className="space-y-2">
               <div className="flex justify-between items-center text-xs font-mono">
-                <label htmlFor="dcf-base-fcf-slider" className="text-muted-foreground font-medium">
-                  {t("dcf.baseFcf")}
+                <label htmlFor="dcf-base-metric-slider" className="text-muted-foreground font-medium">
+                  {isCashFlowMode ? t("dcf.baseFcf") : t("dcf.baseEarnings")}
                 </label>
                 <span className="font-semibold text-foreground bg-secondary/60 px-2.5 py-0.5 rounded border border-border tabular-nums text-sm sm:text-xs" dir="ltr">
-                  ${baseFcf.toFixed(1)}B
+                  ${activeBase.toFixed(1)}B
                 </span>
               </div>
               <div className="relative py-1 flex items-center">
                 <input
-                  id="dcf-base-fcf-slider"
+                  id="dcf-base-metric-slider"
                   type="range"
-                  min="1"
-                  max="300"
+                  min="0.5"
+                  max={baseSliderMax}
                   step="0.5"
-                  value={baseFcf}
-                  onChange={(e) => setBaseFcf(parseFloat(e.target.value) || 1)}
-                  aria-label={t("dcf.baseFcf") || "Base FCF"}
+                  value={activeBase}
+                  onChange={(e) => setActiveBase(parseFloat(e.target.value) || 1)}
+                  aria-label={isCashFlowMode ? t("dcf.baseFcf") : t("dcf.baseEarnings")}
                   className="w-full h-2.5 bg-secondary rounded-full appearance-none cursor-pointer accent-primary border border-border focus:outline-none focus:ring-1 focus:ring-primary shadow-inner"
                   style={{
-                    background: `linear-gradient(to right, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((baseFcf - 1) / (300 - 1)) * 100}%, hsl(250 20% 18%) ${((baseFcf - 1) / (300 - 1)) * 100}%, hsl(250 20% 18%) 100%)`,
+                    background: `linear-gradient(to right, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((activeBase - 0.5) / (baseSliderMax - 0.5)) * 100}%, hsl(250 20% 18%) ${((activeBase - 0.5) / (baseSliderMax - 0.5)) * 100}%, hsl(250 20% 18%) 100%)`,
                   }}
                 />
               </div>
@@ -291,11 +332,11 @@ export function DCFWidget({
               </div>
             </div>
 
-            {/* Slider 3: Terminal Multiple */}
+            {/* Slider 3: Terminal Exit Multiple (P/FCF or P/E) */}
             <div className="space-y-2">
               <div className="flex justify-between items-center text-xs font-mono">
                 <label htmlFor="dcf-multiple-slider" className="text-muted-foreground font-medium">
-                  {t("dcf.exitMultiple")}
+                  {isCashFlowMode ? t("dcf.exitMultiplePcf") : t("dcf.exitMultiplePe")}
                 </label>
                 <span className="font-semibold text-foreground bg-secondary/60 px-2.5 py-0.5 rounded border border-border tabular-nums text-sm sm:text-xs" dir="ltr">
                   {multiple.toFixed(0)}x
@@ -306,20 +347,20 @@ export function DCFWidget({
                   id="dcf-multiple-slider"
                   type="range"
                   min="5"
-                  max="50"
+                  max="70"
                   step="1"
                   value={multiple}
                   onChange={(e) => setMultiple(parseFloat(e.target.value) || 5)}
-                  aria-label={t("dcf.exitMultiple") || "Exit Multiple"}
+                  aria-label={isCashFlowMode ? t("dcf.exitMultiplePcf") : t("dcf.exitMultiplePe")}
                   className="w-full h-2.5 bg-secondary rounded-full appearance-none cursor-pointer accent-primary border border-border focus:outline-none focus:ring-1 focus:ring-primary shadow-inner"
                   style={{
-                    background: `linear-gradient(to right, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((multiple - 5) / (50 - 5)) * 100}%, hsl(250 20% 18%) ${((multiple - 5) / (50 - 5)) * 100}%, hsl(250 20% 18%) 100%)`,
+                    background: `linear-gradient(to right, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((multiple - 5) / (70 - 5)) * 100}%, hsl(250 20% 18%) ${((multiple - 5) / (70 - 5)) * 100}%, hsl(250 20% 18%) 100%)`,
                   }}
                 />
               </div>
             </div>
 
-            {/* Slider 4: Discount Rate */}
+            {/* Slider 4: Target Discount Rate */}
             <div className="space-y-2">
               <div className="flex justify-between items-center text-xs font-mono">
                 <label htmlFor="dcf-discount-slider" className="text-muted-foreground font-medium">
@@ -348,7 +389,7 @@ export function DCFWidget({
             </div>
           </div>
 
-          {/* Right Hero Valuation Card (Image 1 Design) */}
+          {/* Right Hero Valuation Card */}
           <div className="lg:col-span-5 bg-secondary/40 border border-border/80 rounded-2xl p-6 sm:p-7 flex flex-col justify-between space-y-6 shadow-inner ring-1 ring-white/5">
             <div>
               {/* Card Header with Status Badge */}
@@ -461,10 +502,13 @@ export function DCFWidget({
                 </div>
               </div>
               <p className="text-3xl font-bold font-mono tabular-nums text-primary" dir="ltr">
-                {reverseEntryPrice > 0 ? `$${reverseEntryPrice.toFixed(2)}` : "—"}
+                {targetBuyPrice > 0 ? `$${targetBuyPrice.toFixed(2)}` : "—"}
               </p>
               <p className="text-xs text-muted-foreground font-mono">
-                {t("dcf.targetingReturn", { target: targetReturn })}
+                {t("dcf.targetingReturn", {
+                  target: targetReturn,
+                  multiple: requiredMultiple.toFixed(1),
+                })}
               </p>
             </div>
           </div>
@@ -533,8 +577,8 @@ export function DCFWidget({
                   <Line
                     yAxisId="right"
                     type="monotone"
-                    dataKey="fcf"
-                    name={t("dcf.fcfBillions") || "FCF ($B)"}
+                    dataKey="metric"
+                    name={isCashFlowMode ? t("dcf.fcfBillions") : t("dcf.earningsBillions")}
                     stroke="hsl(var(--chart-positive))"
                     strokeWidth={2}
                     dot={{ fill: "hsl(var(--chart-positive))", r: 3 }}
