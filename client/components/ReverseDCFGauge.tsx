@@ -339,7 +339,7 @@ export const ReverseDCFGauge: React.FC<ReverseDCFGaugeProps> = ({
                 : "—"}
             </div>
             <div className="text-[11px] font-mono text-muted-foreground">
-              Based on ${currentPrice.toFixed(2)} price & {discountRate}% WACC
+              {t("dcf.basedOnPriceAndWacc", { price: currentPrice.toFixed(2), wacc: discountRate })}
             </div>
           </div>
         </div>
@@ -359,7 +359,7 @@ export const ReverseDCFGauge: React.FC<ReverseDCFGaugeProps> = ({
                 {userGrowthRate.toFixed(1)}%
               </p>
               <p className="text-[11px] text-muted-foreground font-mono">
-                Current sandbox setting
+                {t("dcf.currentSandboxSetting") || "Current sandbox setting"}
               </p>
             </div>
 
@@ -382,7 +382,9 @@ export const ReverseDCFGauge: React.FC<ReverseDCFGaugeProps> = ({
                 {absSpread.toFixed(1)}%
               </p>
               <p className="text-[11px] text-muted-foreground font-mono">
-                {hasHeadroom ? "Growth headroom" : "Growth deficit"}
+                {hasHeadroom
+                  ? t("dcf.growthHeadroom") || "Growth headroom"
+                  : t("dcf.growthDeficit") || "Growth deficit"}
               </p>
             </div>
           </div>
@@ -405,7 +407,7 @@ export const ReverseDCFGauge: React.FC<ReverseDCFGaugeProps> = ({
                 </p>
                 <p className="text-[11px] text-muted-foreground font-mono">
                   {t("dcf.impliedTerminalMetric") || "Implied Year 5 Base"}: ${impliedYear5Metric.toFixed(1)}B{" "}
-                  ({valuationMode === "cashFlow" ? "FCF" : "Net Income"})
+                  ({valuationMode === "cashFlow" ? t("dcf.fcfBase") || "FCF" : t("dcf.netIncomeBase") || "Net Income"})
                 </p>
               </div>
             </div>

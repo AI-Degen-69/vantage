@@ -857,7 +857,8 @@ export function DCFWidget({
             userGrowthRate={growthRate}
             valuationMode={valuationMode}
             onApplyImpliedGrowth={(impliedG) => {
-              setGrowthRate(impliedG);
+              const clampedG = Math.max(-10, Math.min(40, Number(impliedG.toFixed(1))));
+              setGrowthRate(clampedG);
               setActiveTab("sandbox");
             }}
           />

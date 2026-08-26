@@ -3,6 +3,7 @@ import React, {
   useContext,
   useState,
   useCallback,
+  useMemo,
   useEffect,
 } from "react";
 import { solveTemplate } from "./icu";
@@ -243,6 +244,12 @@ const en = {
   "dcf.regimeContraction": "Contraction Priced In",
   "dcf.headroomDescription": "You expect {{spread}}% higher growth than the market is pricing in (undervaluation cushion).",
   "dcf.deficitDescription": "The market price requires {{spread}}% higher growth than your current assumption.",
+  "dcf.basedOnPriceAndWacc": "Based on ${{price}} price & {{wacc}}% WACC",
+  "dcf.currentSandboxSetting": "Current sandbox setting",
+  "dcf.growthHeadroom": "Growth headroom",
+  "dcf.growthDeficit": "Growth deficit",
+  "dcf.netIncomeBase": "Net Income",
+  "dcf.fcfBase": "FCF",
 
   // Charts page
   "charts.dayRange": "Day Range",
@@ -1345,6 +1352,12 @@ const he: Record<string, string> = {
   "dcf.regimeContraction": "השוק מגלם נסיגה/התכווצות",
   "dcf.headroomDescription": "אתה צופה צמיחה גבוהה ב-{{spread}}% מציפיות השוק (כרית ביטחון).",
   "dcf.deficitDescription": "מחיר השוק דורש צמיחה גבוהה ב-{{spread}}% מהנחת העבודה שלך.",
+  "dcf.basedOnPriceAndWacc": "מבוסס על מחיר ${{price}} ו-WACC של {{wacc}}%",
+  "dcf.currentSandboxSetting": "הגדרה נוכחית בסנדבוקס",
+  "dcf.growthHeadroom": "כרית צמיחה (עודף)",
+  "dcf.growthDeficit": "גירעון צמיחה (חסר)",
+  "dcf.netIncomeBase": "רווח נקי",
+  "dcf.fcfBase": "תזרים חופשי",
 
   // Charts page
   "charts.dayRange": "טווח יומי",
@@ -2116,6 +2129,7 @@ interface I18nContextValue {
   t: (key: string, vars?: Record<string, string | number>) => string;
   setLang: (lang: Lang) => void;
   dir: "ltr" | "rtl";
+  isRtl: boolean;
 }
 
 // ── Context ────────────────────────────────────────────────────────────────────
@@ -2125,6 +2139,7 @@ const I18nContext = createContext<I18nContextValue>({
   t: (key: string) => key,
   setLang: () => {},
   dir: "ltr",
+  isRtl: false,
 });
 
 // ── Plural rules (CLDR) ─────────────────────────────────────────────────────
@@ -2528,16 +2543,19 @@ export function I18nProvider({
     [lang],
   );
 
+  const contextValue = useMemo<I18nContextValue>(
+    () => ({
+      lang,
+      t,
+      setLang,
+      dir: lang === "he" ? "rtl" : "ltr",
+      isRtl: lang === "he",
+    }),
+    [lang, t, setLang],
+  );
+
   return (
-    <I18nContext.Provider
-      value={{
-        lang,
-        t,
-        setLang,
-        dir: lang === "he" ? "rtl" : "ltr",
-        isRtl: lang === "he",
-      }}
-    >
+    <I18nContext.Provider value={contextValue}>
       {children}
     </I18nContext.Provider>
   );
