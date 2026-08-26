@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useI18n } from "@/lib/i18n";
-import { Sliders, LineChart as ChartIcon, Info, RotateCcw } from "lucide-react";
+import { Sliders, LineChart as ChartIcon, Table2, Info, RotateCcw } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -12,6 +12,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import ValuationSensitivityMatrix from "./ValuationSensitivityMatrix";
 
 export interface DCFWidgetProps {
   ticker?: string;
@@ -65,8 +66,8 @@ export function DCFWidget({
 }: DCFWidgetProps) {
   const { t } = useI18n();
 
-  // Active view tab: Interactive Sandbox or 5Y Trajectory Chart
-  const [activeTab, setActiveTab] = useState<"sandbox" | "trajectory">("sandbox");
+  // Active view tab: Interactive Sandbox, 5Y Trajectory Chart, or Sensitivity Matrix
+  const [activeTab, setActiveTab] = useState<"sandbox" | "trajectory" | "sensitivity">("sandbox");
   const [valuationMode, setValuationMode] = useState<"cashFlow" | "earnings">(initialValuationMode);
 
   // Inputs
@@ -214,8 +215,8 @@ export function DCFWidget({
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Tab selector between Sandbox and Trajectory */}
-          <div className="flex items-center bg-muted/60 rounded-lg p-1 border border-border">
+          {/* Tab selector between Sandbox, Trajectory, and Sensitivity Matrix */}
+          <div className="flex items-center bg-muted/60 rounded-lg p-1 border border-border flex-wrap gap-1">
             <button
               type="button"
               aria-pressed={activeTab === "sandbox"}
@@ -242,13 +243,27 @@ export function DCFWidget({
               <ChartIcon className="w-3.5 h-3.5" />
               <span>{t("dcf.trajectoryTab")}</span>
             </button>
+            <button
+              type="button"
+              aria-pressed={activeTab === "sensitivity"}
+              onClick={() => setActiveTab("sensitivity")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono font-medium transition-all ${
+                activeTab === "sensitivity"
+                  ? "bg-primary text-primary-foreground shadow-sm font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Table2 className="w-3.5 h-3.5" />
+              <span>{t("dcf.viewSensitivityMatrix")}</span>
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Main Interactive Valuation Sandbox */}
-      {activeTab === "sandbox" ? (
-        <div className="p-6 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+      {/* Tab 1: Main Interactive Valuation Sandbox */}
+      {activeTab === "sandbox" && (
+        <div className="p-6 sm:p-8 space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
           {/* Left Controls Column (4 Sliders) */}
           <div className="lg:col-span-7 space-y-6">
             {/* Mode selection pills */}
@@ -571,8 +586,23 @@ export function DCFWidget({
             </button>
           </div>
         </div>
-      ) : (
-        /* Trajectory & Recharts Breakdown Mode */
+
+        {/* Shortcut to 2D Sensitivity Matrix */}
+        <div className="pt-2 flex justify-end">
+          <button
+            type="button"
+            onClick={() => setActiveTab("sensitivity")}
+            className="text-xs font-mono text-primary hover:underline flex items-center gap-1.5 transition-colors"
+          >
+            <Table2 className="w-3.5 h-3.5" />
+            <span>{t("dcf.sensitivityTitle") || "2D Valuation Sensitivity Matrix"} →</span>
+          </button>
+        </div>
+      </div>
+      )}
+
+      {/* Tab 2: 5-Year Trajectory & Recharts Breakdown Mode */}
+      {activeTab === "trajectory" && (
         <div className="p-6 sm:p-8 space-y-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="bg-secondary/30 rounded-xl p-6 border border-border space-y-2">
@@ -770,6 +800,26 @@ export function DCFWidget({
               </ResponsiveContainer>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Tab 3: 2D Valuation Sensitivity Matrix */}
+      {activeTab === "sensitivity" && (
+        <div className="p-6 sm:p-8">
+          <ValuationSensitivityMatrix
+            activeBase={activeBase}
+            currentPrice={currentPrice}
+            growthRate={growthRate}
+            multiple={multiple}
+            discountRate={discountRate}
+            sharesOutstanding={sharesOutstanding}
+            valuationMode={valuationMode}
+            onSelectScenario={(scenario) => {
+              if (scenario.discountRate !== undefined) setDiscountRate(scenario.discountRate);
+              if (scenario.growthRate !== undefined) setGrowthRate(scenario.growthRate);
+              if (scenario.multiple !== undefined) setMultiple(scenario.multiple);
+            }}
+          />
         </div>
       )}
     </div>
