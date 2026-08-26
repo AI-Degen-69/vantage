@@ -133,15 +133,8 @@ export function Charts() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && searchQuery.trim()) {
                     const trimmed = searchQuery.trim();
-                    if (
-                      debouncedQuery === trimmed &&
-                      !searchLoading &&
-                      searchResults.length > 0
-                    ) {
-                      handleSelectTicker(searchResults[0].symbol);
-                    } else {
-                      handleSelectTicker(trimmed);
-                    }
+                    if (debouncedQuery !== trimmed || searchLoading) return;
+                    handleSelectTicker(searchResults[0]?.symbol ?? trimmed);
                   }
                 }}
                 placeholder={t("charts.searchPlaceholder")}
