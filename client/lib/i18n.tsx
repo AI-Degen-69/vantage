@@ -209,6 +209,10 @@ const en = {
   "charts.vol": "Vol: {{amount}}M",
   "charts.inRange": "{{percent}}% in range",
   "charts.clearSearch": "Clear search",
+  "charts.midpointTitle": "Midpoint (50%)",
+  "charts.low": "Low",
+  "charts.mid": "Mid: ${{amount}}",
+  "charts.high": "High",
   "charts.dcfGuidance":
     "Adjust the income / growth / multiple inputs to model scenarios. Forward return assumes reinvestment and the multiple stays constant — a real DCF discounts future cash-flows at WACC, not multiples, so treat this widget as a back-of-the-envelope.",
 
@@ -1257,6 +1261,10 @@ const he: Record<string, string> = {
   "charts.vol": "מחזור: {{amount}}M",
   "charts.inRange": "{{percent}}% בטווח",
   "charts.clearSearch": "נקה חיפוש",
+  "charts.midpointTitle": "נקודת אמצע (50%)",
+  "charts.low": "נמוך",
+  "charts.mid": "אמצע: ${{amount}}",
+  "charts.high": "גבוה",
   "charts.dcfGuidance":
     "התאם את תשומות ההכנסה / צמיחה / מכפיל כדי לדמות תרחישים. תשואה צפויה מניחה השקעה חוזרת והמכפיל נשאר קבוע — DCF אמיתי מנכה תזרימי מזומנים עתידיים ב-WACC, לא במכפילים, אז התייחס לווידג'ט הזה כחישוב גס.",
 

@@ -132,10 +132,15 @@ export function Charts() {
                 onFocus={() => setIsSearchOpen(true)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && searchQuery.trim()) {
-                    if (searchResults.length > 0) {
+                    const trimmed = searchQuery.trim();
+                    if (
+                      debouncedQuery === trimmed &&
+                      !searchLoading &&
+                      searchResults.length > 0
+                    ) {
                       handleSelectTicker(searchResults[0].symbol);
                     } else {
-                      handleSelectTicker(searchQuery.trim());
+                      handleSelectTicker(trimmed);
                     }
                   }
                 }}
@@ -389,6 +394,7 @@ function DualRange({
   high: number;
   current: number;
 }) {
+  const { t } = useI18n();
   const pct =
     high > low ? Math.min(100, Math.max(0, ((current - low) / (high - low)) * 100)) : 50;
 
@@ -400,7 +406,7 @@ function DualRange({
         <div
           className="absolute -top-1 bottom-0 w-px bg-muted-foreground/30 z-0 h-4"
           style={{ left: "50%" }}
-          title="Midpoint (50%)"
+          title={t("charts.midpointTitle")}
         />
 
         {/* Active gradient fill up to current position */}
@@ -420,14 +426,18 @@ function DualRange({
       {/* Axis bounds */}
       <div className="flex justify-between items-center text-xs font-mono">
         <div className="flex items-center gap-1 text-chart-negative">
-          <span className="text-[10px] text-muted-foreground uppercase font-sans">Low</span>
+          <span className="text-[10px] text-muted-foreground uppercase font-sans">
+            {t("charts.low")}
+          </span>
           <span className="font-semibold" dir="ltr">${low.toFixed(2)}</span>
         </div>
         <div className="flex items-center gap-1 text-muted-foreground text-[10px]">
-          <span>Mid: ${((low + high) / 2).toFixed(2)}</span>
+          <span>{t("charts.mid", { amount: ((low + high) / 2).toFixed(2) })}</span>
         </div>
         <div className="flex items-center gap-1 text-chart-positive">
-          <span className="text-[10px] text-muted-foreground uppercase font-sans">High</span>
+          <span className="text-[10px] text-muted-foreground uppercase font-sans">
+            {t("charts.high")}
+          </span>
           <span className="font-semibold" dir="ltr">${high.toFixed(2)}</span>
         </div>
       </div>
