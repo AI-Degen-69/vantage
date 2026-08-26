@@ -75,7 +75,7 @@ function formatHumanRange(from: string, to: string): string {
  *
  * @returns The earnings calendar page.
  */
-export default function EarningsPage() {
+export function EarningsPage() {
   const { t } = useI18n();
   const initial = useMemo(() => currentWeekRange(), []);
   const [offset, setOffset] = useState(0); // 0 = this week
@@ -122,14 +122,14 @@ export default function EarningsPage() {
           description={t("earnings.subtitle")}
         />
 
-        <div className="flex items-center justify-between bg-slate-900/50 p-4 rounded-xl border border-border gap-4 flex-wrap">
+        <div className="flex items-center justify-between bg-card/60 p-4 rounded-xl border border-border gap-4 flex-wrap">
           {/* Week Navigation */}
           <div className="flex items-center gap-2">
             <button
               disabled={!hasPrev}
               onClick={() => setOffset((o) => o - 1)}
               title={t("earningsCalendar.prevWeek")}
-              className="p-2 hover:bg-slate-800 rounded-md transition-colors text-slate-400 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              className="p-2 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
@@ -137,8 +137,8 @@ export default function EarningsPage() {
               onClick={() => setOffset(0)}
               className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
                 isThisWeek
-                  ? "bg-blue-600 text-white"
-                  : "bg-slate-800 text-slate-300 hover:text-white"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
               }`}
             >
               {t("earningsCalendar.today")}
@@ -147,36 +147,36 @@ export default function EarningsPage() {
               disabled={!hasNext}
               onClick={() => setOffset((o) => o + 1)}
               title={t("earningsCalendar.nextWeek")}
-              className="p-2 hover:bg-slate-800 rounded-md transition-colors text-slate-400 disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+              className="p-2 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
-            <span className="ml-4 text-sm font-medium" dir="ltr">
+            <span className="ml-4 text-sm font-medium text-foreground" dir="ltr">
               {t("earningsCalendar.weekOf", { range: formatHumanRange(from, to) })}
             </span>
           </div>
 
           {/* Filters */}
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-md text-sm border border-slate-700">
-              <span className="text-slate-400">{t("earningsCalendar.marketCap")}</span>
+            <div className="flex items-center gap-2 bg-secondary/50 px-3 py-1.5 rounded-md text-sm border border-border">
+              <span className="text-muted-foreground">{t("earningsCalendar.marketCap")}</span>
               <select
                 value={marketCap}
                 onChange={(e) => setMarketCap(e.target.value as MarketCapFilter)}
                 className="bg-transparent focus:outline-none text-foreground cursor-pointer"
               >
-                <option value="all">{t("earningsCalendar.marketCapAll")}</option>
-                <option value="large">{t("earningsCalendar.marketCapLarge")}</option>
-                <option value="mid">{t("earningsCalendar.marketCapMid")}</option>
-                <option value="small">{t("earningsCalendar.marketCapSmall")}</option>
+                <option value="all" className="bg-popover text-popover-foreground">{t("earningsCalendar.marketCapAll")}</option>
+                <option value="large" className="bg-popover text-popover-foreground">{t("earningsCalendar.marketCapLarge")}</option>
+                <option value="mid" className="bg-popover text-popover-foreground">{t("earningsCalendar.marketCapMid")}</option>
+                <option value="small" className="bg-popover text-popover-foreground">{t("earningsCalendar.marketCapSmall")}</option>
               </select>
             </div>
-            <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground cursor-pointer transition-colors">
               <input
                 type="checkbox"
                 checked={effectiveWatchlistOnly}
                 onChange={(e) => setWatchlistOnly(e.target.checked)}
-                className="rounded border-slate-700 bg-slate-800 focus:ring-blue-500 cursor-pointer"
+                className="rounded border-border bg-secondary text-primary focus:ring-primary cursor-pointer"
               />
               {t("earningsCalendar.filterByWatchlist")}
             </label>
@@ -195,3 +195,5 @@ export default function EarningsPage() {
     </div>
   );
 }
+
+export default EarningsPage;
