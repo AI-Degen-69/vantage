@@ -7,6 +7,7 @@
 
 /** Coerce a value to a finite number, or null when it isn't finite. */
 export function finite(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
   const n = typeof value === "number" ? value : Number(value);
   return Number.isFinite(n) ? n : null;
 }

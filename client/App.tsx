@@ -6,8 +6,6 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Outlet } from "react-router-dom";
-import { useI18n } from "@/lib/i18n";
-import { useNavigate } from "react-router-dom";
 import Sidebar from "@/components/Sidebar";
 import { WatchlistsProvider } from "@/hooks/useWatchlists";
 import { EarningsAlertEngine } from "@/hooks/useEarningsAlerts";
@@ -25,6 +23,7 @@ import NotFound from "./pages/NotFound";
 // The existing per-route <ErrorBoundary> wraps the lazy elements below, so a
 // failed chunk fetch or render crash surfaces the recoverable error screen
 // instead of white-screening the app.
+const Landing = lazy(() => import("./pages/Landing"));
 const Index = lazy(() => import("./pages/Index"));
 // Dev-only translator QA route. The lazy() call itself is gated behind
 // import.meta.env.DEV so the I18nDebug chunk is excluded from production
@@ -94,54 +93,15 @@ const AppLayout = () => (
         <Sidebar />
         <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
           <TopBar />
-          <ProviderHealthIndicator />
           <main className="flex-1 overflow-auto">
             <Outlet />
           </main>
+          <ProviderHealthIndicator />
         </div>
       </div>
     </EarningsAlertEngine>
   </WatchlistsProvider>
 );
-
-const SplashPage = () => {
-  const { t } = useI18n();
-  const navigate = useNavigate();
-  return (
-    <div className="flex flex-col items-center justify-center h-full max-w-md mx-auto text-center px-4">
-      <h1 className="text-4xl font-bold text-foreground mb-6 tracking-widest">
-        VANTAGE
-      </h1>
-      <p className="text-muted-foreground mb-8 text-lg">
-        {t("splash.subtitle")}
-      </p>
-      <div className="w-full space-y-4 bg-card p-6 rounded-panel border border-border">
-        <div>
-          <input
-            type="email"
-            placeholder={t("splash.email")}
-            className="w-full px-4 py-3 bg-background border border-border rounded-[6px] text-foreground focus:outline-none focus:border-primary transition-colors"
-            defaultValue="demo@vantage.com"
-          />
-        </div>
-        <div>
-          <input
-            type="password"
-            placeholder={t("splash.password")}
-            className="w-full px-4 py-3 bg-background border border-border rounded-[6px] text-foreground focus:outline-none focus:border-primary transition-colors"
-            defaultValue="password123"
-          />
-        </div>
-        <button
-          onClick={() => navigate("/insights")}
-          className="w-full py-3 bg-primary hover:opacity-90 text-primary-foreground font-semibold rounded-[6px] transition-opacity"
-        >
-          {t("splash.login")}
-        </button>
-      </div>
-    </div>
-  );
-};
 
 // ----------------------------------------------------------------------------
 // ErrorBoundary — single route crashes shouldn't white-screen the app (Phase 0 — C3)
@@ -208,7 +168,14 @@ export default function App() {
           <ErrorBoundary>
             <Routes>
               <Route element={<AppLayout />}>
-                <Route path="/" element={<SplashPage />} />
+                <Route
+                  path="/"
+                  element={
+                    <ErrorBoundary>
+                      {withFallback(<Landing />)}
+                    </ErrorBoundary>
+                  }
+                />
                 <Route
                   path="/portfolios"
                   element={

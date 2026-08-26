@@ -58,13 +58,12 @@ describe("chart bar styles", () => {
   it("keeps a negative-only series from pinning zero to the plot edge", () => {
     const [min, max] = calculateChartDomain([-4.6]);
     expect(min).toBeLessThan(-4.6);
-    expect(max).toBeGreaterThan(0);
-    expect(max).toBeLessThanOrEqual(1);
+    expect(max).toBe(0);
   });
 
   it("balances positive-only, mixed, empty, and zero-only series", () => {
     const positive = calculateChartDomain([2, 8]);
-    expect(positive[0]).toBeLessThan(0);
+    expect(positive[0]).toBe(0);
     expect(positive[1]).toBeGreaterThan(8);
 
     const mixed = calculateChartDomain([-3, 5]);

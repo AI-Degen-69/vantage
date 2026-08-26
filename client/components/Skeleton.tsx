@@ -31,14 +31,19 @@ export function Skeleton({ className, rounded = "rounded-md", style }: SkeletonP
 /** Skeleton block shaped like one InsightsCard. Used inside Index.tsx grid. */
 export function MetricCardSkeleton() {
   return (
-    <div className="bg-card border border-border rounded-xl p-4 flex flex-col">
-      <Skeleton className="h-3 w-24 mb-3" />
-      <div className="flex items-end gap-3 mb-4">
-        <Skeleton className="h-7 w-20" />
-        <Skeleton className="h-4 w-12" rounded="rounded" />
+    <div className="bg-card border border-border rounded-panel p-4 flex flex-col justify-between">
+      <div>
+        <Skeleton className="h-3 w-24 mb-2.5" />
+        <div className="flex items-baseline gap-2.5 mb-3">
+          <Skeleton className="h-7 w-24" />
+          <Skeleton className="h-4 w-14" rounded="rounded" />
+        </div>
       </div>
-      <Skeleton className="h-16 w-full" rounded="rounded" />
-      <Skeleton className="h-3 w-full mt-3" />
+      <Skeleton className="h-[68px] w-full mt-2" rounded="rounded-sm" />
+      <div className="flex justify-between items-center mt-3 pt-2.5 border-t border-border/40">
+        <Skeleton className="h-3 w-20" />
+        <Skeleton className="h-3 w-12" />
+      </div>
     </div>
   );
 }

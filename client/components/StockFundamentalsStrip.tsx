@@ -273,30 +273,6 @@ export default function StockFundamentalsStrip({
         <MetricGroup title={fGroup("valuation")} groupKey="valuation">
           <MetricRow
             t={t}
-            label={f("marketCap")}
-            value={formatMoney(marketCap)}
-            loading={loading}
-            source={quoteSource ? { label: quoteSource } : undefined}
-          />
-          <MetricRow
-            t={t}
-            label={f("pe")}
-            value={formatNumber(
-              quote?.pe ??
-                metrics?.ratios?.priceEarningsRatioTTM ??
-                metrics?.metrics?.peRatioTTM,
-            )}
-            loading={loading}
-            source={
-              quoteSource
-                ? { label: quoteSource }
-                : metricsSource
-                  ? { label: metricsSource }
-                  : undefined
-            }
-          />
-          <MetricRow
-            t={t}
             label={f("priceToSales")}
             value={formatNumber(
               metrics?.metrics?.priceToSalesRatioTTM ??

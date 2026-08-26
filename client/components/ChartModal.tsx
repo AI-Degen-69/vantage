@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X, Download, TrendingUp, TrendingDown, Lock, Table as TableIcon } from "lucide-react";
+import { X, Download, TrendingUp, TrendingDown, Lock, Table as TableIcon, Activity, BarChart3 } from "lucide-react";
 import TickerLogo from "@/components/TickerLogo";
 import { useI18n } from "@/lib/i18n";
 import {
@@ -166,10 +166,8 @@ export default function ChartModal({
   const { t } = useI18n();
   const [timeframe, setTimeframe] = useState<TimeframeType>("1Y");
   const [granularity, setGranularity] = useState<Granularity>("annual");
+  const [chartView, setChartView] = useState<"bar" | "line">("bar");
   const [showTable, setShowTable] = useState(false);
-  // Segments the user has toggled off via the modal's filter chips. Stored
-  // as names so the chart, legend, tooltip, table, and CSV all share one
-  // source of truth; cleared when the modal closes.
   const [hiddenSegments, setHiddenSegments] = useState<string[]>([]);
 
   // The revenue card supplies annual segment rows; when non-empty the modal
@@ -518,6 +516,40 @@ export default function ChartModal({
       );
   }, [segmentModel.rows, granularity]);
 
+  // Always compute reliable growth metrics regardless of timeframe selection
+  const cagrValue = useMemo(() => {
+    if (isSegmentMode) return segmentGrowth.cagr3Y;
+    if (liveGrowth.cagr3Y !== null && liveGrowth.cagr3Y !== undefined) return liveGrowth.cagr3Y;
+    const finite = (metric.data || [])
+      .map((d) => d.value)
+      .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+    if (finite.length >= 2) {
+      const first = finite[0];
+      const last = finite[finite.length - 1];
+      const span = finite.length - 1;
+      if (first > 0 && last > 0 && span > 0) {
+        return (Math.pow(last / first, 1 / span) - 1) * 100;
+      }
+    }
+    return null;
+  }, [isSegmentMode, segmentGrowth.cagr3Y, liveGrowth.cagr3Y, metric.data]);
+
+  const yoyValue = useMemo(() => {
+    if (isSegmentMode) return segmentGrowth.yoy;
+    if (liveGrowth.yoy !== null && liveGrowth.yoy !== undefined) return liveGrowth.yoy;
+    const finite = (metric.data || [])
+      .map((d) => d.value)
+      .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+    if (finite.length >= 2) {
+      const last = finite[finite.length - 1];
+      const prev = finite[finite.length - 2];
+      if (prev !== 0) {
+        return ((last - prev) / Math.abs(prev)) * 100;
+      }
+    }
+    return null;
+  }, [isSegmentMode, segmentGrowth.yoy, liveGrowth.yoy, metric.data]);
+
   // Reset toggle + timeframe + segment filters when the modal closes /
   // reopens so the next open starts at the default annual 1Y with every
   // segment visible. The 5Y control remains available for the chart window,
@@ -580,7 +612,7 @@ export default function ChartModal({
   };
 
   const colorMap: { [key: string]: string } = {
-    "chart-green": "hsl(155 55% 50%)", // Aurora Green
+    "chart-green": "hsl(155 65% 52%)", // Aurora Green
     "chart-orange": "hsl(32 85% 58%)",
     "chart-blue": "hsl(200 60% 60%)", // Nebula Blue
     "chart-cyan": "hsl(190 65% 58%)",
@@ -588,9 +620,15 @@ export default function ChartModal({
     "chart-pink": "hsl(340 55% 62%)",
   };
 
-  const chartColor = colorMap[metric.color] || "hsl(200 60% 60%)";
-  const gridColor = "hsl(250 20% 16%)"; // Graticule
-  const axisColor = "hsl(220 10% 60%)"; // Dust
+  const chartColor =
+    metric.yoy != null
+      ? metric.yoy >= 0
+        ? "hsl(155 65% 52%)"
+        : "hsl(6 75% 58%)"
+      : colorMap[metric.color] || "hsl(42 65% 70%)";
+  const gridColor = "hsl(250 20% 18%)"; // Subtle horizontal grid
+  const axisColor = "hsl(220 20% 85%)"; // High contrast readable tick labels
+  const axisLineColor = "hsl(250 20% 28%)"; // Visible axis baseline
   const chartDomain = calculateChartDomain(filteredData.map((entry) => entry.value));
   const requestedPeriodCount = granularity === "quarter" ? (timeframe === "1Y" ? 4 : 12) : 0;
   const quarterlyAvailability = getChartAvailability(
@@ -607,8 +645,16 @@ export default function ChartModal({
 
   const quarterlyMask = granularity === "quarter" && (quarterlyLoading || showQuarterlyMask) ? (
     <div
-      className="pointer-events-none absolute inset-y-0 left-0 z-10 flex flex-col items-center justify-center gap-2 overflow-hidden border-r border-border/70 bg-background/70 px-4 text-center backdrop-blur-md"
-      style={{ width: quarterlyLoading ? "100%" : quarterlyMaskWidth }}
+      className="pointer-events-none absolute z-10 flex flex-col items-center justify-center gap-2 overflow-hidden border border-dashed border-border/80 bg-gradient-to-r from-card/95 via-card/85 to-card/25 px-6 text-center backdrop-blur-[2px] rounded-lg"
+      style={{
+        top: "20px",
+        bottom: "55px",
+        left: "75px",
+        width:
+          quarterlyLoading || quarterlyAvailability.availableCount === 0
+            ? "calc(100% - 100px)"
+            : `calc((100% - 100px) * ${quarterlyAvailability.fractionUnavailable})`,
+      }}
       role="status"
       aria-live="polite"
       aria-label={
@@ -619,14 +665,14 @@ export default function ChartModal({
             : "Some quarterly history is unavailable"
       }
     >
-      <div className="rounded-full border border-border/70 bg-card/80 p-2.5 shadow-lg">
+      <div className="rounded-full border border-border/80 bg-card/90 p-2.5 shadow-md shadow-black/40">
         {quarterlyLoading ? (
-          <span className="block h-5 w-5 animate-pulse rounded-full bg-muted-foreground/50" aria-hidden="true" />
+          <span className="block h-4 w-4 animate-pulse rounded-full bg-muted-foreground/50" aria-hidden="true" />
         ) : (
-          <Lock className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+          <Lock className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
         )}
       </div>
-      <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+      <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-foreground/80">
         {quarterlyLoading
           ? "Loading"
           : quarterlyAvailability.availableCount === 0
@@ -646,7 +692,7 @@ export default function ChartModal({
   const renderChart = () => {
     const commonProps = {
       data: filteredData,
-      margin: { top: 20, right: 30, left: 20, bottom: 20 },
+      margin: { top: 20, right: 25, left: 10, bottom: 25 },
     };
 
     const CustomTooltip = ({ active, payload, label }: any) => {
@@ -654,29 +700,25 @@ export default function ChartModal({
         const data = payload[0].payload;
         if (data.isLocked) {
           return (
-            <div className="bg-card border border-border p-3 rounded-panel text-xs text-foreground shadow-lg text-center rtl:text-right">
-              <p className="text-muted-foreground mb-2 font-mono" dir="ltr">{label}</p>
-              <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                <span className="text-lg">🔒</span>
+            <div className="bg-card/95 backdrop-blur-md border border-border/80 p-3 rounded-panel text-xs text-foreground shadow-xl text-center rtl:text-right">
+              <p className="text-muted-foreground mb-1.5 font-mono text-[11px]" dir="ltr">{label}</p>
+              <div className="flex items-center justify-center gap-1.5 text-muted-foreground font-semibold text-xs">
+                <Lock className="w-3.5 h-3.5" />
                 <span>Pro</span>
               </div>
             </div>
           );
         }
-        // In case value is null but it wasn't marked locked
-        if (data.value === null) return null;
+        if (data.value === null || data.value === undefined) return null;
 
         return (
-          <div className="bg-card border border-border p-3 rounded-panel text-xs text-foreground shadow-lg text-left rtl:text-right">
-            <p className="text-muted-foreground mb-2 font-mono" dir="ltr">
+          <div className="bg-card/95 backdrop-blur-md border border-border/80 p-3 rounded-panel text-xs text-foreground shadow-xl text-left rtl:text-right min-w-[130px]">
+            <p className="text-muted-foreground mb-1.5 font-mono text-[11px] pb-1 border-b border-border/40" dir="ltr">
               {label}
             </p>
-            <p
-              className="font-bold text-lg flex gap-1 font-mono tabular-nums"
-              style={{ color: chartColor }}
-            >
-              <span className="font-sans font-normal">{t(metric.name)}:</span>
-              <span dir="ltr">
+            <p className="font-bold text-base flex items-baseline gap-1.5 font-mono tabular-nums text-foreground">
+              <span className="font-sans text-xs font-normal text-muted-foreground">{t(metric.name)}:</span>
+              <span dir="ltr" className={data.value >= 0 ? "text-chart-positive" : "text-chart-negative"}>
                 {formatMetricValue(data.value, metric.unit, 2)}
               </span>
             </p>
@@ -686,11 +728,89 @@ export default function ChartModal({
       return null;
     };
 
-    // Every chart renders on the same instrument grid: a fine Graticule
-    // CartesianGrid, Dust-colored axes, and a soft glow on the metric's
-    // own line/bars (DESIGN.md: The Earned Glow Rule). The glow is scoped
-    // to this chart via a per-metric filter id so multiple modals never
-    // collide.
+    const renderBarValueLabel = (props: {
+      x?: number | string;
+      y?: number | string;
+      width?: number | string;
+      height?: number | string;
+      value?: unknown;
+    }) => {
+      const { x, y, width, value } = props;
+      const numX = typeof x === "number" ? x : typeof x === "string" ? parseFloat(x) : NaN;
+      const numY = typeof y === "number" ? y : typeof y === "string" ? parseFloat(y) : NaN;
+      const numW = typeof width === "number" ? width : typeof width === "string" ? parseFloat(width) : NaN;
+      if (
+        typeof value !== "number" ||
+        !Number.isFinite(value) ||
+        !Number.isFinite(numX) ||
+        !Number.isFinite(numY) ||
+        !Number.isFinite(numW)
+      ) {
+        return null;
+      }
+      const formatted = formatMetricValue(value, metric.unit, 1);
+      const isNegative = value < 0;
+      return (
+        <text
+          x={numX + numW / 2}
+          y={isNegative ? numY + 14 : numY - 6}
+          fill="#f8fafc"
+          textAnchor="middle"
+          fontSize={11.5}
+          fontWeight={500}
+          fontFamily="JetBrains Mono, monospace"
+          style={{
+            pointerEvents: "none",
+            paintOrder: "stroke fill",
+            stroke: "rgba(10, 9, 16, 0.9)",
+            strokeWidth: 2.5,
+            strokeLinejoin: "round",
+          }}
+        >
+          {formatted}
+        </text>
+      );
+    };
+
+    const renderAreaValueLabel = (props: {
+      x?: number | string;
+      y?: number | string;
+      value?: unknown;
+    }) => {
+      const { x, y, value } = props;
+      const numX = typeof x === "number" ? x : typeof x === "string" ? parseFloat(x) : NaN;
+      const numY = typeof y === "number" ? y : typeof y === "string" ? parseFloat(y) : NaN;
+      if (
+        typeof value !== "number" ||
+        !Number.isFinite(value) ||
+        !Number.isFinite(numX) ||
+        !Number.isFinite(numY)
+      ) {
+        return null;
+      }
+      const formatted = formatMetricValue(value, metric.unit, 1);
+      return (
+        <text
+          x={numX}
+          y={numY - 10}
+          fill="#f8fafc"
+          textAnchor="middle"
+          fontSize={11.5}
+          fontWeight={500}
+          fontFamily="JetBrains Mono, monospace"
+          style={{
+            pointerEvents: "none",
+            paintOrder: "stroke fill",
+            stroke: "rgba(10, 9, 16, 0.9)",
+            strokeWidth: 2.5,
+            strokeLinejoin: "round",
+          }}
+        >
+          {formatted}
+        </text>
+      );
+    };
+
     const glowId = `light-curve-glow-${metric.name}`;
     const GlowFilter = () => (
       <defs>
@@ -704,13 +824,6 @@ export default function ChartModal({
       </defs>
     );
 
-    // Segment stacked mode — the modal's raison d'être for the revenue card.
-    // One bar per fiscal period (year, or quarter when the granularity
-    // toggle is on) with every visible segment stacked (legend + per-
-    // segment tooltip), so opening the modal from the segment card shows
-    // the full product mix regardless of which chip is selected on the
-    // card. The modal's own filter chips can hide segments from the stack;
-    // the axis rescales to the visible total.
     if (isSegmentMode) {
       const maxTotal = Math.max(
         1,
@@ -721,38 +834,40 @@ export default function ChartModal({
         const point = payload[0].payload;
         const total = visibleTotal(point);
         return (
-          <div className="bg-card border border-border p-3 rounded-panel text-xs text-foreground shadow-lg text-left rtl:text-right min-w-[11rem]">
-            <p className="text-muted-foreground mb-2 font-mono" dir="ltr">
+          <div className="bg-card/95 backdrop-blur-md border border-border/80 p-3.5 rounded-panel text-xs text-foreground shadow-xl text-left rtl:text-right min-w-[12rem]">
+            <p className="text-muted-foreground mb-2 font-mono text-[11px] pb-1 border-b border-border/40" dir="ltr">
               {label}
             </p>
-            {visibleNames.map((name) => {
-              const value = point[name];
-              if (typeof value !== "number" || !Number.isFinite(value)) {
-                return null;
-              }
-              return (
-                <div
-                  key={name}
-                  className="flex items-center justify-between gap-4 py-0.5"
-                >
-                  <span className="flex items-center gap-1.5">
-                    <span
-                      className="w-2 h-2 rounded-full shrink-0"
-                      style={{ background: segmentColor(name) }}
-                    />
-                    {name}
-                  </span>
-                  <span className="font-mono tabular-nums" dir="ltr">
-                    {formatMetricValue(value, "B", 2)}
-                  </span>
-                </div>
-              );
-            })}
+            <div className="space-y-1">
+              {visibleNames.map((name) => {
+                const value = point[name];
+                if (typeof value !== "number" || !Number.isFinite(value)) {
+                  return null;
+                }
+                return (
+                  <div
+                    key={name}
+                    className="flex items-center justify-between gap-4 py-0.5"
+                  >
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0 shadow-sm"
+                        style={{ background: segmentColor(name) }}
+                      />
+                      <span className="truncate max-w-[100px]">{name}</span>
+                    </span>
+                    <span className="font-mono tabular-nums font-semibold text-foreground" dir="ltr">
+                      {formatMetricValue(value, "B", 2)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
             {total > 0 && (
-              <div className="flex items-center justify-between gap-4 mt-2 pt-2 border-t border-border">
-                <span className="font-medium">{t("chart.total")}</span>
+              <div className="flex items-center justify-between gap-4 mt-2 pt-2 border-t border-border/50">
+                <span className="font-semibold text-foreground/80">{t("chart.total")}</span>
                 <span
-                  className="font-mono tabular-nums font-bold"
+                  className="font-mono tabular-nums font-bold text-foreground"
                   dir="ltr"
                 >
                   {formatMetricValue(total, "B", 2)}
@@ -763,29 +878,14 @@ export default function ChartModal({
         );
       };
 
-      // Every segment hidden — show a nudge instead of an empty plot.
       if (visibleNames.length === 0) {
         return (
-          <div className="h-[400px] w-full flex items-center justify-center text-sm text-muted-foreground">
+          <div className="h-[340px] sm:h-[380px] w-full flex items-center justify-center text-sm text-muted-foreground">
             {t("chart.segmentNoSelection")}
           </div>
         );
       }
 
-      // In-bar percentage labels: each visible segment gets a small white
-      // `NN%` centered inside its layer of the stack. We skip labels that
-      // would be unreadable — sub-4% shares, segments shorter than 14px, and
-      // bars narrower than 28px (the 3Y quarterly case packs 12 columns into
-      // the chart). The share is computed off `visibleTotal`, so when the
-      // modal's filter chips hide a layer the remaining labels always sum to
-      // 100% against the new total.
-      //
-      // NOTE — recharts passes `<Bar>` LabelLists the *cumulative* stack
-      // value at that layer, not the layer's own slice; the share is
-      // therefore read off `point[segmentName]` rather than the raw `value`
-      // prop. The segment name is captured per-bar via the closure factory
-      // below, so each `<Bar>`'s LabelList content correctly identifies
-      // which slice it is labelling.
       const renderSegmentLabel = (segmentName: string) => {
         const SegmentShareLabel = (props: {
           x?: number;
@@ -843,23 +943,27 @@ export default function ChartModal({
       };
 
       return (
-        <div className="relative h-[400px] w-full">
+        <div className="relative h-[340px] sm:h-[380px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={segmentWindow}
-              margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+              margin={{ top: 20, right: 25, left: 10, bottom: 25 }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} strokeOpacity={0.7} />
               <XAxis
+                height={30}
                 dataKey="date"
-                stroke={axisColor}
-                tick={{ fontSize: 12 }}
-                tickMargin={8}
+                stroke={axisLineColor}
+                tickLine={{ stroke: axisLineColor, strokeWidth: 1 }}
+                tick={{ fontSize: 12, fill: axisColor, fontWeight: 600, fontFamily: "JetBrains Mono, monospace" }}
+                tickMargin={10}
               />
               <YAxis
-                stroke={axisColor}
-                tick={{ fontSize: 12 }}
-                tickMargin={8}
+                width={65}
+                stroke={axisLineColor}
+                tickLine={{ stroke: axisLineColor, strokeWidth: 1 }}
+                tick={{ fontSize: 12, fill: axisColor, fontWeight: 600, fontFamily: "JetBrains Mono, monospace" }}
+                tickMargin={10}
                 domain={[0, maxTotal * 1.15]}
                 tickCount={5}
                 tickFormatter={(val) => formatMetricValue(val, "B", 0)}
@@ -877,12 +981,9 @@ export default function ChartModal({
                   fill={segmentColor(name)}
                   stroke="hsl(250 20% 14%)"
                   strokeWidth={1}
-                  // No entrance animation: stacked bars render at their final
-                  // geometry immediately (rAF-throttled views can otherwise
-                  // freeze the grow-in at ~0%). The single-series charts keep
-                  // their animation since they render fine everywhere.
                   isAnimationActive={false}
-                  maxBarSize={72}
+                  maxBarSize={48}
+                  radius={[2, 2, 0, 0]}
                 >
                   <LabelList content={renderSegmentLabel(name)} />
                 </Bar>
@@ -893,97 +994,11 @@ export default function ChartModal({
       );
     }
 
-    switch (metric.type) {
-      case "bar":
-        return (
-          <div className="relative h-[400px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-            <BarChart {...commonProps}>
-              <defs>
-                {/* Positive bars fade from a quiet baseline to their
-                    strongest green at the top. Negative bars do the inverse:
-                    they begin quietly at zero and finish bright red at the
-                    bottom. Cells select the correct direction per datum. */}
-                <linearGradient
-                  id={`colorValue-positive-${metric.name}`}
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  <stop offset="0%" stopColor="hsl(155 70% 58%)" stopOpacity={1} />
-                  <stop offset="100%" stopColor="hsl(155 55% 38%)" stopOpacity={0.3} />
-                </linearGradient>
-                <linearGradient
-                  id={`colorValue-negative-${metric.name}`}
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  <stop offset="0%" stopColor="hsl(6 55% 38%)" stopOpacity={0.3} />
-                  <stop offset="100%" stopColor="hsl(6 80% 62%)" stopOpacity={1} />
-                </linearGradient>
-                <linearGradient
-                  id={`colorValue-neutral-${metric.name}`}
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  <stop offset="0%" stopColor="hsl(220 10% 60%)" stopOpacity={0.45} />
-                  <stop offset="100%" stopColor="hsl(220 10% 60%)" stopOpacity={0.2} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-              <XAxis
-                dataKey="date"
-                stroke={axisColor}
-                tick={{ fontSize: 12 }}
-                tickMargin={8}
-              />
-              <YAxis
-                stroke={axisColor}
-                tick={{ fontSize: 12 }}
-                tickMargin={8}
-                domain={chartDomain}
-                allowDataOverflow={false}
-                tickCount={5}
-                tickFormatter={(val) => formatMetricValue(val, metric.unit, 0)}
-              />
-              <Tooltip content={<CustomTooltip />} cursor={false} />
-              <Bar
-                stackId="a"
-                dataKey="value"
-                strokeWidth={1}
-                radius={[2, 2, 2, 2]}
-                isAnimationActive={true}
-                animationDuration={1000}
-              >
-                {filteredData.map((entry, index) => (
-                  <Cell
-                    key={`bar-cell-${index}`}
-                    fill={`url(#${barGradientId(metric.name, entry.value)})`}
-                    stroke={barStroke(entry.value)}
-                  />
-                ))}
-              </Bar>
-              <ReferenceLine
-                y={0}
-                yAxisId="0"
-                stroke="hsl(220 18% 82%)"
-                strokeOpacity={0.9}
-                strokeWidth={2}
-              />
-            </BarChart>
-            </ResponsiveContainer>
-            {quarterlyMask}
-          </div>
-        );
-      case "area":
-        return (
-          <div className="relative h-[400px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
+    // Single-series rendering (Line Chart vs Bar)
+    if (chartView === "line" || metric.type === "area" || metric.type === "line") {
+      return (
+        <div className="relative h-[340px] sm:h-[380px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
             <AreaChart {...commonProps}>
               <defs>
                 <linearGradient
@@ -993,123 +1008,177 @@ export default function ChartModal({
                   x2="0"
                   y2="1"
                 >
-                  <stop offset="5%" stopColor={chartColor} stopOpacity={0.35} />
-                  <stop offset="95%" stopColor={chartColor} stopOpacity={0.0} />
+                  <stop offset="0%" stopColor={chartColor} stopOpacity={0.35} />
+                  <stop offset="100%" stopColor={chartColor} stopOpacity={0.0} />
                 </linearGradient>
                 <GlowFilter />
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} strokeOpacity={0.7} />
               <XAxis
+                height={30}
                 dataKey="date"
-                stroke={axisColor}
-                tick={{ fontSize: 12 }}
-                tickMargin={8}
+                stroke={axisLineColor}
+                tickLine={{ stroke: axisLineColor, strokeWidth: 1 }}
+                tick={{ fontSize: 12, fill: axisColor, fontWeight: 600, fontFamily: "JetBrains Mono, monospace" }}
+                tickMargin={10}
               />
               <YAxis
-                stroke={axisColor}
-                tick={{ fontSize: 12 }}
-                tickMargin={8}
+                width={65}
+                stroke={axisLineColor}
+                tickLine={{ stroke: axisLineColor, strokeWidth: 1 }}
+                tick={{ fontSize: 12, fill: axisColor, fontWeight: 600, fontFamily: "JetBrains Mono, monospace" }}
+                tickMargin={10}
                 domain={chartDomain}
                 allowDataOverflow={false}
-                tickCount={5}
+                tickCount={6}
                 tickFormatter={(val) => formatMetricValue(val, metric.unit, 0)}
               />
-              <Tooltip content={<CustomTooltip />} cursor={false} />
+              <Tooltip content={<CustomTooltip />} cursor={{ stroke: "hsl(250 20% 30%)", strokeWidth: 1, strokeDasharray: "3 3" }} />
               <Area
                 type="monotone"
                 dataKey="value"
                 stroke={chartColor}
-                strokeWidth={1.5}
+                strokeWidth={2.5}
                 filter={`url(#${glowId})`}
                 fill={`url(#colorValue-area-${metric.name})`}
                 fillOpacity={1}
+                dot={{ r: 5, stroke: chartColor, strokeWidth: 2.5, fill: "#0c0b14" }}
+                activeDot={{ r: 7.5, stroke: chartColor, strokeWidth: 3, fill: "#ffffff" }}
                 isAnimationActive={true}
-                animationDuration={1000}
-              />
+                animationDuration={800}
+                animationEasing="ease-out"
+              >
+                <LabelList
+                  dataKey="value"
+                  content={renderAreaValueLabel}
+                />
+              </Area>
               <ReferenceLine
                 y={0}
                 yAxisId="0"
-                stroke="hsl(220 18% 82%)"
-                strokeOpacity={0.9}
-                strokeWidth={2}
+                stroke="hsl(250 20% 30%)"
+                strokeWidth={1.5}
+                strokeDasharray="3 3"
               />
             </AreaChart>
-            </ResponsiveContainer>
-            {quarterlyMask}
-          </div>
-        );
-      case "line":
-      default:
-        return (
-          <div className="relative h-[400px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-            <LineChart {...commonProps}>
-              <defs>
-                <GlowFilter />
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-              <XAxis
-                dataKey="date"
-                stroke={axisColor}
-                tick={{ fontSize: 12 }}
-                tickMargin={8}
-              />
-              <YAxis
-                stroke={axisColor}
-                tick={{ fontSize: 12 }}
-                tickMargin={8}
-                domain={chartDomain}
-                allowDataOverflow={false}
-                tickCount={5}
-                tickFormatter={(val) => formatMetricValue(val, metric.unit, 0)}
-              />
-              <Tooltip content={<CustomTooltip />} cursor={false} />
-              <Line
-                type="monotone"
-                dataKey="value"
-                stroke={chartColor}
-                dot={false}
-                strokeWidth={1.5}
-                filter={`url(#${glowId})`}
-                isAnimationActive={true}
-                animationDuration={1000}
-              />
-              <ReferenceLine
-                y={0}
-                yAxisId="0"
-                stroke="hsl(220 18% 82%)"
-                strokeOpacity={0.9}
-                strokeWidth={2}
-              />
-            </LineChart>
-            </ResponsiveContainer>
-            {quarterlyMask}
-          </div>
-        );
+          </ResponsiveContainer>
+          {quarterlyMask}
+        </div>
+      );
     }
-  };
 
-  const showGrowthMetrics = timeframe !== "1Y";
+    // Default Bar Chart View
+    return (
+      <div className="relative h-[340px] sm:h-[380px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart {...commonProps}>
+            <defs>
+              <linearGradient
+                id={`colorValue-positive-${metric.name}`}
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <stop offset="0%" stopColor="hsl(155 75% 55%)" stopOpacity={0.95} />
+                <stop offset="100%" stopColor="hsl(155 55% 35%)" stopOpacity={0.4} />
+              </linearGradient>
+              <linearGradient
+                id={`colorValue-negative-${metric.name}`}
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <stop offset="0%" stopColor="hsl(6 55% 35%)" stopOpacity={0.4} />
+                <stop offset="100%" stopColor="hsl(6 80% 60%)" stopOpacity={0.95} />
+              </linearGradient>
+              <linearGradient
+                id={`colorValue-neutral-${metric.name}`}
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <stop offset="0%" stopColor={chartColor} stopOpacity={0.95} />
+                <stop offset="100%" stopColor={chartColor} stopOpacity={0.4} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} strokeOpacity={0.7} />
+            <XAxis
+              height={30}
+              dataKey="date"
+              stroke={axisLineColor}
+              tickLine={{ stroke: axisLineColor, strokeWidth: 1 }}
+              tick={{ fontSize: 12, fill: axisColor, fontWeight: 600, fontFamily: "JetBrains Mono, monospace" }}
+              tickMargin={10}
+            />
+            <YAxis
+              width={65}
+              stroke={axisLineColor}
+              tickLine={{ stroke: axisLineColor, strokeWidth: 1 }}
+              tick={{ fontSize: 12, fill: axisColor, fontWeight: 600, fontFamily: "JetBrains Mono, monospace" }}
+              tickMargin={10}
+              domain={chartDomain}
+              allowDataOverflow={false}
+              tickCount={6}
+              tickFormatter={(val) => formatMetricValue(val, metric.unit, 0)}
+            />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: "hsl(250 20% 16% / 0.35)" }} />
+            <Bar
+              dataKey="value"
+              strokeWidth={1}
+              radius={[6, 6, 0, 0]}
+              maxBarSize={48}
+              isAnimationActive={true}
+              animationDuration={800}
+              animationEasing="ease-out"
+            >
+              {filteredData.map((entry, index) => (
+                <Cell
+                  key={`bar-cell-${index}`}
+                  fill={`url(#${barGradientId(metric.name, entry.value)})`}
+                  stroke={barStroke(entry.value)}
+                />
+              ))}
+              <LabelList
+                dataKey="value"
+                content={renderBarValueLabel}
+              />
+            </Bar>
+            <ReferenceLine
+              y={0}
+              yAxisId="0"
+              stroke="hsl(250 20% 30%)"
+              strokeWidth={1.5}
+              strokeDasharray="3 3"
+            />
+          </BarChart>
+        </ResponsiveContainer>
+        {quarterlyMask}
+      </div>
+    );
+  };
 
   return (
     <div 
-      className="fixed inset-0 bg-background/85 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-background/80 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div 
-        className="bg-card rounded-panel border border-primary/20 shadow-glow w-[95vw] max-w-6xl h-[90vh] max-h-[850px] flex flex-row overflow-hidden relative"
+        className="bg-card rounded-panel border border-border shadow-[0_20px_60px_-15px_rgba(0,0,0,0.85)] w-[96vw] max-w-5xl max-h-[90vh] flex flex-row overflow-hidden relative my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Main Left Content */}
         <div className="flex-1 flex flex-col min-w-0 overflow-y-auto custom-scrollbar relative">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-card z-10 shrink-0">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-border/80 sticky top-0 bg-card/95 backdrop-blur-sm z-20 shrink-0">
             <div className="flex items-center gap-3">
               <TickerLogo ticker={ticker} size="md" />
-              <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
-                <span className="font-mono text-muted-foreground uppercase">{ticker}</span>
-                <span className="text-muted-foreground/50">-</span>
-                <span>
+              <h2 className="text-lg sm:text-xl font-bold text-foreground flex items-center gap-2.5">
+                <span className="font-mono text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-muted/60 border border-border/60 text-foreground">{ticker}</span>
+                <span className="text-muted-foreground/40 font-light">/</span>
+                <span className="tracking-tight">
                   {isSegmentMode
                     ? t("metrics.revenueBySegment")
                     : t(metric.name)}
@@ -1118,21 +1187,22 @@ export default function ChartModal({
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-muted rounded-[6px] transition-colors text-muted-foreground hover:text-foreground"
+              className="h-8 w-8 rounded-md bg-muted/30 hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-all border border-border/30 hover:border-border"
+              aria-label="Close modal"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Timeframe + Granularity selector and Download */}
-          <div className="flex items-center justify-between p-6 border-b border-border bg-background/40 gap-2 flex-wrap shrink-0">
+          {/* Timeframe + Granularity + Chart Style Selector and Download */}
+          <div className="flex items-center justify-between px-6 py-3 border-b border-border/60 bg-muted/15 gap-3 flex-wrap shrink-0">
             <div
-              className="flex gap-2"
+              className="flex items-center gap-2 flex-wrap"
               role="tablist"
               aria-label={t("chart.granularity")}
             >
               <div
-                className="flex border border-border rounded-lg overflow-hidden"
+                className="inline-flex p-0.5 rounded-md bg-muted/40 border border-border/60"
                 role="tablist"
                 aria-label={t("chart.timeframe")}
               >
@@ -1141,29 +1211,25 @@ export default function ChartModal({
                     key={tf}
                     onClick={() => setTimeframe(tf as TimeframeType)}
                     className={cn(
-                      "px-4 py-2 font-medium font-mono transition-all",
+                      "px-3 py-1 text-xs font-mono font-bold rounded-[4px] transition-all",
                       timeframe === tf
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted",
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50",
                     )}
                   >
                     {tf}
                   </button>
                 ))}
               </div>
-              {/* Yearly / Quarterly toggle — available for the single-series
-                  charts and for the segment view alike. In segment mode the
-                  quarterly rows come from `revenue-product-segmentation?
-                  period=quarter` (each bar is one 10-Q filing's product
-                  breakdown). */}
-              <div className="flex border border-border rounded-lg overflow-hidden ms-2">
+              {/* Yearly / Quarterly toggle */}
+              <div className="inline-flex p-0.5 rounded-md bg-muted/40 border border-border/60 ms-1 sm:ms-2">
                 <button
                   onClick={() => setGranularity("annual")}
                   className={cn(
-                    "px-3 py-2 text-sm font-medium transition-all",
+                    "px-3 py-1 text-xs font-medium rounded-[4px] transition-all",
                     granularity === "annual"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted",
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50",
                   )}
                   title={t("chart.annualHint")}
                 >
@@ -1172,42 +1238,74 @@ export default function ChartModal({
                 <button
                   onClick={() => setGranularity("quarter")}
                   className={cn(
-                    "px-3 py-2 text-sm font-medium transition-all",
+                    "px-3 py-1 text-xs font-medium rounded-[4px] transition-all",
                     granularity === "quarter"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted",
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50",
                   )}
                   title={t("chart.quarterlyHint")}
                 >
                   {t("chart.quarterly")}
                 </button>
               </div>
+
+              {/* Chart Style Toggle (Bar vs Line Chart) */}
+              {!isSegmentMode && (
+                <div className="inline-flex p-0.5 rounded-md bg-muted/40 border border-border/60 ms-1 sm:ms-2">
+                  <button
+                    onClick={() => setChartView("bar")}
+                    className={cn(
+                      "px-2.5 py-1 text-xs font-medium rounded-[4px] flex items-center gap-1.5 transition-all",
+                      chartView === "bar"
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                    )}
+                    title="Bar Chart View"
+                  >
+                    <BarChart3 className="w-3.5 h-3.5" />
+                    <span>Bar</span>
+                  </button>
+                  <button
+                    onClick={() => setChartView("line")}
+                    className={cn(
+                      "px-2.5 py-1 text-xs font-medium rounded-[4px] flex items-center gap-1.5 transition-all",
+                      chartView === "line"
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50",
+                    )}
+                    title="Line Chart View"
+                  >
+                    <Activity className="w-3.5 h-3.5" />
+                    <span>Line Chart</span>
+                  </button>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowTable(!showTable)}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-2 border rounded-lg transition-colors text-sm font-medium",
+                  "flex items-center gap-1.5 px-3 py-1.5 border rounded-md transition-all text-xs font-semibold",
                   showTable 
-                    ? "bg-primary text-primary-foreground border-primary" 
-                    : "bg-transparent border-border hover:border-primary/40 hover:text-primary text-foreground"
+                    ? "bg-primary/15 text-primary border-primary/40 shadow-[0_0_10px_-3px_hsl(var(--primary)/0.3)]" 
+                    : "bg-muted/30 border-border/60 hover:border-border text-muted-foreground hover:text-foreground hover:bg-muted/60"
                 )}
               >
-                <TableIcon className="w-4 h-4" />
+                <TableIcon className="w-3.5 h-3.5" />
                 <span>Table View</span>
               </button>
               <button
                 onClick={handleDownload}
-                className="flex items-center gap-2 px-4 py-2 bg-transparent border border-border hover:border-primary/40 hover:text-primary rounded-lg transition-colors text-foreground text-sm font-medium"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-muted/30 border border-border/60 hover:border-border hover:text-foreground hover:bg-muted/60 rounded-md transition-all text-muted-foreground text-xs font-semibold"
               >
-                <Download className="w-4 h-4" />
+                <Download className="w-3.5 h-3.5" />
                 <span>{t("chart.download")}</span>
               </button>
             </div>
           </div>
 
           {/* Chart */}
-          <div className="p-6 shrink-0">
+          <div className="p-4 sm:p-6 shrink-0">
             {granularity === "quarter" && quarterlySource === null && quarterlyStatements && (
               <div className="mb-3 rounded-lg border border-chart-amber/30 bg-chart-amber/5 px-3 py-2 text-xs text-chart-amber">
                 Quarterly statements are unavailable from both providers for this symbol.
@@ -1218,35 +1316,30 @@ export default function ChartModal({
                 {t("chart.segmentQuarterlyUnavailable")}
               </div>
             )}
-            {/* Locked-premium fallback — surfaced when the revenue card
-                falls back to the total-revenue chart because the segment
-                payload is rate-limited / unavailable. Mirrors the card's
-                `:lock` chip strip so the modal and the card agree about
-                the premium-tier state. Hidden in segment mode (data is
-                fine; the chips below suffice). */}
+            {/* Locked-premium fallback */}
             {segmentLockedReason && !isSegmentMode && (
               <>
-                <div className="mb-3 flex items-start gap-2 rounded-lg border border-border/40 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                  <Lock className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground" />
+                <div className="mb-4 flex items-start gap-3 rounded-lg border border-chart-amber/30 bg-chart-amber/5 p-3.5 text-xs text-muted-foreground shadow-sm">
+                  <div className="p-1 rounded-md bg-chart-amber/15 text-chart-amber shrink-0 mt-0.5">
+                    <Lock className="h-3.5 w-3.5" />
+                  </div>
                   <div className="text-left rtl:text-right flex-1">
-                    <p className="font-semibold text-foreground/80 mb-0.5">
+                    <p className="font-bold text-foreground tracking-tight mb-0.5">
                       {t("revenueSegments.modalBannerTitle")}
                     </p>
-                    <p>
+                    <p className="text-muted-foreground/90 leading-relaxed">
                       {segmentLockedReason === "rateLimited"
                         ? t("revenueSegments.modalBannerRateLimited")
                         : t("revenueSegments.modalBannerUnavailable")}
                     </p>
                   </div>
-                  {/* Inline CTA — opens the placeholder /pricing modal
-                      hosted at the page root. Hidden when no callback
-                      was supplied (standalone preview / Storybook). */}
+                  {/* Inline CTA */}
                   {onUpgradeClick && (
                     <button
                       type="button"
                       onClick={onUpgradeClick}
                       data-testid="revenue-segments-upgrade-cta"
-                      className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+                      className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity shadow-[0_0_12px_-2px_hsl(var(--primary)/0.4)]"
                     >
                       {t("revenueSegments.upgradeCta")}
                       <span aria-hidden="true">→</span>
@@ -1261,15 +1354,14 @@ export default function ChartModal({
                     type="button"
                     disabled
                     aria-disabled="true"
-                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-blue-500/15 text-blue-400 border-blue-500/30"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border bg-chart-blue/15 text-chart-blue border-chart-blue/30"
                   >
                     {t("revenueSegments.all")}
                   </button>
                   <span className="inline-flex items-center gap-1.5">
-                    {/* Locked chip — same shape as the card so the
-                        modal's strip mirrors the card chrome. */}
+                    {/* Locked chip */}
                     <span
-                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border bg-muted/40 text-muted-foreground border-border/40 cursor-not-allowed select-none"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border bg-muted/30 text-muted-foreground border-border/50 cursor-not-allowed select-none"
                       title={
                         segmentLockedReason === "rateLimited"
                           ? t("revenueSegments.rateLimitedTooltip")
@@ -1279,13 +1371,9 @@ export default function ChartModal({
                       <Lock className="h-3 w-3" />
                       {t("revenueSegments.locked")}
                     </span>
-                    {/* Premium pill — Starlight Gold so the gate is
-                        discoverable without hovering the tooltip, just
-                        like the card. Mirrors the card exactly so users
-                        who saw `Premium` next to `Segments 🔒` on the
-                        card see the same here when they expand. */}
+                    {/* Premium pill */}
                     <span
-                      className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide border border-primary/40 bg-primary/15 text-primary"
+                      className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide border border-primary/40 bg-primary/15 text-primary shadow-[0_0_8px_-2px_hsl(var(--primary)/0.3)]"
                       aria-label={t("revenueSegments.premiumBadge")}
                       title={
                         segmentLockedReason === "rateLimited"
@@ -1300,10 +1388,7 @@ export default function ChartModal({
                 </div>
               </>
             )}
-            {/* Segment filter chips — hide / reveal individual layers in
-                the stacked chart (and the tooltip, table, and CSV below).
-                Independent of the card's chips: opening the modal always
-                starts with every segment visible. */}
+            {/* Segment filter chips */}
             {isSegmentMode && (
               <div
                 className="flex flex-wrap items-center gap-1.5 mb-4"
@@ -1313,10 +1398,10 @@ export default function ChartModal({
                   type="button"
                   onClick={() => setHiddenSegments([])}
                   className={cn(
-                    "px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors",
+                    "px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition-all",
                     hiddenSegments.length === 0
-                      ? "bg-blue-500/15 text-blue-400 border-blue-500/30"
-                      : "bg-muted/40 text-muted-foreground border-border/40 hover:text-foreground",
+                      ? "bg-chart-blue/15 text-chart-blue border-chart-blue/40 shadow-[0_0_8px_-2px_hsl(var(--chart-blue)/0.3)]"
+                      : "bg-muted/30 text-muted-foreground border-border/40 hover:text-foreground hover:bg-muted/60",
                   )}
                 >
                   {t("revenueSegments.all")}
@@ -1329,14 +1414,14 @@ export default function ChartModal({
                       type="button"
                       onClick={() => toggleSegment(name)}
                       className={cn(
-                        "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors",
+                        "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border transition-all",
                         hidden
-                          ? "bg-muted/40 text-muted-foreground/50 border-border/40 line-through decoration-muted-foreground/40"
-                          : "bg-muted/40 text-foreground border-border/40 hover:text-foreground",
+                          ? "bg-muted/30 text-muted-foreground/40 border-border/30 line-through decoration-muted-foreground/40"
+                          : "bg-muted/30 text-foreground border-border/40 hover:text-foreground hover:bg-muted/60",
                       )}
                     >
                       <span
-                        className="w-2 h-2 rounded-full shrink-0"
+                        className="w-2 h-2 rounded-full shrink-0 shadow-sm"
                         style={{ background: segmentColor(name) }}
                       />
                       {name}
@@ -1348,102 +1433,120 @@ export default function ChartModal({
             {renderChart()}
           </div>
 
-          {/* Growth Metrics */}
-          {showGrowthMetrics && (
-            <div className="border-t border-border bg-background/40 shrink-0">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-6">
-                {[
-                  {
-                    label: t("chart.cagr3Y"),
-                    value: isSegmentMode
-                      ? segmentGrowth.cagr3Y
-                      : liveGrowth.cagr3Y,
-                    description:
-                      granularity === "quarter"
-                        ? t("chart.descCagr3YQuarter")
-                        : t("chart.descCagr3Y"),
-                  },
-                  {
-                    label: t("chart.yoy1Y"),
-                    value: isSegmentMode ? segmentGrowth.yoy : liveGrowth.yoy,
-                    description:
-                      granularity === "quarter"
-                        ? t("chart.descYoYQuarter")
-                        : t("chart.descYoY"),
-                  },
-                ].map((item, idx) => {
-                  const hasValue =
-                    item.value !== null && item.value !== undefined;
-                  const valueColor = !hasValue
-                    ? "text-muted-foreground"
-                    : Number(item.value) >= 0
-                      ? "text-chart-positive"
-                      : "text-chart-negative";
-                  return (
-                    <div key={idx} className="text-center group cursor-help">
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
+          {/* Growth Metrics — Always visible with clean spacing */}
+          <div className="border-t border-border/70 bg-muted/15 shrink-0 p-4 sm:p-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-4xl mx-auto">
+              {[
+                {
+                  label: t("chart.cagr3Y"),
+                  value: cagrValue,
+                  description:
+                    granularity === "quarter"
+                      ? t("chart.descCagr3YQuarter")
+                      : t("chart.descCagr3Y"),
+                },
+                {
+                  label: t("chart.yoy1Y"),
+                  value: yoyValue,
+                  description:
+                    granularity === "quarter"
+                      ? t("chart.descYoYQuarter")
+                      : t("chart.descYoY"),
+                },
+              ].map((item, idx) => {
+                const hasValue =
+                  item.value !== null &&
+                  item.value !== undefined &&
+                  Number.isFinite(Number(item.value));
+                const num = hasValue ? Number(item.value) : 0;
+                const isPositive = hasValue && num >= 0;
+                const isNegative = hasValue && num < 0;
+                const valueColor = !hasValue
+                  ? "text-muted-foreground/60"
+                  : isPositive
+                    ? "text-chart-positive"
+                    : "text-chart-negative";
+                return (
+                  <div
+                    key={idx}
+                    className="bg-card/85 border border-border/70 rounded-xl p-3.5 sm:px-5 flex items-center justify-between shadow-sm hover:border-primary/40 transition-all group relative cursor-help"
+                  >
+                    <div className="flex flex-col text-left rtl:text-right">
+                      <p className="text-[11px] text-muted-foreground/80 font-bold uppercase tracking-[0.14em]">
                         {item.label}
                       </p>
-                      <p
-                        className={`text-2xl font-semibold font-mono tabular-nums ${valueColor}`}
+                      <p className="text-[11px] text-muted-foreground/70 mt-0.5 max-w-[220px] truncate">
+                        {item.description}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 font-mono">
+                      {hasValue && (
+                        isPositive ? (
+                          <TrendingUp className="w-4 h-4 text-chart-positive shrink-0" />
+                        ) : (
+                          <TrendingDown className="w-4 h-4 text-chart-negative shrink-0" />
+                        )
+                      )}
+                      <span
+                        className={`text-xl sm:text-2xl font-extrabold font-mono tabular-nums tracking-tight ${valueColor}`}
                         dir="ltr"
                       >
-                        {hasValue ? `${Number(item.value).toFixed(2)}%` : "-"}
-                      </p>
-                      <div className="mt-2 invisible group-hover:visible text-xs text-muted-foreground bg-card p-2 rounded-[6px] absolute z-10 w-max border border-border">
-                        {item.description}
-                      </div>
+                        {hasValue ? `${num.toFixed(2)}%` : "—"}
+                      </span>
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="invisible group-hover:visible text-xs text-muted-foreground bg-card/95 backdrop-blur-sm p-2 rounded border border-border/80 shadow-lg absolute left-1/2 -translate-x-1/2 -top-10 z-20 w-max pointer-events-none">
+                      {item.description}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          )}
+          </div>
         </div>
 
         {/* Right Side Data Table Panel */}
         {showTable && (
-          <div className="w-80 md:w-96 border-l border-border bg-background/50 flex flex-col z-10 shrink-0">
-            <div className="p-4 border-b border-border flex justify-between items-center sticky top-0 bg-background/80 backdrop-blur-md z-10 shrink-0">
-              <div className="flex items-center gap-2 text-primary font-semibold text-sm">
+          <div className="w-80 md:w-96 border-l border-border/80 bg-card/95 backdrop-blur-md flex flex-col z-10 shrink-0 animate-in slide-in-from-right duration-200">
+            <div className="p-4 border-b border-border/80 flex justify-between items-center sticky top-0 bg-card z-10 shrink-0">
+              <div className="flex items-center gap-2 text-primary font-bold text-sm tracking-tight">
                 <TableIcon className="w-4 h-4" />
                 Table View
               </div>
-              <button onClick={() => setShowTable(false)} className="p-1.5 hover:bg-muted rounded-md text-muted-foreground transition-colors">
+              <button onClick={() => setShowTable(false)} className="h-7 w-7 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>
             
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
               {isSegmentMode ? (
-                <div className="rounded-xl border border-border/50 overflow-x-auto bg-card/40 backdrop-blur-md shadow-sm">
-                  <table className="w-full text-sm text-left rtl:text-right border-collapse">
-                    <thead className="sticky top-0 bg-muted/80 backdrop-blur-md z-10 border-b border-border/50">
+                <div className="rounded-lg border border-border/60 overflow-x-auto bg-card/50 shadow-sm">
+                  <table className="w-full text-xs text-left rtl:text-right border-collapse">
+                    <thead className="sticky top-0 bg-muted/90 backdrop-blur-md z-10 border-b border-border/60">
                       <tr>
-                        <th className="py-3 px-4 text-muted-foreground font-medium whitespace-nowrap">
+                        <th className="py-2.5 px-3 text-muted-foreground font-semibold uppercase tracking-wider whitespace-nowrap">
                           {t("chart.period") || "Period"}
                         </th>
                         {visibleNames.map((name) => (
                           <th
                             key={name}
-                            className="py-3 px-4 text-muted-foreground font-medium text-right whitespace-nowrap"
+                            className="py-2.5 px-3 text-muted-foreground font-semibold uppercase tracking-wider text-right whitespace-nowrap"
                           >
                             {name}
                           </th>
                         ))}
-                        <th className="py-3 px-4 text-muted-foreground font-medium text-right whitespace-nowrap">
+                        <th className="py-2.5 px-3 text-muted-foreground font-semibold uppercase tracking-wider text-right whitespace-nowrap">
                           {t("chart.total")}
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-border/30">
+                    <tbody className="divide-y divide-border/30 font-mono">
                       {segmentTableRows.map((row) => (
                         <tr
                           key={String(row.date)}
-                          className="hover:bg-white/5 transition-colors"
+                          className="hover:bg-muted/40 transition-colors"
                         >
                           <td
-                            className="py-3 px-4 font-mono text-foreground/80 whitespace-nowrap"
+                            className="py-2.5 px-3 font-semibold text-foreground whitespace-nowrap"
                             dir="ltr"
                           >
                             {String(row.date)}
@@ -1456,7 +1559,7 @@ export default function ChartModal({
                             return (
                               <td
                                 key={name}
-                                className="py-3 px-4 text-right font-mono tabular-nums whitespace-nowrap"
+                                className="py-2.5 px-3 text-right font-mono tabular-nums whitespace-nowrap text-foreground/90"
                                 dir="ltr"
                               >
                                 {hasValue
@@ -1465,12 +1568,12 @@ export default function ChartModal({
                                       "B",
                                       2,
                                     )
-                                  : "-"}
+                                  : "—"}
                               </td>
                             );
                           })}
                           <td
-                            className="py-3 px-4 text-right font-mono tabular-nums font-semibold whitespace-nowrap"
+                            className="py-2.5 px-3 text-right font-mono tabular-nums font-bold whitespace-nowrap text-foreground"
                             dir="ltr"
                           >
                             {formatMetricValue(
@@ -1485,25 +1588,25 @@ export default function ChartModal({
                   </table>
                 </div>
               ) : (
-              <div className="rounded-xl border border-border/50 overflow-hidden bg-card/40 backdrop-blur-md shadow-sm">
-                <table className="w-full text-sm text-left rtl:text-right border-collapse">
-                  <thead className="sticky top-0 bg-muted/80 backdrop-blur-md z-10 border-b border-border/50">
+              <div className="rounded-lg border border-border/60 overflow-hidden bg-card/50 shadow-sm">
+                <table className="w-full text-xs text-left rtl:text-right border-collapse">
+                  <thead className="sticky top-0 bg-muted/90 backdrop-blur-md z-10 border-b border-border/60">
                     <tr>
-                      <th className="py-3 px-4 text-muted-foreground font-medium w-1/3">{t("chart.period") || "Period"}</th>
-                      <th className="py-3 px-4 text-muted-foreground font-medium text-right w-1/3">{t("chart.value") || "Value"}</th>
-                      <th className="py-3 px-4 text-muted-foreground font-medium text-right w-1/3">{t("chart.yoy") || "YoY Growth"}</th>
+                      <th className="py-2.5 px-3 text-muted-foreground font-semibold uppercase tracking-wider w-1/3">{t("chart.period") || "Period"}</th>
+                      <th className="py-2.5 px-3 text-muted-foreground font-semibold uppercase tracking-wider text-right w-1/3">{t("chart.value") || "Value"}</th>
+                      <th className="py-2.5 px-3 text-muted-foreground font-semibold uppercase tracking-wider text-right w-1/3">{t("chart.yoy") || "YoY Growth"}</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border/30">
+                  <tbody className="divide-y divide-border/30 font-mono">
                     {tableData.map((row, i) => {
                       if (row.isLocked) {
                         return (
-                          <tr key={`locked-${i}`} className="hover:bg-white/5 transition-colors group">
-                            <td className="py-3 px-4 font-mono text-muted-foreground/60" dir="ltr">{row.date}</td>
-                            <td className="py-3 px-4 text-right" colSpan={2}>
-                              <div className="flex items-center justify-end gap-2 text-muted-foreground/50">
-                                <Lock className="w-3.5 h-3.5" />
-                                <span className="text-xs font-medium tracking-wide uppercase">Pro</span>
+                          <tr key={`locked-${i}`} className="hover:bg-muted/30 transition-colors group">
+                            <td className="py-2.5 px-3 font-mono text-muted-foreground/60" dir="ltr">{row.date}</td>
+                            <td className="py-2.5 px-3 text-right" colSpan={2}>
+                              <div className="flex items-center justify-end gap-1.5 text-muted-foreground/50">
+                                <Lock className="w-3 h-3" />
+                                <span className="text-[10px] font-semibold tracking-wide uppercase">Pro</span>
                               </div>
                             </td>
                           </tr>
@@ -1516,19 +1619,19 @@ export default function ChartModal({
                       const isNegative = hasYoY && row.yoy! < 0;
 
                       return (
-                        <tr key={row.date} className="hover:bg-white/5 transition-colors">
-                          <td className="py-3 px-4 font-mono text-foreground/80" dir="ltr">{row.date}</td>
-                          <td className="py-3 px-4 text-right font-mono tabular-nums text-foreground" dir="ltr">
-                            {hasValue ? formatMetricValue(row.value, metric.unit, 2) : "-"}
+                        <tr key={row.date} className="hover:bg-muted/40 transition-colors">
+                          <td className="py-2.5 px-3 font-semibold text-foreground whitespace-nowrap" dir="ltr">{row.date}</td>
+                          <td className="py-2.5 px-3 text-right font-mono tabular-nums text-foreground whitespace-nowrap" dir="ltr">
+                            {hasValue ? formatMetricValue(row.value, metric.unit, 2) : "—"}
                           </td>
-                          <td className="py-3 px-4 text-right font-mono tabular-nums" dir="ltr">
+                          <td className="py-2.5 px-3 text-right font-mono tabular-nums whitespace-nowrap" dir="ltr">
                             {hasYoY ? (
-                              <div className={`flex items-center justify-end gap-1.5 ${isPositive ? 'text-chart-positive' : isNegative ? 'text-chart-negative' : 'text-muted-foreground'}`}>
-                                {isPositive ? <TrendingUp className="w-3.5 h-3.5" /> : isNegative ? <TrendingDown className="w-3.5 h-3.5" /> : null}
+                              <div className={`flex items-center justify-end gap-1 font-semibold ${isPositive ? 'text-chart-positive' : isNegative ? 'text-chart-negative' : 'text-muted-foreground'}`}>
+                                {isPositive ? <TrendingUp className="w-3 h-3" /> : isNegative ? <TrendingDown className="w-3 h-3" /> : null}
                                 <span>{Math.abs(row.yoy!).toFixed(2)}%</span>
                               </div>
                             ) : (
-                              <span className="text-muted-foreground">-</span>
+                              <span className="text-muted-foreground/50">—</span>
                             )}
                           </td>
                         </tr>

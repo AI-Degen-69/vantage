@@ -137,10 +137,10 @@ export default function RevenueSegmentsCard({
           setSelectedSegment(null);
         }}
         onKeyDown={(e) => e.stopPropagation()}
-        className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors ${
+        className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-all ${
           selectedSegment === null
-            ? "bg-blue-500/15 text-blue-400 border-blue-500/30"
-            : "bg-muted/40 text-muted-foreground border-border/40 hover:text-foreground"
+            ? "bg-chart-blue/15 text-chart-blue border-chart-blue/40 shadow-[0_0_8px_-2px_hsl(var(--chart-blue)/0.3)]"
+            : "bg-muted/30 text-muted-foreground border-border/40 hover:text-foreground hover:bg-muted/60 hover:border-border/80"
         }`}
       >
         {t("revenueSegments.all")}
@@ -155,10 +155,10 @@ export default function RevenueSegmentsCard({
                 setSelectedSegment(selectedSegment === name ? null : name);
               }}
               onKeyDown={(e) => e.stopPropagation()}
-              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-colors max-w-32 truncate ${
+              className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border transition-all max-w-32 truncate ${
                 selectedSegment === name
-                  ? "bg-blue-500/15 text-blue-400 border-blue-500/30"
-                  : "bg-muted/40 text-muted-foreground border-border/40 hover:text-foreground"
+                  ? "bg-chart-blue/15 text-chart-blue border-chart-blue/40 shadow-[0_0_8px_-2px_hsl(var(--chart-blue)/0.3)]"
+                  : "bg-muted/30 text-muted-foreground border-border/40 hover:text-foreground hover:bg-muted/60 hover:border-border/80"
               }`}
             >
               {name}
@@ -174,7 +174,7 @@ export default function RevenueSegmentsCard({
             // the placeholder /pricing modal hosted at the page root.
             <span className="inline-flex items-center gap-1.5">
               <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border border-border/40 bg-muted/40 text-muted-foreground/70 cursor-not-allowed"
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold border border-border/50 bg-muted/30 text-muted-foreground/70 cursor-not-allowed select-none"
                 title={lockedTooltip}
                 aria-disabled="true"
               >
@@ -182,7 +182,7 @@ export default function RevenueSegmentsCard({
                 {t("revenueSegments.locked")}
               </span>
               <span
-                className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide border border-primary/40 bg-primary/15 text-primary"
+                className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wide border border-primary/40 bg-primary/15 text-primary shadow-[0_0_8px_-2px_hsl(var(--primary)/0.3)]"
                 aria-label={t("revenueSegments.premiumBadge")}
                 title={lockedTooltip}
                 data-testid="revenue-segments-premium-badge"
@@ -197,7 +197,7 @@ export default function RevenueSegmentsCard({
                     onUpgradeClick();
                   }}
                   data-testid="revenue-segments-upgrade-cta"
-                  className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+                  className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-primary text-primary-foreground hover:opacity-90 transition-opacity shadow-[0_0_8px_-2px_hsl(var(--primary)/0.4)]"
                 >
                   {t("revenueSegments.upgradeCta")}
                   <span aria-hidden="true">→</span>

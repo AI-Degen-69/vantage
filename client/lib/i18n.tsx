@@ -677,6 +677,113 @@ const en = {
   "splash.subtitle":
     "Your personalized Bloomberg terminal for long-term investors.",
 
+  // Landing Page
+  "landing.hero.eyebrow": "OBSERVATORY FOR COMPANY FUNDAMENTALS",
+  "landing.hero.badge": "v2.4 Research Workspace",
+  "landing.hero.titleLine1": "Read the Signal in",
+  "landing.hero.titleHighlight": "Company Fundamentals",
+  "landing.hero.subtitle":
+    "A quiet, luminous financial research workspace. Deep 5-year financial statements, light-curve historical charts, live DCF valuation modeling, and real-time earnings intelligence — without market noise.",
+  "landing.hero.launchWorkspace": "Launch Workspace",
+  "landing.hero.exploreScreener": "Open Screener",
+  "landing.hero.commandSearch": "Search Tickers (⌘K)",
+  "landing.hero.liveDataFeed": "Multi-provider live & fallback data feed",
+
+  "landing.spotlight.title": "Interactive Ticker Spotlight",
+  "landing.spotlight.subtitle":
+    "Select a benchmark asset to preview historical light-curves and valuation metrics",
+  "landing.spotlight.openStock": "Open Full Observatory →",
+  "landing.spotlight.marketCap": "Market Cap",
+  "landing.spotlight.revenue": "Revenue (TTM)",
+  "landing.spotlight.fcf": "Free Cash Flow",
+  "landing.spotlight.grossMargin": "Gross Margin",
+  "landing.spotlight.pe": "P/E Ratio",
+  "landing.spotlight.cagr3Y": "3Y Rev CAGR",
+  "landing.spotlight.lightCurveLabel": "5-Year Revenue Light-Curve",
+
+  "landing.earningsShowcase.badge": "Proactive Event Intelligence",
+  "landing.earningsShowcase.title":
+    "Upcoming Earnings Calendar & Wall St. Consensus",
+  "landing.earningsShowcase.subtitle":
+    "Track earnings reporting dates, consensus EPS/revenue estimates, and surprises filtered to your holdings.",
+  "landing.earningsShowcase.openFull": "Open Full Earnings Calendar →",
+  "landing.earningsShowcase.beforeOpen": "Before Open",
+  "landing.earningsShowcase.afterClose": "After Close",
+  "landing.earningsShowcase.beat": "BEAT",
+  "landing.earningsShowcase.miss": "MISS",
+  "landing.earningsShowcase.filterAll": "All Reporting",
+  "landing.earningsShowcase.filterLarge": "Large Cap ($200B+)",
+  "landing.earningsShowcase.filterWatchlist": "Watchlists Only",
+  "landing.earningsShowcase.epsEst": "EPS Est",
+  "landing.earningsShowcase.epsActual": "Actual EPS",
+  "landing.earningsShowcase.revEst": "Revenue Est",
+  "landing.earningsShowcase.revActual": "Actual Rev",
+
+  "landing.dcfSandbox.badge": "Interactive Valuation Engine",
+  "landing.dcfSandbox.title": "Instant Discounted Cash Flow Sandbox",
+  "landing.dcfSandbox.subtitle":
+    "Stress-test growth assumptions, multiples, and target discount rates with real-time intrinsic value computation.",
+  "landing.dcfSandbox.fcfInput": "Base FCF ($B)",
+  "landing.dcfSandbox.growthInput": "Expected 5Y Growth Rate (%)",
+  "landing.dcfSandbox.multipleInput": "Terminal Exit Multiple (P/FCF)",
+  "landing.dcfSandbox.discountInput": "Target Discount Rate (%)",
+  "landing.dcfSandbox.sharesInput": "Shares Outstanding (B)",
+  "landing.dcfSandbox.computedFairValue": "Estimated Fair Value",
+  "landing.dcfSandbox.marketPrice": "Market Price",
+  "landing.dcfSandbox.upside": "Projected Margin of Safety",
+  "landing.dcfSandbox.undervalued": "Undervalued",
+  "landing.dcfSandbox.fairValue": "Fairly Valued",
+  "landing.dcfSandbox.overvalued": "Overvalued",
+  "landing.dcfSandbox.openDcfTool": "Open Full DCF Tool in Workspace →",
+
+  "landing.features.badge": "The Instrument Suite",
+  "landing.features.title": "Built for Deep Fundamental Research",
+  "landing.features.subtitle":
+    "Every metric treated like a variable star — charted over time, read for trajectory rather than instant price theater.",
+  "landing.features.card1Title": "5-Year Statement Light-Curves",
+  "landing.features.card1Desc":
+    "Interactive income statements, balance sheets, and cash flows with instant quarterly vs annual switching and CAGR calculations.",
+  "landing.features.card2Title": "Global Screener & Deep Filters",
+  "landing.features.card2Desc":
+    "Filter over 18,400+ assets across 10+ countries by asset type, sector, exchange, and primary listing status.",
+  "landing.features.card3Title": "Curated Watchlists & Custom Universes",
+  "landing.features.card3Desc":
+    "Organize high-conviction ideas, monitor live scorecards, and track sector exposure across customizable lists.",
+  "landing.features.card4Title": "Thematic Insights & Sector Heatmaps",
+  "landing.features.card4Desc":
+    "Explore pre-built thematic universes like S&P 500, Dividend Growth, Buyback Machines, and AI with live metrics.",
+  "landing.features.card5Title": "Institutional Risk Analytics",
+  "landing.features.card5Desc":
+    "Sharpe ratio, Sortino ratio, IRR return models, and downside volatility metrics computed from synthetic cash flows.",
+  "landing.features.card6Title": "Multi-Provider Resilience",
+  "landing.features.card6Desc":
+    "Zero-cost architecture with transparent provider fallbacks across Yahoo Finance, FMP, and AlphaVantage.",
+
+  "landing.sectors.badge": "Sector Radar",
+  "landing.sectors.title": "Market Macro & Sector Momentum",
+  "landing.sectors.subtitle":
+    "Quickly gauge capital flows across major market sectors",
+  "landing.sectors.viewAllScreener": "View All 500+ Tickers in Screener →",
+
+  "landing.shortcuts.badge": "Power User Workflow",
+  "landing.shortcuts.title": "Observatory Keyboard Protocol",
+  "landing.shortcuts.subtitle":
+    "Designed for swift terminal-like keyboard efficiency",
+  "landing.shortcuts.cmdK": "Open universal search and ticker command menu",
+  "landing.shortcuts.key15":
+    "Jump between Valuation, Profitability, and Balance metrics",
+  "landing.shortcuts.keyQA":
+    "Toggle between Quarterly and Annual statement history",
+  "landing.shortcuts.keyLang":
+    "Instant Hebrew / English language and RTL layout switch",
+
+  "landing.cta.badge": "Start Researching Today",
+  "landing.cta.title": "Elevate Your Fundamental Investment Workflow",
+  "landing.cta.subtitle":
+    "No paywalls, no login friction. Step into the observatory and read the fundamentals.",
+  "landing.cta.launchNow": "Launch Vantage Workspace",
+  "landing.cta.exploreWatchlists": "Explore Watchlists",
+
   // Slide-over
   "slideover.loading": "Loading data...",
   "slideover.error.title": "Failed to load data",
@@ -787,6 +894,30 @@ const en = {
   "providerHealth.batchFallback": "Yahoo fallback",
   "providerHealth.batchFallbackTooltip":
     "Batch quotes are paid-gated on this plan — each price is fetched per-symbol via Yahoo",
+  "providerHealth.barTitle": "Data Feeds",
+  "providerHealth.allHealthy": "All Data Feeds Operational",
+  "providerHealth.fallbackActive": "Live Fallback Active (Zero Downtime)",
+  "providerHealth.viewDetails": "View Diagnostics",
+  "providerHealth.hideDetails": "Hide",
+  "providerHealth.modalTitle": "Data Provider Diagnostics & Fallback Routing",
+  "providerHealth.modalSubtitle":
+    "Real-time health telemetry across all market data feeds, daily quota limits, and automated failover pipelines.",
+  "providerHealth.status.ok": "Operational",
+  "providerHealth.status.degraded": "Degraded · Fallback Active",
+  "providerHealth.status.down": "Outage",
+  "providerHealth.status.knownRestriction": "Free Tier Limit",
+  "providerHealth.status.notConfigured": "Not Configured",
+  "providerHealth.yahooDesc":
+    "Primary keyless real-time quote feed, intraday/historical charts, and fundamental ratios fallback.",
+  "providerHealth.fmpDesc":
+    "5-year audited financial statements, balance sheets, DCF inputs, and insider transactions.",
+  "providerHealth.alphavantageDesc":
+    "Secondary macro time-series and supplementary quote redundancy.",
+  "providerHealth.fallbackEngagedNote":
+    "FMP free-tier quota (250 req/day) is rate-limited — Vantage is transparently routing quotes & financial metrics through Yahoo Finance with zero interruption.",
+  "providerHealth.recheck": "Re-probe Feeds",
+  "providerHealth.latency": "Latency",
+  "providerHealth.lastChecked": "Checked: {{time}}",
 
   // Footer usage pills (live API-call counts vs free-tier limits)
   "usage.footerLabel": "API usage",
@@ -1465,6 +1596,112 @@ const he: Record<string, string> = {
   "splash.login": "התחברות / ניסיון ל-7 ימים",
   "splash.subtitle": "טרמינל ההשקעות האישי שלך למשקיעים לטווח ארוך.",
 
+  // Landing Page
+  "landing.hero.eyebrow": "מצפה כוכבים לנתוני יסוד של חברות",
+  "landing.hero.badge": "סביבת מחקר פיננסית v2.4",
+  "landing.hero.titleLine1": "קרא את האותות בתוך",
+  "landing.hero.titleHighlight": "נתוני היסוד של החברות",
+  "landing.hero.subtitle":
+    "מרחב מחקר פיננסי שקט ומאיר עיניים. דוחות כספיים מעמיקים ל-5 שנים, תרשימי עקומת-אור היסטוריים, מודל הערכת שווי DCF ומודיעין דוחות בזמן אמת — ללא רעשי שוק.",
+  "landing.hero.launchWorkspace": "כניסה למרחב המחקר",
+  "landing.hero.exploreScreener": "פתח סורק מניות",
+  "landing.hero.commandSearch": "חיפוש סימול (⌘K)",
+  "landing.hero.liveDataFeed": "הזנת נתונים חיה ורב-ספקית עם גיבוי אוטומטי",
+
+  "landing.spotlight.title": "זרקור מניות אינטראקטיבי",
+  "landing.spotlight.subtitle":
+    "בחר נכס מוביל לתצוגה מקדימה של עקומות אור היסטוריות ומדדי הערכת שווי",
+  "landing.spotlight.openStock": "פתח מצפה מלא ←",
+  "landing.spotlight.marketCap": "שווי שוק",
+  "landing.spotlight.revenue": "הכנסות (TTM)",
+  "landing.spotlight.fcf": "תזרים מזומנים חופשי",
+  "landing.spotlight.grossMargin": "שולי רווח גולמי",
+  "landing.spotlight.pe": "מכפיל רווח (P/E)",
+  "landing.spotlight.cagr3Y": "צמיחת הכנסות שנתית (3Y)",
+  "landing.spotlight.lightCurveLabel": "עקומת אור הכנסות ל-5 שנים",
+
+  "landing.earningsShowcase.badge": "מודיעין אירועים יזום",
+  "landing.earningsShowcase.title": "יומן דוחות קרובים וקונצנזוס וול סטריט",
+  "landing.earningsShowcase.subtitle":
+    "עקוב אחר תאריכי דיווח, תחזיות רווח והכנסות של האנליסטים והפתעות ביצועים מסוננות לאחזקות שלך.",
+  "landing.earningsShowcase.openFull": "פתח יומן דוחות מלא ←",
+  "landing.earningsShowcase.beforeOpen": "לפני הפתיחה",
+  "landing.earningsShowcase.afterClose": "אחרי הסגירה",
+  "landing.earningsShowcase.beat": "הכה",
+  "landing.earningsShowcase.miss": "פספס",
+  "landing.earningsShowcase.filterAll": "כל המדווחות",
+  "landing.earningsShowcase.filterLarge": "חברות ענק (מעל $200B)",
+  "landing.earningsShowcase.filterWatchlist": "רשימות מעקב בלבד",
+  "landing.earningsShowcase.epsEst": "צפי EPS",
+  "landing.earningsShowcase.epsActual": "EPS בפועל",
+  "landing.earningsShowcase.revEst": "צפי הכנסות",
+  "landing.earningsShowcase.revActual": "הכנסות בפועל",
+
+  "landing.dcfSandbox.badge": "מנוע הערכת שווי אינטראקטיבי",
+  "landing.dcfSandbox.title": "סימולטור DCF מהיר לתזרים מזומנים מהוון",
+  "landing.dcfSandbox.subtitle":
+    "בדוק הנחות צמיחה, מכפילים ויעדי תשואה בחישוב ערך מהותי בזמן אמת.",
+  "landing.dcfSandbox.fcfInput": "תזרים חופשי בסיסי (מיליארד $)",
+  "landing.dcfSandbox.growthInput": "שיעור צמיחה חזוי ל-5 שנים (%)",
+  "landing.dcfSandbox.multipleInput": "מכפיל יציאה (P/FCF)",
+  "landing.dcfSandbox.discountInput": "תשואת יעד / שיעור היוון (%)",
+  "landing.dcfSandbox.sharesInput": "מניות מונפקות (מיליארד)",
+  "landing.dcfSandbox.computedFairValue": "שווי הוגן מחושב",
+  "landing.dcfSandbox.marketPrice": "מחיר שוק נוכחי",
+  "landing.dcfSandbox.upside": "מרווח ביטחון צפוי",
+  "landing.dcfSandbox.undervalued": "מתחת לשווי (הזדמנות)",
+  "landing.dcfSandbox.fairValue": "שווי הוגן",
+  "landing.dcfSandbox.overvalued": "מעל השווי",
+  "landing.dcfSandbox.openDcfTool": "פתח כלי DCF מלא במרחב המחקר ←",
+
+  "landing.features.badge": "ערכת המכשירים",
+  "landing.features.title": "נבנה למחקר יסוד מעמיק",
+  "landing.features.subtitle":
+    "כל מדד נחקר כמו כוכב משתנה — מתועד על פני זמן, נקרא לפי מגמה ולא כהצגת מחיר רגעית.",
+  "landing.features.card1Title": "עקומות אור של דוחות ל-5 שנים",
+  "landing.features.card1Desc":
+    "דוחות רווח והפסד, מאזנים ותזרימי מזומנים אינטראקטיביים עם מעבר מיידי בין תצוגה רבעונית לשנתית וחישובי CAGR.",
+  "landing.features.card2Title": "סורק שוק גלובלי וסינון מתקדם",
+  "landing.features.card2Desc":
+    "סנן מעל 18,400+ נכסים בלמעלה מ-10 מדינות לפי סוג נכס, ענף, בורסה ורישום ראשי.",
+  "landing.features.card3Title": "רשימות מעקב מותאמות אישית",
+  "landing.features.card3Desc":
+    "ארגן רעיונות השקעה בעלי שכנוע גבוה, עקוב אחר כרטיסי ניקוד חיים ובחן חשיפה סקטוריאלית.",
+  "landing.features.card4Title": "תמות נבחרות ומפת חום סקטוריאלית",
+  "landing.features.card4Desc":
+    "חקור תמות מובנות כמו S&P 500, צמיחת דיבידנד, רכישות עצמיות, AI וענן עם מדדים חיים.",
+  "landing.features.card5Title": "ניתוחי סיכון ברמה מוסדית",
+  "landing.features.card5Desc":
+    "מדדי שארפ, סורטינו, מודל IRR ותנודתיות ירידה המחושבים מתזרימי מזומנים.",
+  "landing.features.card6Title": "חוסן רב-ספקי ושקיפות מלאה",
+  "landing.features.card6Desc":
+    "ארכיטקטורה ללא עלות עם שרשרת גיבוי שקופה בין Yahoo Finance, FMP ו-AlphaVantage.",
+
+  "landing.sectors.badge": "מכ\"ם סקטוריאלי",
+  "landing.sectors.title": "מאקרו שוק ומומנטום לפי מגזר",
+  "landing.sectors.subtitle":
+    "זהה במהירות זרימת הון בין ענפי השוק המרכזיים",
+  "landing.sectors.viewAllScreener": "צפה בכל 500+ המניות בסורק ←",
+
+  "landing.shortcuts.badge": "זרימת עבודה למשתמשים מתקדמים",
+  "landing.shortcuts.title": "פרוטוקול מקלדת של המצפה",
+  "landing.shortcuts.subtitle":
+    "תוכנן ליעילות מקלדת מהירה וחלקה",
+  "landing.shortcuts.cmdK": "פתיחת תפריט פקודות וחיפוש סימולים אוניברסלי",
+  "landing.shortcuts.key15":
+    "מעבר מהיר בין מדדי הערכת שווי, רווחיות ומאזן",
+  "landing.shortcuts.keyQA":
+    "מעבר בין היסטוריית דוחות רבעונית לשנתית",
+  "landing.shortcuts.keyLang":
+    "החלפה מיידית של שפה בין עברית לאנגלית והיפוך כיווניות RTL",
+
+  "landing.cta.badge": "התחל לחקור עוד היום",
+  "landing.cta.title": "שדרג את תהליך מחקר ההשקעות היסודי שלך",
+  "landing.cta.subtitle":
+    "ללא חומות תשלום, ללא חיכוך כניסה. היכנס למצפה וקרא את נתוני היסוד.",
+  "landing.cta.launchNow": "כניסה ל-Vantage",
+  "landing.cta.exploreWatchlists": "חקור רשימות מעקב",
+
   // Slide-over
   "slideover.loading": "טוען נתונים...",
   "slideover.error.title": "טעינת הנתונים נכשלה",
@@ -1574,6 +1811,30 @@ const he: Record<string, string> = {
   "providerHealth.batchFallback": "גיבוי Yahoo",
   "providerHealth.batchFallbackTooltip":
     "שערים מרובים אינם זמינים בתוכנית הנוכחית — כל שער נטען בנפרד דרך Yahoo",
+  "providerHealth.barTitle": "ספקי נתונים",
+  "providerHealth.allHealthy": "כל ספקי הנתונים פועלים כשורה",
+  "providerHealth.fallbackActive": "מנגנון גיבוי אוטומטי פעיל (ללא הפרעה)",
+  "providerHealth.viewDetails": "הצג אבחון ספקים",
+  "providerHealth.hideDetails": "הסתר",
+  "providerHealth.modalTitle": "אבחון ספקי נתונים וניתוב גיבוי אוטומטי",
+  "providerHealth.modalSubtitle":
+    "טלמטריה חיה בזמן אמת של ספקי נתוני השוק, מכסות שימוש יומיות ונתיבי גיבוי.",
+  "providerHealth.status.ok": "פעיל ותקין",
+  "providerHealth.status.degraded": "מוגבל · גיבוי פעיל",
+  "providerHealth.status.down": "השבתה",
+  "providerHealth.status.knownRestriction": "מגבלת תוכנית חינמית",
+  "providerHealth.status.notConfigured": "לא מוגדר",
+  "providerHealth.yahooDesc":
+    "ספק ראשי לשערי זמן אמת, גרפים תוך-יומיים והיסטוריים, וגיבוי מדדי שווי.",
+  "providerHealth.fmpDesc":
+    "דוחות כספיים מבוקרים ל-5 שנים, מאזנים, נתוני DCF ועסקאות בעלי עניין.",
+  "providerHealth.alphavantageDesc":
+    "סדרות נתונים היסטוריות משניות וגיבוי שערים רציף.",
+  "providerHealth.fallbackEngagedNote":
+    "מכסת FMP החינמית היומית (250 בקשות) מוצתה — Vantage מנתבת שערים ומדדים אוטומטית דרך Yahoo ללא כל הפרעה.",
+  "providerHealth.recheck": "בדוק ספקים מחדש",
+  "providerHealth.latency": "זמן תגובה",
+  "providerHealth.lastChecked": "נבדק: {{time}}",
 
   // Footer usage pills (live API-call counts vs free-tier limits). Numbers
   // stay inside `dir="ltr"` on the page side, so the Hebrew string can sit
