@@ -155,10 +155,10 @@ export function Portfolio() {
     const irrRes = irrBisection(cfs);
 
     let cagrVal: number | null = null;
-    if (activePortfolio.cashflows.length > 0) {
+    if (activePortfolio.cashflows.length === 1) {
       const firstDate = activePortfolio.cashflows[0].date;
       const startVal = Math.abs(activePortfolio.cashflows[0].amount);
-      const endVal = activePortfolio.currentValue;
+      const endVal = activePortfolio.currentValue + activePortfolio.gainLoss;
       const days = (new Date().getTime() - new Date(firstDate).getTime()) / (1000 * 60 * 60 * 24);
       const years = days / 365.25;
       if (years > 0.2 && startVal > 0) {
@@ -213,10 +213,26 @@ export function Portfolio() {
     return arr;
   }, [holdingsData, sortKey]);
 
+  // Normalized risk metric aggregations excluding missing values
+  const weightedMetric = (key: "volatility" | "sharpe" | "sortino") => {
+    let weightedSum = 0;
+    let totalWeight = 0;
+    for (const h of sortedHoldings) {
+      const val = h[key];
+      if (val != null && Number.isFinite(val)) {
+        weightedSum += val * h.weight;
+        totalWeight += h.weight;
+      }
+    }
+    return totalWeight > 0 ? weightedSum / totalWeight : null;
+  };
+
   // ---- Display helpers ---------------------------------------------------
   const usd2display = (usd: number | null | undefined) => {
     if (usd === null || usd === undefined || !Number.isFinite(usd)) return null;
-    return usd * (fxRate ?? 1);
+    if (currency === "USD") return usd;
+    if (fxRate === null) return null;
+    return usd * fxRate;
   };
 
   const gainLossFxAware = usd2display(activePortfolio.gainLoss);
@@ -251,6 +267,7 @@ export function Portfolio() {
             <select
               value={selectedPortfolioId}
               onChange={(e) => setSelectedPortfolioId(e.target.value)}
+              aria-label="Select portfolio"
               className="appearance-none bg-secondary/50 border border-border text-lg font-bold py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary cursor-pointer text-foreground"
             >
               {portfolios.map((p) => (
@@ -264,6 +281,7 @@ export function Portfolio() {
             <select
               value={currency}
               onChange={(e) => setCurrency(e.target.value as Currency)}
+              aria-label="Currency"
               className="appearance-none bg-secondary/50 border border-border text-sm py-2.5 pl-4 pr-10 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary cursor-pointer text-foreground"
             >
               {CURRENCY_OPTIONS.map((opt) => (
@@ -361,14 +379,17 @@ export function Portfolio() {
           <div>
             <p className="text-xs text-muted-foreground mb-1">{t("portfolio.cagr")}</p>
             <p className={`text-xl font-bold font-mono tabular-nums ${(portfolioMetrics.cagr ?? -1) >= 0 ? "text-chart-positive" : "text-chart-negative"}`} dir="ltr">
-              {fmtPct(portfolioMetrics.cagr)}
+              {portfolioMetrics.cagr === null ? "\u2014" : fmtPct(portfolioMetrics.cagr)}
             </p>
             <p className="text-xs text-muted-foreground mt-1">{t("portfolio.oneYearBasis")}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground mb-1">{t("portfolio.volatility")}</p>
             <p className="text-xl font-bold font-mono tabular-nums text-chart-amber" dir="ltr">
-              {fmtPct(sortedHoldings.reduce((s, h) => s + (h.volatility ?? 0) * (h.weight / 100), 0))}
+              {(() => {
+                const vol = weightedMetric("volatility");
+                return vol !== null ? fmtPct(vol) : "\u2014";
+              })()}
             </p>
             <p className="text-xs text-muted-foreground mt-1">{t("portfolio.weightedAvg")}</p>
           </div>
@@ -376,8 +397,8 @@ export function Portfolio() {
             <p className="text-xs text-muted-foreground mb-1">{t("portfolio.sharpe")}</p>
             <p className="text-xl font-bold font-mono tabular-nums text-primary" dir="ltr">
               {(() => {
-                const ws = sortedHoldings.reduce((s, h) => s + (h.sharpe ?? 0) * (h.weight / 100), 0);
-                return Number.isFinite(ws) ? ws.toFixed(2) : "\u2014";
+                const ws = weightedMetric("sharpe");
+                return ws !== null ? ws.toFixed(2) : "\u2014";
               })()}
             </p>
             <p className="text-xs text-muted-foreground mt-1">rf 4.5%</p>
@@ -386,8 +407,8 @@ export function Portfolio() {
             <p className="text-xs text-muted-foreground mb-1">{t("portfolio.sortino")}</p>
             <p className="text-xl font-bold font-mono tabular-nums text-primary" dir="ltr">
               {(() => {
-                const ws = sortedHoldings.reduce((s, h) => s + (h.sortino ?? 0) * (h.weight / 100), 0);
-                return Number.isFinite(ws) ? ws.toFixed(2) : "\u2014";
+                const ws = weightedMetric("sortino");
+                return ws !== null ? ws.toFixed(2) : "\u2014";
               })()}
             </p>
             <p className="text-xs text-muted-foreground mt-1">{t("portfolio.downsideOnly")}</p>
@@ -401,9 +422,11 @@ export function Portfolio() {
           <h3 className="text-xl font-bold text-foreground">{t("portfolio.holdings")}</h3>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <BatchQuoteFallbackHint />
-            <span>{t("portfolio.sortBy")}:</span>
+            <label htmlFor="portfolio-sort-select">{t("portfolio.sortBy")}:</label>
             <div className="relative">
               <select
+                id="portfolio-sort-select"
+                aria-label={t("portfolio.sortBy") || "Sort by"}
                 value={sortKey}
                 onChange={(e) => setSortKey(e.target.value as SortKey)}
                 className="appearance-none bg-secondary/50 border border-border text-xs font-medium py-1.5 pl-3 pr-8 rounded-md focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary cursor-pointer text-foreground"
