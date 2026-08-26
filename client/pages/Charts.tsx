@@ -165,10 +165,30 @@ export function Charts() {
 
         {/* DCF widget */}
         {quoteLoading || currentPrice == null ? (
-          <SectionCardSkeleton height={360} />
-        ) : (
-          <DCFWidget currentPrice={currentPrice} />
-        )}
+          <SectionCardSkeleton height={420} />
+        ) : (() => {
+          const mktCap = profileData?.mktCap ?? (profileData as any)?.marketCap ?? null;
+          const isFinitePositiveMktCap = mktCap != null && Number.isFinite(mktCap) && mktCap > 0;
+          const derivedShares =
+            isFinitePositiveMktCap && currentPrice > 0
+              ? (mktCap / currentPrice) / 1e9
+              : 15.2;
+          const derivedFcf =
+            isFinitePositiveMktCap
+              ? Math.max(1, (mktCap / 1e9) / 25)
+              : 108.8;
+
+          return (
+            <DCFWidget
+              key={ticker}
+              ticker={ticker}
+              companyName={profileData?.companyName}
+              currentPrice={currentPrice}
+              sharesOutstanding={derivedShares}
+              initialFcf={derivedFcf}
+            />
+          );
+        })()}
 
         {/* Footer hint card */}
         {!quoteLoading && currentPrice && (

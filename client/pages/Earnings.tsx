@@ -2,10 +2,10 @@ import { useI18n } from "@/lib/i18n";
 import { useState, useMemo, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
-import EarningsCalendar from "@/components/EarningsCalendar";
+import EarningsCalendar, { type MarketCapFilter } from "@/components/EarningsCalendar";
 import PageHeader from "@/components/PageHeader";
-
-type MarketCapFilter = "all" | "large" | "mid" | "small";
+import DataLegend from "@/components/DataLegend";
+import DataStatusBadge from "@/components/DataStatusBadge";
 
 /**
  * Formats a date as an ISO calendar date.
@@ -57,30 +57,38 @@ function shiftRange(from: string, to: string, weeks: number): { from: string; to
  * @param to - The range's end date
  * @returns The formatted date range
  */
-function formatHumanRange(from: string, to: string): string {
-  const f = new Date(from);
-  const t = new Date(to);
+function parseLocalDate(isoStr: string): Date {
+  const parts = isoStr.split("-").map(Number);
+  if (parts.length === 3 && parts.every((n) => Number.isFinite(n))) {
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+  return new Date(isoStr);
+}
+
+function formatHumanRange(from: string, to: string, lang: string = "en"): string {
+  const f = parseLocalDate(from);
+  const t = parseLocalDate(to);
+  const locale = lang === "he" ? "he-IL" : "en-US";
   const fmt = (d: Date) =>
-    d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    d.toLocaleDateString(locale, { month: "short", day: "numeric" });
   return `${fmt(f)} – ${fmt(t)}`;
 }
 
 /**
- * Renders the earnings calendar with week navigation and filtering controls.
+ * Renders the earnings calendar with week navigation, market cap filtering,
+ * watchlist toggles, and live telemetry data source attribution.
  *
- * Honors `?focus=AAPL&date=2025-09-15` URL parameters from the alert engine's
- * "Open" action: shifts the visible week to land `date` in the rendered Mon-
- * Fri window, forces `watchlistOnly = true`, and forwards both values down
- * to `<EarningsCalendar>` for highlight + scrollIntoView.
+ * Honors `?focus=AAPL&date=2025-09-15` URL parameters from the alert engine.
  *
  * @returns The earnings calendar page.
  */
 export function EarningsPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const initial = useMemo(() => currentWeekRange(), []);
   const [offset, setOffset] = useState(0); // 0 = this week
   const [marketCap, setMarketCap] = useState<MarketCapFilter>("all");
   const [watchlistOnly, setWatchlistOnly] = useState(false);
+  const [dataStatus, setDataStatus] = useState<"live" | "mock">("live");
   const [searchParams] = useSearchParams();
   const focusSymbol = searchParams.get("focus");
   const focusDate = searchParams.get("date");
@@ -113,6 +121,8 @@ export function EarningsPage() {
   const hasPrev = offset > -8; // up to 8 weeks back
   const hasNext = offset < 4; // up to 4 weeks forward
 
+  const normalizedFocusSymbol = focusSymbol ? focusSymbol.toUpperCase() : undefined;
+
   return (
     <div className="w-full bg-background dark min-h-screen p-8">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -120,15 +130,25 @@ export function EarningsPage() {
           eyebrow={t("nav.earnings")}
           title={t("earnings.title")}
           description={t("earnings.subtitle")}
+          status={dataStatus}
+          source="FMP & Yahoo Consensus"
+          actions={
+            <>
+              <DataStatusBadge status={dataStatus} source="FMP Telemetry" />
+              <DataLegend />
+            </>
+          }
         />
 
-        <div className="flex items-center justify-between bg-card/60 p-4 rounded-xl border border-border gap-4 flex-wrap">
+        {/* Global Controls Strip */}
+        <div className="flex items-center justify-between bg-card/80 p-4 rounded-xl border border-border gap-4 flex-wrap shadow-sm">
           {/* Week Navigation */}
           <div className="flex items-center gap-2">
             <button
               disabled={!hasPrev}
               onClick={() => setOffset((o) => o - 1)}
               title={t("earningsCalendar.prevWeek")}
+              aria-label={t("earningsCalendar.prevWeek")}
               className="p-2 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
             >
               <ChevronLeft className="w-5 h-5" />
@@ -147,23 +167,28 @@ export function EarningsPage() {
               disabled={!hasNext}
               onClick={() => setOffset((o) => o + 1)}
               title={t("earningsCalendar.nextWeek")}
+              aria-label={t("earningsCalendar.nextWeek")}
               className="p-2 hover:bg-muted rounded-md transition-colors text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:hover:bg-transparent disabled:cursor-not-allowed"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
-            <span className="ml-4 text-sm font-medium text-foreground" dir="ltr">
-              {t("earningsCalendar.weekOf", { range: formatHumanRange(from, to) })}
+            <span className="ml-4 text-sm font-medium text-foreground font-mono" dir="ltr">
+              {t("earningsCalendar.weekOf", { range: formatHumanRange(from, to, lang) })}
             </span>
           </div>
 
-          {/* Filters */}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 bg-secondary/50 px-3 py-1.5 rounded-md text-sm border border-border">
-              <span className="text-muted-foreground">{t("earningsCalendar.marketCap")}</span>
+          {/* Filters: Market Cap + Watchlists */}
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2 bg-secondary/50 px-3 py-1.5 rounded-lg text-sm border border-border">
+              <label htmlFor="earnings-market-cap-select" className="text-muted-foreground text-xs font-mono">
+                {t("earningsCalendar.marketCap")}:
+              </label>
               <select
+                id="earnings-market-cap-select"
+                aria-label={t("earningsCalendar.marketCap") || "Market Cap"}
                 value={marketCap}
                 onChange={(e) => setMarketCap(e.target.value as MarketCapFilter)}
-                className="bg-transparent focus:outline-none text-foreground cursor-pointer"
+                className="bg-transparent focus:outline-none text-foreground text-sm sm:text-xs font-mono font-medium cursor-pointer"
               >
                 <option value="all" className="bg-popover text-popover-foreground">{t("earningsCalendar.marketCapAll")}</option>
                 <option value="large" className="bg-popover text-popover-foreground">{t("earningsCalendar.marketCapLarge")}</option>
@@ -171,25 +196,36 @@ export function EarningsPage() {
                 <option value="small" className="bg-popover text-popover-foreground">{t("earningsCalendar.marketCapSmall")}</option>
               </select>
             </div>
-            <label className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground cursor-pointer transition-colors">
+
+            <label
+              className={`flex items-center gap-2 text-sm transition-colors px-3 py-1.5 rounded-lg border ${
+                focusSymbol
+                  ? "bg-secondary/20 border-border/50 text-muted-foreground cursor-not-allowed opacity-80"
+                  : "bg-secondary/30 border-border text-muted-foreground hover:text-foreground cursor-pointer"
+              }`}
+              title={focusSymbol ? t("earningsCalendar.watchlistLockedByFocus") : undefined}
+            >
               <input
                 type="checkbox"
                 checked={effectiveWatchlistOnly}
+                disabled={!!focusSymbol}
                 onChange={(e) => setWatchlistOnly(e.target.checked)}
-                className="rounded border-border bg-secondary text-primary focus:ring-primary cursor-pointer"
+                className="rounded border-border bg-secondary text-primary focus:ring-primary cursor-pointer disabled:cursor-not-allowed"
               />
-              {t("earningsCalendar.filterByWatchlist")}
+              <span className="text-xs font-mono">{t("earningsCalendar.filterByWatchlist")}</span>
             </label>
           </div>
         </div>
 
+        {/* Calendar / Grid Display */}
         <EarningsCalendar
           from={from}
           to={to}
           marketCap={marketCap}
           watchlistOnly={effectiveWatchlistOnly}
-          focusSymbol={focusSymbol ?? undefined}
+          focusSymbol={normalizedFocusSymbol}
           focusDate={focusDate ?? undefined}
+          onStatusChange={setDataStatus}
         />
       </div>
     </div>
