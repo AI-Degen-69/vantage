@@ -25,8 +25,9 @@ export const mockEarningsEvents: EarningsEventData[] = [
   {
     ticker: "NVDA",
     name: "NVIDIA Corporation",
-    date: "Mon",
-    dateFull: "Feb 24, 2025",
+    date: "2025-02-24",
+    dateFull: "2025-02-24",
+    weekday: 1,
     epsEst: 5.59,
     epsActual: 5.82,
     revEst: 24.6,
@@ -39,8 +40,9 @@ export const mockEarningsEvents: EarningsEventData[] = [
   {
     ticker: "SNOW",
     name: "Snowflake Inc.",
-    date: "Tue",
-    dateFull: "Feb 25, 2025",
+    date: "2025-02-25",
+    dateFull: "2025-02-25",
+    weekday: 2,
     epsEst: 0.14,
     epsActual: 0.18,
     revEst: 0.749,
@@ -53,8 +55,9 @@ export const mockEarningsEvents: EarningsEventData[] = [
   {
     ticker: "CRM",
     name: "Salesforce, Inc.",
-    date: "Wed",
-    dateFull: "Feb 26, 2025",
+    date: "2025-02-26",
+    dateFull: "2025-02-26",
+    weekday: 3,
     epsEst: 2.44,
     epsActual: 2.51,
     revEst: 9.35,
@@ -67,8 +70,9 @@ export const mockEarningsEvents: EarningsEventData[] = [
   {
     ticker: "PANW",
     name: "Palo Alto Networks",
-    date: "Thu",
-    dateFull: "Feb 27, 2025",
+    date: "2025-02-27",
+    dateFull: "2025-02-27",
+    weekday: 4,
     epsEst: 1.48,
     revEst: 2.12,
     time: "Before Open",
@@ -78,8 +82,9 @@ export const mockEarningsEvents: EarningsEventData[] = [
   {
     ticker: "DELL",
     name: "Dell Technologies",
-    date: "Thu",
-    dateFull: "Feb 27, 2025",
+    date: "2025-02-27",
+    dateFull: "2025-02-27",
+    weekday: 4,
     epsEst: 2.05,
     revEst: 24.5,
     time: "After Close",
@@ -89,8 +94,9 @@ export const mockEarningsEvents: EarningsEventData[] = [
   {
     ticker: "BABA",
     name: "Alibaba Group",
-    date: "Fri",
-    dateFull: "Feb 28, 2025",
+    date: "2025-02-28",
+    dateFull: "2025-02-28",
+    weekday: 5,
     epsEst: 2.68,
     revEst: 38.1,
     time: "Before Open",
@@ -234,12 +240,18 @@ export function EarningsCalendar({
           weekday: wd,
           epsEst: e.epsEstimated ?? e.epsEstimate ?? null,
           epsActual: e.eps ?? e.epsActual ?? null,
-          revEst: e.revenueEstimated
-            ? e.revenueEstimated / 1e9
-            : e.revenueEstimate
-            ? e.revenueEstimate / 1e9
-            : null,
-          revActual: e.revenue ? e.revenue / 1e9 : e.revenueActual ? e.revenueActual / 1e9 : null,
+          revEst:
+            e.revenueEstimated != null
+              ? e.revenueEstimated / 1e9
+              : e.revenueEstimate != null
+              ? e.revenueEstimate / 1e9
+              : null,
+          revActual:
+            e.revenue != null
+              ? e.revenue / 1e9
+              : e.revenueActual != null
+              ? e.revenueActual / 1e9
+              : null,
           time: normalizedTime,
           marketCap: e.marketCap,
           surprise:

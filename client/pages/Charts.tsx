@@ -166,13 +166,28 @@ export function Charts() {
         {/* DCF widget */}
         {quoteLoading || currentPrice == null ? (
           <SectionCardSkeleton height={420} />
-        ) : (
-          <DCFWidget
-            ticker={ticker}
-            companyName={profileData?.companyName}
-            currentPrice={currentPrice}
-          />
-        )}
+        ) : (() => {
+          const mktCap = profileData?.mktCap ?? (profileData as any)?.marketCap ?? null;
+          const derivedShares =
+            mktCap != null && currentPrice > 0
+              ? Number(((mktCap / currentPrice) / 1e9).toFixed(2))
+              : 15.2;
+          const derivedFcf =
+            mktCap != null
+              ? Math.max(1, Number(((mktCap / 1e9) / 25).toFixed(1)))
+              : 108.8;
+
+          return (
+            <DCFWidget
+              key={`${ticker}-${currentPrice}`}
+              ticker={ticker}
+              companyName={profileData?.companyName}
+              currentPrice={currentPrice}
+              sharesOutstanding={derivedShares}
+              initialFcf={derivedFcf}
+            />
+          );
+        })()}
 
         {/* Footer hint card */}
         {!quoteLoading && currentPrice && (

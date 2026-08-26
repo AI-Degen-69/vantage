@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useI18n } from "@/lib/i18n";
 import { Sliders, LineChart as ChartIcon } from "lucide-react";
 import {
@@ -60,6 +60,14 @@ export function DCFWidget({
   const [discountRate, setDiscountRate] = useState<number>(initialDiscount);
   const [targetReturn, setTargetReturn] = useState<number>(15.0);
 
+  // Sync inputs when ticker or initial props change
+  useEffect(() => {
+    setBaseFcf(initialFcf);
+    setGrowthRate(initialGrowth);
+    setMultiple(initialMultiple);
+    setDiscountRate(initialDiscount);
+  }, [ticker, initialFcf, initialGrowth, initialMultiple, initialDiscount]);
+
   // --------------------------------------------------------------------------
   // DCF Calculations
   // --------------------------------------------------------------------------
@@ -88,7 +96,10 @@ export function DCFWidget({
 
       const y5Price = (y5Fcf / (shares / 10)) * multiple;
       const fwd = currentPrice > 0 ? (Math.pow(y5Price / currentPrice, 1 / 5) - 1) * 100 : 0;
-      const revEntry = y5Price / Math.pow(1 + targetReturn / 100, 5);
+      const revEntry =
+        targetReturn > -99.9 && y5Price > 0
+          ? y5Price / Math.pow(1 + targetReturn / 100, 5)
+          : 0;
       const mos = currentPrice > 0 ? ((computedFairValue - currentPrice) / currentPrice) * 100 : 0;
 
       return {
@@ -229,15 +240,15 @@ export function DCFWidget({
                 <input
                   id="dcf-base-fcf-slider"
                   type="range"
-                  min="5"
-                  max="200"
+                  min="1"
+                  max="300"
                   step="0.5"
                   value={baseFcf}
-                  onChange={(e) => setBaseFcf(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => setBaseFcf(parseFloat(e.target.value) || 1)}
                   aria-label={t("dcf.baseFcf") || "Base FCF"}
                   className="w-full h-2.5 bg-secondary rounded-full appearance-none cursor-pointer accent-primary border border-border focus:outline-none focus:ring-1 focus:ring-primary shadow-inner"
                   style={{
-                    background: `linear-gradient(to right, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((baseFcf - 5) / (200 - 5)) * 100}%, hsl(250 20% 18%) ${((baseFcf - 5) / (200 - 5)) * 100}%, hsl(250 20% 18%) 100%)`,
+                    background: `linear-gradient(to right, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((baseFcf - 1) / (300 - 1)) * 100}%, hsl(250 20% 18%) ${((baseFcf - 1) / (300 - 1)) * 100}%, hsl(250 20% 18%) 100%)`,
                   }}
                 />
               </div>
@@ -289,7 +300,7 @@ export function DCFWidget({
                   max="50"
                   step="1"
                   value={multiple}
-                  onChange={(e) => setMultiple(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => setMultiple(parseFloat(e.target.value) || 5)}
                   aria-label={t("dcf.exitMultiple") || "Exit Multiple"}
                   className="w-full h-2.5 bg-secondary rounded-full appearance-none cursor-pointer accent-primary border border-border focus:outline-none focus:ring-1 focus:ring-primary shadow-inner"
                   style={{
@@ -317,7 +328,7 @@ export function DCFWidget({
                   max="18"
                   step="0.5"
                   value={discountRate}
-                  onChange={(e) => setDiscountRate(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => setDiscountRate(parseFloat(e.target.value) || 4)}
                   aria-label={t("dcf.discountRate") || "Discount Rate"}
                   className="w-full h-2.5 bg-secondary rounded-full appearance-none cursor-pointer accent-primary border border-border focus:outline-none focus:ring-1 focus:ring-primary shadow-inner"
                   style={{
@@ -426,16 +437,22 @@ export function DCFWidget({
                   <input
                     id="dcf-target-return-input"
                     type="number"
+                    min="-90"
+                    max="500"
+                    step="0.5"
                     value={targetReturn}
-                    onChange={(e) => setTargetReturn(parseFloat(e.target.value) || 0)}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      setTargetReturn(Number.isFinite(val) ? Math.max(-90, Math.min(500, val)) : 0);
+                    }}
                     aria-label="Target return percentage"
-                    className="w-14 bg-background border border-border rounded text-center text-xs py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+                    className="w-16 bg-background border border-border rounded text-center text-xs py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary font-mono"
                     dir="ltr"
                   />
                 </div>
               </div>
               <p className="text-3xl font-bold font-mono tabular-nums text-primary" dir="ltr">
-                ${reverseEntryPrice.toFixed(2)}
+                {reverseEntryPrice > 0 ? `$${reverseEntryPrice.toFixed(2)}` : "—"}
               </p>
               <p className="text-xs text-muted-foreground font-mono">
                 {t("dcf.targetingReturn", { target: targetReturn })}

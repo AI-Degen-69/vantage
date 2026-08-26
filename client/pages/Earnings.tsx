@@ -57,9 +57,17 @@ function shiftRange(from: string, to: string, weeks: number): { from: string; to
  * @param to - The range's end date
  * @returns The formatted date range
  */
+function parseLocalDate(isoStr: string): Date {
+  const parts = isoStr.split("-").map(Number);
+  if (parts.length === 3 && parts.every((n) => Number.isFinite(n))) {
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+  return new Date(isoStr);
+}
+
 function formatHumanRange(from: string, to: string, lang: string = "en"): string {
-  const f = new Date(from);
-  const t = new Date(to);
+  const f = parseLocalDate(from);
+  const t = parseLocalDate(to);
   const locale = lang === "he" ? "he-IL" : "en-US";
   const fmt = (d: Date) =>
     d.toLocaleDateString(locale, { month: "short", day: "numeric" });
