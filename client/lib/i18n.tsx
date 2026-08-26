@@ -201,6 +201,22 @@ const en = {
   "dcf.targetingReturn": "Targeting a {{target}}% annualized return (Req. Exit: {{multiple}}x).",
   "dcf.projectedPrice": "Projected Price",
 
+  // DCF Tooltips
+  "dcf.tooltip.cashFlowMode": "Valuation based on Free Cash Flow (cash from operations minus CapEx). Ideal for capital-intensive or cash-compounding businesses.",
+  "dcf.tooltip.earningsMode": "Valuation based on Net Income (GAAP earnings). Ideal for mature, profitable companies or financial firms where FCF is less representative.",
+  "dcf.tooltip.baseFcf": "Starting annual Free Cash Flow in billions ($B). Sourced from the latest audited cash flow statement.",
+  "dcf.tooltip.baseEarnings": "Starting annual Net Income in billions ($B). Sourced from the latest audited income statement.",
+  "dcf.tooltip.growthRate": "Projected annual compound growth rate for cash flows or earnings over the next 5 years.",
+  "dcf.tooltip.exitMultiplePcf": "The Price-to-FCF (P/FCF) valuation multiple applied to Year 5 cash flows to determine terminal exit value.",
+  "dcf.tooltip.exitMultiplePe": "The Price-to-Earnings (P/E) valuation multiple applied to Year 5 earnings to determine terminal exit value.",
+  "dcf.tooltip.discountRate": "Annual hurdle rate / required return used to discount future cash flows back to present day value.",
+  "dcf.tooltip.fairValue": "Intrinsic value per share: (Sum of discounted 5-year flows + discounted terminal exit value) ÷ diluted shares outstanding.",
+  "dcf.tooltip.marginOfSafety": "Difference between fair value and market price. Positive indicates an undervalued discount; negative indicates a premium.",
+  "dcf.tooltip.forwardReturn": "Annualized compound rate of return (IRR) from current market price to projected Year 5 target price.",
+  "dcf.tooltip.targetBuyPrice": "The maximum price you should pay today to lock in your desired target annual return at the projected Year 5 valuation.",
+  "dcf.tooltip.trajectoryChart": "Year-by-year projected expansion path showing operational cash flow / earnings growth and implied milestone stock prices.",
+  "dcf.tooltip.terminalExitPrice": "Implied stock price in Year 5 calculated by multiplying Year 5 projected metric by your terminal exit multiple.",
+
   // Charts page
   "charts.dayRange": "Day Range",
   "charts.weekRange": "52-Week Range",
@@ -1256,6 +1272,22 @@ const he: Record<string, string> = {
   "dcf.reverse": "מחיר קנייה ליעד תשואה של {{target}}%",
   "dcf.targetingReturn": "מכוון לתשואה שנתית של {{target}}% (מכפיל יציאה נדרש: {{multiple}}x).",
   "dcf.projectedPrice": "מחיר צפוי",
+
+  // DCF Tooltips
+  "dcf.tooltip.cashFlowMode": "הערכת שווי מבוססת תזרים מזומנים חופשי (תזרים מפעילות פחות השקעות הון). מומלץ לחברות רווחיות ומייצרות מזומנים.",
+  "dcf.tooltip.earningsMode": "הערכת שווי מבוססת רווח נקי חשבונאי (GAAP). מתאים לחברות בוגרות או פיננסים שבהם תזרים חופשי פחות מייצג.",
+  "dcf.tooltip.baseFcf": "תזרים מזומנים חופשי שנתי התחלתי במיליארדי דולרים, מתוך הדוח הכספי המבוקר האחרון.",
+  "dcf.tooltip.baseEarnings": "רווח נקי שנתי התחלתי במיליארדי דולרים, מתוך דוח רווח והפסד האחרון.",
+  "dcf.tooltip.growthRate": "שיעור צמיחה שנתי חזוי לתזרים או לרווחים ב-5 השנים הקרובות.",
+  "dcf.tooltip.exitMultiplePcf": "מכפיל מחיר לתזרים (P/FCF) שישמש לחישוב שווי המניה בסוף השנה החמישית.",
+  "dcf.tooltip.exitMultiplePe": "מכפיל מחיר לרווח (P/E) שישמש לחישוב שווי המניה בסוף השנה החמישית.",
+  "dcf.tooltip.discountRate": "שיעור ההיוון / תשואת המינימום הנדרשת להיוון תזרימי העתיד לערכם הנוכחי.",
+  "dcf.tooltip.fairValue": "שווי הוגן פנימי למניה: (סכום התזרימים המהוונים ל-5 שנים + ערך סופי מהוון) ÷ מספר מניות מדוללות.",
+  "dcf.tooltip.marginOfSafety": "הפער בין השווי ההוגן למחיר השוק. פער חיובי מצביע על מניה הנסחרת בהנחה (מתחת לשוויה).",
+  "dcf.tooltip.forwardReturn": "תשואה שנתית מורכבת (IRR) צפויה ממחיר השוק הנוכחי למחיר היעד בשנה 5.",
+  "dcf.tooltip.targetBuyPrice": "מחיר הקנייה המרבי המומלץ היום כדי להגיע ליעד התשואה השנתי שהגדרת.",
+  "dcf.tooltip.trajectoryChart": "מסלול צמיחה שנתי המציג את הגידול בתזרים/רווח ואת מחירי המניה המשוערים לכל שנה.",
+  "dcf.tooltip.terminalExitPrice": "מחיר מניה משוער בשנה 5 לפי מכפיל היציאה והתזרים החזוי.",
 
   // Charts page
   "charts.dayRange": "טווח יומי",
