@@ -429,7 +429,7 @@ export function EarningsCalendar({
           {!isLoading && (
             <DataStatusBadge
               status={isMock ? "mock" : "live"}
-              source={isMock ? (lang === "he" ? "נתוני הדגמה" : "Sample Data") : (lang === "he" ? "זמן אמת" : "Real-time Feed")}
+              source={isMock ? t("earningsCalendar.sourceMock") : t("earningsCalendar.sourceLive")}
             />
           )}
         </div>

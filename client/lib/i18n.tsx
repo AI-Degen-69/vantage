@@ -261,6 +261,8 @@ const en = {
   "earningsCalendar.viewCalendar": "Weekly Columns",
   "earningsCalendar.dataSource":
     "Source: Financial Modeling Prep (FMP) & Yahoo Finance Consensus",
+  "earningsCalendar.sourceLive": "FMP & Yahoo Consensus",
+  "earningsCalendar.sourceMock": "Sample Data",
   "earningsCalendar.allReporting": "All Reporting",
   "earningsCalendar.watchlistsOnly": "Watchlists Only",
   "earningsCalendar.watchlist": "Watchlist",
@@ -1333,6 +1335,8 @@ const he: Record<string, string> = {
   "earningsCalendar.viewCalendar": "עמודות שבועיות",
   "earningsCalendar.dataSource":
     "מקור: Financial Modeling Prep (FMP) וקונצנזוס Yahoo Finance",
+  "earningsCalendar.sourceLive": "קונצנזוס FMP ו-Yahoo",
+  "earningsCalendar.sourceMock": "נתוני הדגמה",
   "earningsCalendar.allReporting": "כל המדווחות",
   "earningsCalendar.watchlistsOnly": "רשימות מעקב בלבד",
   "earningsCalendar.watchlist": "רשימת מעקב",
