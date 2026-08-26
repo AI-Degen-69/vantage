@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { Maximize2 } from "lucide-react";
+import { Maximize2, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import ChartModal from "./ChartModal";
 import { FinancialMetric } from "@/lib/mockData";
 import type { RevenueSegmentRow } from "@shared/api";
 import { useI18n } from "@/lib/i18n";
-import { Area, AreaChart, ReferenceLine, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, ReferenceLine, ResponsiveContainer } from "recharts";
 import { splitSparklineValues } from "@/lib/chartStyles";
 
 interface InsightsCardProps {
@@ -44,17 +44,6 @@ interface InsightsCardProps {
   onUpgradeClick?: () => void;
 }
 
-/**
- * Displays a financial metric card with its current value, trend badge, sparkline, and detailed chart modal.
- *
- * @param title - The metric title displayed on the card
- * @param value - The current metric value displayed on the card
- * @param badgeText - Optional text displayed alongside the metric value
- * @param badgeType - The badge style indicating a positive, negative, or neutral trend
- * @param metricId - Identifies the metric whose historical data is displayed
- * @param metricData - The metric's historical data for sparkline and chart modal
- * @param filterBar - Optional interactive strip between header and sparkline
- */
 export default function InsightsCard({
   title,
   value,
@@ -65,32 +54,36 @@ export default function InsightsCard({
   ticker,
   filterBar,
   segmentRows,
-  selectedSegment, // forwarded to the chart modal so it can mirror the card's focus
+  selectedSegment,
   segmentLockedReason,
   onUpgradeClick,
 }: InsightsCardProps) {
   const { t } = useI18n();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const getBadgeColor = () => {
+  const getBadgeStyles = () => {
     switch (badgeType) {
       case "positive":
-        return "bg-chart-positive/10 text-chart-positive border-chart-positive/30";
+        return "bg-chart-positive/15 text-chart-positive border-chart-positive/30 shadow-[0_0_12px_-2px_hsl(var(--chart-positive)/0.3)]";
       case "negative":
-        return "bg-chart-negative/10 text-chart-negative border-chart-negative/30";
+        return "bg-chart-negative/15 text-chart-negative border-chart-negative/30 shadow-[0_0_12px_-2px_hsl(var(--chart-negative)/0.3)]";
       default:
-        return "bg-muted text-muted-foreground border-border";
+        return "bg-muted/40 text-muted-foreground border-border/50";
     }
   };
 
-  // Light-curve stroke tracks the metric's trend direction — Aurora Green
-  // for growth, Ember Red for decline, Starlight Gold when flat/unknown.
-  // See DESIGN.md: The Instrument, Not Alarm Rule.
+  const TrendIcon =
+    badgeType === "positive"
+      ? TrendingUp
+      : badgeType === "negative"
+        ? TrendingDown
+        : Minus;
+
   const lineColor =
     badgeType === "positive"
-      ? "hsl(155 55% 50%)"
+      ? "hsl(155 65% 52%)"
       : badgeType === "negative"
-        ? "hsl(6 70% 58%)"
+        ? "hsl(6 75% 58%)"
         : "hsl(42 65% 70%)";
 
   const handleOpenModal = () => setIsModalOpen(true);
@@ -105,9 +98,6 @@ export default function InsightsCard({
   // Extract a small sparkline dataset (last 20 items)
   const sparklineData = splitSparklineValues(metricData.data.slice(-20));
 
-  // Compute the real visible window for the footer strip — first / last date
-  // labels from the underlying series, NOT a hardcoded "1D/5D/1M/…/All"
-  // string row that looks like a timeframe toggle but does nothing on click.
   const firstDate = metricData.data[0]?.date;
   const lastDate = metricData.data[metricData.data.length - 1]?.date;
   const dataSpanLabel =
@@ -121,51 +111,59 @@ export default function InsightsCard({
   return (
     <>
       <div
-        className="bg-card border border-border rounded-panel p-4 flex flex-col hover:border-primary/40 transition-all cursor-pointer relative group"
+        className="relative overflow-hidden rounded-xl border border-border/80 bg-gradient-to-b from-card/95 via-card/75 to-card/45 backdrop-blur-xl p-5 flex flex-col justify-between shadow-[0_4px_20px_-4px_rgba(0,0,0,0.5)] transition-all duration-300 hover:border-primary/60 hover:shadow-[0_8px_30px_-4px_rgba(0,0,0,0.7),0_0_20px_-4px_hsl(var(--primary)/0.25)] hover:-translate-y-0.5 group cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
         onClick={handleOpenModal}
         onKeyDown={handleKeyDown}
         role="button"
         tabIndex={0}
       >
-        <button
-          className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary z-10"
-          aria-label="Expand chart"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleOpenModal();
-          }}
-        >
-          <Maximize2 className="h-4 w-4" />
-        </button>
-        <div className="flex flex-col mb-4">
-          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">
-            {title}
-          </span>
-          <div className="flex items-end gap-3">
-            <span className="text-2xl font-semibold text-foreground font-mono tabular-nums tracking-tight">
+        {/* Subtle Ambient Radial Highlight on Hover */}
+        <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-primary/5 blur-2xl group-hover:bg-primary/10 transition-all duration-500" />
+
+        {/* Top Header Row */}
+        <div>
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <span className="text-[11px] font-bold text-muted-foreground/80 uppercase tracking-[0.14em] group-hover:text-foreground/90 transition-colors">
+              {title}
+            </span>
+            <button
+              className="h-7 w-7 rounded-lg bg-muted/30 border border-border/40 hover:bg-muted hover:border-primary/40 text-muted-foreground hover:text-primary transition-all flex items-center justify-center opacity-70 group-hover:opacity-100 focus:opacity-100 shadow-sm"
+              aria-label="Expand chart"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenModal();
+              }}
+            >
+              <Maximize2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* Value Readout & Trend Badge */}
+          <div className="flex items-baseline gap-2.5 flex-wrap">
+            <span className="text-[1.65rem] font-bold text-foreground font-mono tabular-nums tracking-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)]">
               {value}
             </span>
             {badgeText && (
               <span
-                className={`text-xs font-semibold font-mono tabular-nums px-2 py-0.5 rounded border whitespace-nowrap ${getBadgeColor()} mb-1`}
+                className={`text-xs font-bold font-mono tabular-nums px-2.5 py-0.5 rounded-full border whitespace-nowrap inline-flex items-center gap-1 ${getBadgeStyles()}`}
                 dir="ltr"
               >
+                <TrendIcon className="w-3 h-3" />
                 {badgeText}
               </span>
             )}
           </div>
+
           {filterBar}
         </div>
 
-        {/* Light-curve sparkline — a thin traced line against the panel's
-            own graticule, not a filled gradient blob. Glow is earned by
-            being the metric's own data line (DESIGN.md: Earned Glow Rule). */}
+        {/* Luminous Light-Curve Sparkline */}
         <div
-          className="h-16 w-full -mx-2 mt-auto"
-          style={{ filter: `drop-shadow(0 0 3px ${lineColor}80)` }}
+          className="h-[74px] w-full -mx-1 mt-3 pt-1 relative"
+          style={{ filter: `drop-shadow(0 0 5px ${lineColor}70)` }}
         >
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={sparklineData}>
+            <AreaChart data={sparklineData} margin={{ top: 6, right: 2, left: 2, bottom: 2 }}>
               <defs>
                 <linearGradient
                   id={`gradient-positive-${metricId}`}
@@ -174,8 +172,8 @@ export default function InsightsCard({
                   x2="0"
                   y2="1"
                 >
-                  <stop offset="0%" stopColor="hsl(155 75% 58%)" stopOpacity={0.62} />
-                  <stop offset="100%" stopColor="hsl(155 55% 35%)" stopOpacity={0.06} />
+                  <stop offset="0%" stopColor="hsl(155 75% 55%)" stopOpacity={0.45} />
+                  <stop offset="100%" stopColor="hsl(155 55% 35%)" stopOpacity={0.0} />
                 </linearGradient>
                 <linearGradient
                   id={`gradient-negative-${metricId}`}
@@ -184,8 +182,8 @@ export default function InsightsCard({
                   x2="0"
                   y2="1"
                 >
-                  <stop offset="0%" stopColor="hsl(6 55% 35%)" stopOpacity={0.06} />
-                  <stop offset="100%" stopColor="hsl(6 78% 58%)" stopOpacity={0.62} />
+                  <stop offset="0%" stopColor="hsl(6 55% 35%)" stopOpacity={0.0} />
+                  <stop offset="100%" stopColor="hsl(6 80% 60%)" stopOpacity={0.45} />
                 </linearGradient>
               </defs>
               <Area
@@ -196,7 +194,7 @@ export default function InsightsCard({
                 fill={`url(#gradient-positive-${metricId})`}
                 strokeWidth={0}
                 isAnimationActive={true}
-                animationDuration={1000}
+                animationDuration={800}
                 connectNulls={false}
                 baseValue={0}
               />
@@ -208,7 +206,7 @@ export default function InsightsCard({
                 fill={`url(#gradient-negative-${metricId})`}
                 strokeWidth={0}
                 isAnimationActive={true}
-                animationDuration={1000}
+                animationDuration={800}
                 connectNulls={false}
                 baseValue={0}
               />
@@ -217,31 +215,30 @@ export default function InsightsCard({
                 dataKey="value"
                 stroke={lineColor}
                 fill="none"
-                strokeWidth={1.5}
+                strokeWidth={2}
                 isAnimationActive={true}
-                animationDuration={1000}
+                animationDuration={800}
                 connectNulls={false}
               />
               <ReferenceLine
                 y={0}
                 yAxisId="0"
-                stroke="hsl(220 18% 82%)"
+                stroke="hsl(250 20% 24%)"
                 strokeOpacity={0.8}
-                strokeWidth={1.5}
+                strokeWidth={1}
+                strokeDasharray="2 2"
                 ifOverflow="extendDomain"
               />
             </AreaChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Data-span footer — replaces the misleading static "1D / 5D / 1M /
-            ... / All" row. Reports the actual period range + sample count so
-            users know what they're looking at. */}
-        <div className="flex justify-between items-center mt-3 pt-3 border-t border-border text-xs text-muted-foreground font-mono">
-          <span className="truncate" dir="ltr">
+        {/* Footer Meta Row */}
+        <div className="flex justify-between items-center mt-3 pt-2.5 border-t border-border/40 text-[11px] text-muted-foreground/80 font-mono">
+          <span className="truncate text-muted-foreground/75" dir="ltr">
             {dataSpanLabel ?? pointsLabel}
           </span>
-          <span className="text-muted-foreground font-medium">
+          <span className="px-2 py-0.5 rounded-full bg-muted/40 border border-border/30 text-[10px] text-muted-foreground/80 font-sans font-medium uppercase tracking-wider">
             {pointsLabel}
           </span>
         </div>

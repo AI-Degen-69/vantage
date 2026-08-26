@@ -38,6 +38,7 @@ export function handleScreenerSearch(req: Request, res: Response) {
 
 export function handleScreenerFilter(req: Request, res: Response) {
   const {
+    q,
     sector,
     industry,
     country,
@@ -54,6 +55,12 @@ export function handleScreenerFilter(req: Request, res: Response) {
     
     const conditions: string[] = [];
     const params: any[] = [];
+
+    if (q && typeof q === 'string' && q.trim().length > 0) {
+      const searchStr = `%${q.trim()}%`;
+      conditions.push('(symbol LIKE ? OR name LIKE ?)');
+      params.push(searchStr, searchStr);
+    }
 
     // Helper: split comma-separated values into an IN (?,?,...) clause
     const addMulti = (col: string, raw: string | undefined) => {

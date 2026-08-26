@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useI18n } from "@/lib/i18n";
 import {
   useStockProfile,
-  useStockAnalyst,
   useStockInsider,
   useStockNews,
   useStockMetrics,
@@ -13,15 +12,16 @@ import { formatMoneyCompact } from "@/lib/format";
 import type { InsiderTransactionCategory } from "@shared/api";
 import { SectionCardSkeleton } from "@/components/Skeleton";
 import DataStatusBadge from "@/components/DataStatusBadge";
-import { Building2, ChartNoAxesCombined, Newspaper, Scale } from "lucide-react";
+import {
+  Building2,
+  Newspaper,
+  Scale,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-
-type EstimateRow = {
-  period: string;
-  avg: number | null;
-  low: number | null;
-  high: number | null;
-};
 
 export default function CompanyProfile({
   ticker = "AAPL",
@@ -34,7 +34,6 @@ export default function CompanyProfile({
   const { data: overviewData, isLoading: overviewLoading } =
     useStockProfile(ticker);
   const { data: screenerAsset } = useScreenerAsset(ticker);
-  const { data: analystData } = useStockAnalyst(ticker);
   const { data: insiderData } = useStockInsider(ticker);
   const { data: newsData } = useStockNews(ticker);
   const { data: metricsData } = useStockMetrics(ticker);
@@ -48,12 +47,6 @@ export default function CompanyProfile({
   const beta = overviewData?.beta ?? null;
   const piotroskiScore = metricsData?.scores?.piotroskiScore ?? null;
   const website = overviewData?.website?.trim() || null;
-  const translatePeriod = (period: string) => {
-    if (period === "0q") return t("insights.currentQtr");
-    if (period === "0y") return t("insights.currentYear");
-    if (period === "+1y") return t("insights.nextYear");
-    return period;
-  };
 
   const news = (newsData ?? []).map((item) => ({
     headline: item.title,
@@ -86,31 +79,9 @@ export default function CompanyProfile({
       marketClosePrice: item.marketClosePrice ?? null,
     }));
 
-  const epsEstimates: EstimateRow[] = [];
-  const revenueEstimates: EstimateRow[] = [];
-  for (const trend of analystData ?? []) {
-    if (!["0q", "0y", "+1y"].includes(trend.period)) continue;
-    if (trend.earningsEstimate) {
-      epsEstimates.push({
-        period: trend.period,
-        avg: trend.earningsEstimate.avg ?? null,
-        low: trend.earningsEstimate.low ?? null,
-        high: trend.earningsEstimate.high ?? null,
-      });
-    }
-    if (trend.revenueEstimate) {
-      revenueEstimates.push({
-        period: trend.period,
-        avg: toBillions(trend.revenueEstimate.avg),
-        low: toBillions(trend.revenueEstimate.low),
-        high: toBillions(trend.revenueEstimate.high),
-      });
-    }
-  }
-
   if (overviewLoading) {
     return (
-      <div className="mt-8 space-y-6">
+      <div className="mt-10 space-y-6">
         <SkeletonHeader />
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
@@ -127,175 +98,117 @@ export default function CompanyProfile({
   }
 
   return (
-    <div className="mt-8 space-y-6">
-      <SectionHeading
-        icon={Building2}
-        title={t("insights.companyProfile")}
-        live={Boolean(overviewData || screenerAsset)}
-        source="FMP / FinanceDatabase"
-      />
+    <div className="mt-10 space-y-10 text-left">
+      {/* 1. Company News & Media Wire Section */}
+      <div>
+        <SectionHeading
+          icon={Newspaper}
+          title={t("insights.news")}
+          live={Boolean(newsData?.length)}
+          source="Yahoo Finance"
+          subtitle="Latest company press releases, market coverage, and analyst commentary."
+        />
 
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
-        <section
-          className={`order-1 rounded-panel border border-border bg-card p-5 lg:col-span-2 ${
-            descriptionExpanded ? "" : "lg:h-[364px] overflow-hidden"
-          }`}
-          aria-labelledby="company-profile-card-title"
-        >
-          <h2 id="company-profile-card-title" className="sr-only">
-            {t("insights.companyProfile")}
-          </h2>
-          {description && (
-            <div className="mb-4">
-              <p
-                id="company-description"
-                className={`text-base leading-7 text-muted-foreground ${descriptionExpanded ? "" : "line-clamp-4"}`}
-              >
-                {description}
-              </p>
-              {canExpandDescription && (
-                <button
-                  type="button"
-                  className="mt-2 inline-flex min-h-8 items-center rounded-md text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-                  onClick={() => setDescriptionExpanded((value) => !value)}
-                  aria-expanded={descriptionExpanded}
-                  aria-controls="company-description"
+        <section className="rounded-panel border border-border/70 bg-card/80 p-5 sm:p-6 backdrop-blur-md shadow-xs hover:border-border transition-all">
+          <div className="grid gap-3.5 md:grid-cols-2 xl:grid-cols-4">
+            {news.slice(0, 8).map((item, index) => {
+              const initial = (item.publisher || "?")
+                .trim()
+                .charAt(0)
+                .toUpperCase();
+              return (
+                <a
+                  key={index}
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex min-w-0 gap-3.5 rounded-lg border border-border/40 bg-background/50 p-3 transition-all hover:border-primary/40 hover:bg-muted/40 cursor-pointer"
                 >
-                  {descriptionExpanded
-                    ? t("insights.showLess")
-                    : t("insights.showMore")}
-                </button>
-              )}
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-3">
-            <KV label={t("insights.ceo")} value={ceo} />
-            <KV label={t("insights.sector")} value={sector} />
-            <KV label={t("insights.industry")} value={industry} />
-            <KV
-              label={t("insights.beta")}
-              value={beta !== null ? beta.toFixed(2) : "—"}
-            />
-            <KV
-              label={t("insights.piotroskiScore")}
-              value={piotroskiScore !== null ? `${piotroskiScore} / 9` : "—"}
-              accentClass="text-chart-positive"
-            />
+                  {item.thumbnail ? (
+                    <img
+                      src={item.thumbnail}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="h-16 w-16 shrink-0 rounded-md bg-muted object-cover border border-border/40"
+                    />
+                  ) : (
+                    <div
+                      className="flex h-16 w-16 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-muted to-card text-base font-bold text-muted-foreground border border-border/40"
+                      aria-hidden="true"
+                    >
+                      {initial}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1 flex flex-col justify-between">
+                    <p
+                      className="line-clamp-2 text-sm font-semibold leading-snug text-foreground transition-colors group-hover:text-primary"
+                      title={item.headline}
+                    >
+                      {item.headline}
+                    </p>
+                    <div className="mt-2 flex items-center justify-between gap-2 text-[11px] font-mono text-muted-foreground">
+                      <span
+                        className="truncate font-semibold px-1.5 py-0.5 rounded bg-muted/80 text-foreground/80 border border-border/40 text-[10px] uppercase"
+                        title={item.publisher}
+                      >
+                        {item.publisher}
+                      </span>
+                      <span className="shrink-0 text-muted-foreground/70 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-muted-foreground/50" />
+                        {item.timestamp}
+                      </span>
+                    </div>
+                  </div>
+                </a>
+              );
+            })}
+            {news.length === 0 && (
+              <div className="col-span-full py-8 text-center text-xs text-muted-foreground italic">
+                No recent news available for {ticker}.
+              </div>
+            )}
           </div>
-
-          <div className="mt-5 border-t border-border pt-4">
-            <p className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              {t("insights.idChips")}
+          {news.length > 0 && (
+            <p className="mt-4 border-t border-border/50 pt-3 text-xs text-muted-foreground/80">
+              {t("news.footer", { count: Math.min(news.length, 8) })}
             </p>
-            <div className="flex flex-wrap gap-2">
-              {overviewData?.cik && (
-                <Chip label={t("insights.cik")} value={overviewData.cik} />
-              )}
-              {overviewData?.isin && (
-                <Chip label={t("insights.isin")} value={overviewData.isin} />
-              )}
-              {overviewData?.cusip && (
-                <Chip label={t("insights.cusip")} value={overviewData.cusip} />
-              )}
-              {overviewData?.ipoDate && (
-                <Chip
-                  label={t("insights.ipoDate")}
-                  value={overviewData.ipoDate}
-                />
-              )}
-              {overviewData?.exchangeFullName && (
-                <Chip
-                  label={t("insights.exchangeDescription")}
-                  value={overviewData.exchangeFullName}
-                />
-              )}
-              {website && (
-                <Chip
-                  label={t("insights.website")}
-                  value={website.replace(/^https?:\/\//i, "").replace(/\/+$/, "")}
-                  href={website}
-                />
-              )}
-              {overviewData?.lastDividend !== undefined && (
-                <Chip
-                  label={t("insights.lastDividend")}
-                  value={`$${overviewData.lastDividend.toFixed(2)}`}
-                  tone="success"
-                />
-              )}
-              {overviewData?.isActivelyTrading !== undefined && (
-                <FlagBadge
-                  label={t("insights.activeStatus")}
-                  tone={overviewData.isActivelyTrading ? "success" : "danger"}
-                  value={
-                    overviewData.isActivelyTrading
-                      ? t("insights.yes")
-                      : t("insights.no")
-                  }
-                />
-              )}
-            </div>
-          </div>
+          )}
         </section>
+      </div>
 
-        <section className="order-2 rounded-panel border border-border bg-card p-5 lg:col-span-1 lg:h-[364px] lg:overflow-hidden">
-          <SectionHeading
-            icon={ChartNoAxesCombined}
-            title={t("insights.analystEstimates")}
-            live={Boolean(analystData?.length)}
-            source="Yahoo Finance consensus"
-          />
-          <EstimateTable
-            title="EPS"
-            rows={epsEstimates}
-            format={formatEstimate}
-            tone="primary"
-            translatePeriod={translatePeriod}
-            t={t}
-          />
-          <EstimateTable
-            title="Revenue (B)"
-            rows={revenueEstimates}
-            format={formatRevenueEstimate}
-            tone="positive"
-            translatePeriod={translatePeriod}
-            t={t}
-          />
-        </section>
+      {/* 2. Insider Trading Section */}
+      <div>
+        <SectionHeading
+          icon={Scale}
+          title={t("insights.insiderTrading")}
+          live={Boolean(insiderData?.length)}
+          source="Yahoo Finance"
+          subtitle="Recent executive and director stock transactions filed with the SEC."
+        />
 
-        <section className="order-3 rounded-panel border border-border bg-card p-6 lg:col-span-3">
-          <SectionHeading
-            icon={Scale}
-            title={t("insights.insiderTrading")}
-            live={Boolean(insiderData?.length)}
-            source="Yahoo Finance"
-          />
+        <section className="rounded-panel border border-border/70 bg-card/80 p-5 sm:p-6 backdrop-blur-md shadow-xs hover:border-border transition-all">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[820px] text-left text-sm">
-              <thead className="border-b border-border text-xs uppercase text-muted-foreground">
+              <thead className="border-b border-border/60 text-[11px] font-mono uppercase font-bold text-muted-foreground/80">
                 <tr>
-                  <th className="pb-3 font-medium">{t("common.name")}</th>
-                  <th className="pb-3 font-medium">{t("common.date")}</th>
-                  <th className="pb-3 font-medium">{t("common.type")}</th>
-                  <th className="pb-3 font-medium">{t("common.shares")}</th>
-                  <th className="pb-3 font-medium">
+                  <th className="pb-3 font-semibold">{t("common.name")}</th>
+                  <th className="pb-3 font-semibold">{t("common.date")}</th>
+                  <th className="pb-3 font-semibold">{t("common.type")}</th>
+                  <th className="pb-3 font-semibold">{t("common.shares")}</th>
+                  <th className="pb-3 font-semibold">
                     {t("common.pricePerShare")}
                   </th>
-                  <th className="pb-3 font-medium">{t("common.value")}</th>
-                  <th className="pb-3 text-right font-medium">
+                  <th className="pb-3 font-semibold">{t("common.value")}</th>
+                  <th className="pb-3 text-right font-semibold">
                     {t("common.marketClose")}
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border">
+              <tbody className="divide-y divide-border/40 font-mono text-xs">
                 {insiders.slice(0, 8).map((trade, index) => {
-                  const tone =
-                    trade.category === "purchase"
-                      ? "text-chart-positive"
-                      : trade.category === "sale"
-                        ? "text-chart-negative"
-                        : "text-muted-foreground";
+                  const isPurchase = trade.category === "purchase";
+                  const isSale = trade.category === "sale";
                   const price =
                     trade.price !== null
                       ? `$${trade.price.toFixed(2)}`
@@ -305,10 +218,10 @@ export default function CompanyProfile({
                   return (
                     <tr
                       key={`${trade.name}-${trade.date}-${index}`}
-                      className="transition-colors hover:bg-muted/60"
+                      className="transition-colors hover:bg-muted/40"
                     >
-                      <td className="py-3 font-medium">
-                        {trade.name}
+                      <td className="py-3 font-medium font-sans">
+                        <span className="font-semibold text-foreground text-sm">{trade.name}</span>
                         {trade.relation && (
                           <span className="block text-xs font-normal text-muted-foreground">
                             {trade.relation}
@@ -319,24 +232,32 @@ export default function CompanyProfile({
                         {trade.date}
                       </td>
                       <td
-                        className={`max-w-[190px] py-3 ${tone}`}
+                        className="max-w-[190px] py-3"
                         title={trade.transactionText}
                       >
-                        {trade.typeLabel}
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-[4px] text-[11px] font-bold border ${
+                          isPurchase
+                            ? "bg-chart-positive/10 text-chart-positive border-chart-positive/30"
+                            : isSale
+                              ? "bg-chart-negative/10 text-chart-negative border-chart-negative/30"
+                              : "bg-muted text-muted-foreground border-border/50"
+                        }`}>
+                          {trade.typeLabel}
+                        </span>
                         {trade.isAdministrative && (
-                          <span className="block text-[10px] text-muted-foreground">
+                          <span className="block text-[10px] text-muted-foreground mt-0.5">
                             {t("insider.administrative")}
                           </span>
                         )}
                       </td>
-                      <td className="py-3 font-mono tabular-nums" dir="ltr">
+                      <td className="py-3 font-mono tabular-nums text-foreground font-semibold" dir="ltr">
                         {trade.shares.toLocaleString()}{" "}
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-[11px] text-muted-foreground/70 font-normal">
                           {t("common.sharesUnit")}
                         </span>
                       </td>
                       <td
-                        className="py-3 font-mono tabular-nums"
+                        className="py-3 font-mono tabular-nums text-foreground"
                         dir="ltr"
                         title={
                           trade.price !== null
@@ -346,7 +267,7 @@ export default function CompanyProfile({
                       >
                         {price}
                       </td>
-                      <td className="py-3 font-mono tabular-nums" dir="ltr">
+                      <td className="py-3 font-mono tabular-nums text-foreground font-bold" dir="ltr">
                         {formatMoneyCompact(trade.value) ?? "—"}
                       </td>
                       <td
@@ -361,174 +282,190 @@ export default function CompanyProfile({
                     </tr>
                   );
                 })}
+                {insiders.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="py-6 text-center text-xs text-muted-foreground italic font-sans">
+                      No insider transaction records found for {ticker}.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
         </section>
+      </div>
 
-        <section className="order-4 rounded-panel border border-border bg-card p-5 lg:col-span-3">
-          <SectionHeading
-            icon={Newspaper}
-            title={t("insights.news")}
-            live={Boolean(newsData?.length)}
-            source="Yahoo Finance"
-          />
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {news.slice(0, 8).map((item, index) => {
-              const initial = (item.publisher || "?")
-                .trim()
-                .charAt(0)
-                .toUpperCase();
-              return (
-                <a
-                  key={index}
-                  href={item.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group flex min-w-0 gap-3 rounded-lg border-b border-border p-2.5 transition-colors hover:bg-muted/40 md:border-b-0 md:border-r md:last:border-r-0"
-                >
-                  {item.thumbnail ? (
-                    <img
-                      src={item.thumbnail}
-                      alt=""
-                      loading="lazy"
-                      decoding="async"
-                      className="h-14 w-14 shrink-0 rounded-md bg-muted object-cover"
-                    />
-                  ) : (
-                    <div
-                      className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-muted to-card text-base font-bold text-muted-foreground"
-                      aria-hidden="true"
-                    >
-                      {initial}
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className="line-clamp-2 text-[15px] font-medium leading-6 text-foreground transition-colors group-hover:text-primary"
-                      title={item.headline}
-                    >
-                      {item.headline}
-                    </p>
-                    <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                      <span
-                        className="truncate font-semibold"
-                        title={item.publisher}
-                      >
-                        {item.publisher}
-                      </span>
-                      <span aria-hidden="true">•</span>
-                      <span className="shrink-0">{item.timestamp}</span>
-                    </div>
-                  </div>
-                </a>
-              );
-            })}
+      {/* 3. Company Profile Section */}
+      <div>
+        <SectionHeading
+          icon={Building2}
+          title={t("insights.companyProfile")}
+          live={Boolean(overviewData || screenerAsset)}
+          source="FMP / FinanceDatabase"
+          subtitle="Corporate background, leadership team, and regulatory identifiers."
+        />
+
+        <section
+          className="rounded-panel border border-border/70 bg-card/80 p-5 sm:p-6 backdrop-blur-md shadow-xs hover:border-border transition-all flex flex-col justify-between"
+          aria-labelledby="company-profile-card-title"
+        >
+          {/* Internal Card Header */}
+          <div className="flex items-center justify-between pb-3.5 border-b border-border/50 mb-4">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+              </span>
+              <h3 id="company-profile-card-title" className="font-display text-xs font-bold uppercase tracking-[0.14em] text-foreground flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5 text-primary" />
+                <span>Corporate Summary & Executive Details</span>
+              </h3>
+            </div>
+            {overviewData?.exchangeFullName && (
+              <span className="text-[10px] font-mono text-muted-foreground/80 px-2 py-0.5 rounded bg-muted/60 border border-border/40 uppercase">
+                {overviewData.exchangeFullName}
+              </span>
+            )}
           </div>
-          {news.length > 0 && (
-            <p className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
-              {t("news.footer", { count: Math.min(news.length, 8) })}
-            </p>
-          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left: Summary Description */}
+            <div className="lg:col-span-7">
+              {description && (
+                <div>
+                  <p
+                    id="company-description"
+                    className={`text-sm sm:text-[14.5px] leading-relaxed text-muted-foreground/90 font-normal ${
+                      descriptionExpanded ? "" : "line-clamp-6"
+                    }`}
+                  >
+                    {description}
+                  </p>
+                  {canExpandDescription && (
+                    <button
+                      type="button"
+                      className="mt-2.5 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 cursor-pointer"
+                      onClick={() => setDescriptionExpanded((value) => !value)}
+                      aria-expanded={descriptionExpanded}
+                      aria-controls="company-description"
+                    >
+                      <span>
+                        {descriptionExpanded
+                          ? t("insights.showLess")
+                          : t("insights.showMore")}
+                      </span>
+                      {descriptionExpanded ? (
+                        <ChevronUp className="w-3.5 h-3.5" />
+                      ) : (
+                        <ChevronDown className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Right: Key Facts & Fundamental Metrics */}
+            <div className="lg:col-span-5 space-y-4">
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-2">
+                <div className="p-3 rounded-lg bg-background/50 border border-border/50 space-y-1 hover:border-primary/30 transition-colors">
+                  <div className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground font-semibold">
+                    {t("insights.ceo")}
+                  </div>
+                  <div className="text-xs sm:text-sm font-bold font-mono text-foreground truncate" title={ceo ?? "—"}>
+                    {ceo ?? "—"}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-background/50 border border-border/50 space-y-1 hover:border-primary/30 transition-colors">
+                  <div className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground font-semibold">
+                    {t("insights.sector")}
+                  </div>
+                  <div className="text-xs sm:text-sm font-bold font-mono text-foreground truncate" title={sector ?? "—"}>
+                    {sector ?? "—"}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-background/50 border border-border/50 space-y-1 hover:border-primary/30 transition-colors">
+                  <div className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground font-semibold">
+                    {t("insights.industry")}
+                  </div>
+                  <div className="text-xs sm:text-sm font-bold font-mono text-foreground truncate" title={industry ?? "—"}>
+                    {industry ?? "—"}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-background/50 border border-border/50 space-y-1 hover:border-primary/30 transition-colors">
+                  <div className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground font-semibold">
+                    {t("insights.beta")}
+                  </div>
+                  <div className="text-xs sm:text-sm font-bold font-mono text-foreground tabular-nums" dir="ltr">
+                    {beta !== null ? beta.toFixed(2) : "—"}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-background/50 border border-border/50 space-y-1 hover:border-primary/30 transition-colors col-span-2 sm:col-span-1 lg:col-span-2">
+                  <div className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground font-semibold">
+                    {t("insights.piotroskiScore")}
+                  </div>
+                  <div className="text-xs sm:text-sm font-bold font-mono text-chart-positive tabular-nums" dir="ltr">
+                    {piotroskiScore !== null ? `${piotroskiScore} / 9 (Financial Health)` : "—"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Identifiers Chip Strip */}
+              <div className="border-t border-border/50 pt-3">
+                <p className="mb-2 text-[10px] font-mono font-bold uppercase tracking-wider text-muted-foreground/70">
+                  {t("insights.idChips")}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {overviewData?.cik && (
+                    <Chip label={t("insights.cik")} value={overviewData.cik} />
+                  )}
+                  {overviewData?.isin && (
+                    <Chip label={t("insights.isin")} value={overviewData.isin} />
+                  )}
+                  {overviewData?.cusip && (
+                    <Chip label={t("insights.cusip")} value={overviewData.cusip} />
+                  )}
+                  {overviewData?.ipoDate && (
+                    <Chip
+                      label={t("insights.ipoDate")}
+                      value={overviewData.ipoDate}
+                    />
+                  )}
+                  {website && (
+                    <Chip
+                      label={t("insights.website")}
+                      value={website.replace(/^https?:\/\//i, "").replace(/\/+$/, "")}
+                      href={website}
+                    />
+                  )}
+                  {overviewData?.lastDividend !== undefined && (
+                    <Chip
+                      label={t("insights.lastDividend")}
+                      value={`$${overviewData.lastDividend.toFixed(2)}`}
+                      tone="success"
+                    />
+                  )}
+                  {overviewData?.isActivelyTrading !== undefined && (
+                    <FlagBadge
+                      label={t("insights.activeStatus")}
+                      tone={overviewData.isActivelyTrading ? "success" : "danger"}
+                      value={
+                        overviewData.isActivelyTrading
+                          ? t("insights.yes")
+                          : t("insights.no")
+                      }
+                    />
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </section>
       </div>
-    </div>
-  );
-}
-
-function EstimateTable({
-  title,
-  rows,
-  format,
-  tone,
-  translatePeriod,
-  t,
-}: {
-  title: string;
-  rows: EstimateRow[];
-  format: (value: number | null) => string;
-  tone: "primary" | "positive";
-  translatePeriod: (period: string) => string;
-  t: (key: string) => string;
-}) {
-  return (
-    <div className="mb-4 last:mb-0">
-      <div
-        className={`mb-2 text-sm font-medium ${tone === "positive" ? "text-chart-positive" : "text-primary"}`}
-      >
-        {title}
-      </div>
-      <div className="grid grid-cols-4 gap-3 border-b border-border pb-2 text-xs uppercase text-muted-foreground">
-        <div>{t("insights.period")}</div>
-        <div className="text-right">{t("insights.avg")}</div>
-        <div className="text-right">{t("insights.low")}</div>
-        <div className="text-right">{t("insights.high")}</div>
-      </div>
-      {rows.map((row, index) => (
-        <div
-          key={`${title}-${index}`}
-          className="grid grid-cols-4 items-center gap-3 py-1.5 text-sm"
-        >
-          <div className="truncate text-muted-foreground">
-            {translatePeriod(row.period)}
-          </div>
-          <div
-            className="text-right font-mono font-bold tabular-nums text-primary"
-            dir="ltr"
-          >
-            <span className="rounded bg-primary/10 px-1.5 py-0.5">
-              {format(row.avg)}
-            </span>
-          </div>
-          <div
-            className="text-right font-mono tabular-nums text-muted-foreground"
-            dir="ltr"
-          >
-            {format(row.low)}
-          </div>
-          <div
-            className="text-right font-mono tabular-nums text-muted-foreground"
-            dir="ltr"
-          >
-            {format(row.high)}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function formatEstimate(value: number | null): string {
-  return value === null || !Number.isFinite(value) ? "—" : value.toFixed(2);
-}
-
-function formatRevenueEstimate(value: number | null): string {
-  return value === null || !Number.isFinite(value) ? "—" : value.toFixed(1);
-}
-
-function toBillions(value: number | null | undefined): number | null {
-  return value === null || value === undefined ? null : value / 1e9;
-}
-
-function KV({
-  label,
-  value,
-  accentClass = "",
-}: {
-  label: string;
-  value: string | null;
-  accentClass?: string;
-}) {
-  return (
-    <div className="flex min-w-0 flex-col items-start">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p
-        className={`truncate text-sm font-medium ${accentClass}`}
-        dir="ltr"
-        title={value ?? "—"}
-      >
-        {value ?? "—"}
-      </p>
     </div>
   );
 }
@@ -546,18 +483,21 @@ function Chip({
 }) {
   const content = (
     <>
-      <span className="shrink-0 font-medium uppercase tracking-wider text-muted-foreground">
+      <span className="shrink-0 font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
         {label}
       </span>
       <span
         className={
           tone === "success"
-            ? "truncate font-semibold text-chart-positive"
-            : "truncate font-medium text-foreground"
+            ? "truncate font-mono text-xs font-bold text-chart-positive"
+            : "truncate font-mono text-xs font-medium text-foreground"
         }
       >
         {value}
       </span>
+      {href && (
+        <ExternalLink className="w-3 h-3 text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0" />
+      )}
     </>
   );
 
@@ -567,7 +507,7 @@ function Chip({
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex max-w-full items-center gap-1.5 rounded-[6px] border border-border bg-muted px-2.5 py-1 text-xs transition-colors hover:border-primary/40 hover:bg-primary/5"
+        className="group inline-flex max-w-full items-center gap-1.5 rounded-md border border-border/70 bg-background/60 px-2.5 py-1 text-xs transition-all hover:border-primary/40 hover:bg-primary/5 hover:shadow-xs cursor-pointer"
         dir="ltr"
         title={`${label}: ${value}`}
       >
@@ -578,7 +518,7 @@ function Chip({
 
   return (
     <span
-      className="inline-flex max-w-full items-center gap-1.5 rounded-[6px] border border-border bg-muted px-2.5 py-1 text-xs"
+      className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border/70 bg-background/60 px-2.5 py-1 text-xs"
       dir="ltr"
       title={`${label}: ${value}`}
     >
@@ -598,10 +538,14 @@ function FlagBadge({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium uppercase tracking-wider ${tone === "success" ? "border-chart-positive/30 bg-chart-positive/10 text-chart-positive" : "border-chart-negative/30 bg-chart-negative/10 text-chart-negative"}`}
+      className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-mono font-medium uppercase tracking-wider ${
+        tone === "success"
+          ? "border-chart-positive/30 bg-chart-positive/10 text-chart-positive"
+          : "border-chart-negative/30 bg-chart-negative/10 text-chart-negative"
+      }`}
     >
-      {label}
-      <span className="normal-case tracking-normal opacity-75">{value}</span>
+      <span className="text-[10px] font-bold opacity-75">{label}</span>
+      <span className="font-bold">{value}</span>
     </span>
   );
 }
@@ -611,21 +555,39 @@ function SectionHeading({
   title,
   live,
   source,
+  subtitle,
 }: {
   icon: LucideIcon;
   title: string;
-  live: boolean;
-  source: string;
+  live?: boolean;
+  source?: string;
+  subtitle?: string;
 }) {
   return (
-    <div className="mb-4 flex items-center justify-between gap-3">
-      <h3 className="flex min-w-0 items-center gap-2 text-lg font-semibold text-foreground">
-        <Icon className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-        <span className="truncate">{title}</span>
-      </h3>
-      {live && (
-        <DataStatusBadge status="live" source={source} compact iconOnly />
-      )}
+    <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="p-1.5 rounded-lg bg-primary/10 border border-primary/25 text-primary shadow-xs">
+            <Icon className="w-4 h-4" />
+          </div>
+          <h2 className="font-display text-base sm:text-lg font-bold text-foreground tracking-tight">
+            {title}
+          </h2>
+          {live && source && (
+            <DataStatusBadge
+              status="live"
+              source={source}
+              compact
+              iconOnly
+            />
+          )}
+        </div>
+        {subtitle && (
+          <p className="mt-1.5 text-xs text-muted-foreground/80">
+            {subtitle}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -664,4 +626,3 @@ function i18nInsiderCategory(
       return fallback || t("insider.type.other");
   }
 }
-

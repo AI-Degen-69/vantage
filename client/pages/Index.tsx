@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
+import { Activity, BarChart3, ChartNoAxesCombined, Clock, ExternalLink, Newspaper, TrendingUp } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import AnimatedNumber from "@/components/AnimatedNumber";
 import ChartModal from "@/components/ChartModal";
@@ -9,6 +10,7 @@ import RevenueSegmentsCard from "@/components/RevenueSegmentsCard";
 import CompanyProfile from "@/components/CompanyProfile";
 import StockFundamentalsStrip from "@/components/StockFundamentalsStrip";
 import TickerLogo from "@/components/TickerLogo";
+import { deriveSpotlightMetrics } from "@/lib/spotlightMetrics";
 import {
   AnalystCardSkeleton,
   HeaderPriceSkeleton,
@@ -37,6 +39,99 @@ import {
   formatEarningsDate,
   yoyGrowth,
 } from "@/lib/finance";
+
+type EstimateRow = {
+  period: string;
+  avg: number | null;
+  low: number | null;
+  high: number | null;
+};
+
+function formatEstimate(value: number | null): string {
+  return value === null || !Number.isFinite(value) ? "—" : value.toFixed(2);
+}
+
+function formatRevenueEstimate(value: number | null): string {
+  return value === null || !Number.isFinite(value) ? "—" : value.toFixed(1);
+}
+
+function toBillions(value: number | null | undefined): number | null {
+  return value === null || value === undefined ? null : value / 1e9;
+}
+
+function IndexEstimateTable({
+  title,
+  rows,
+  format,
+  tone,
+  translatePeriod,
+  t,
+}: {
+  title: string;
+  rows: EstimateRow[];
+  format: (value: number | null) => string;
+  tone: "primary" | "positive";
+  translatePeriod: (period: string) => string;
+  t: (key: string) => string;
+}) {
+  return (
+    <div className="p-3 rounded-lg bg-background/50 border border-border/50 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${
+              tone === "positive" ? "bg-chart-positive" : "bg-primary"
+            }`}
+          />
+          <span className="text-xs font-mono font-bold uppercase tracking-wider text-foreground">
+            {title}
+          </span>
+        </div>
+      </div>
+      <div className="grid grid-cols-4 gap-2 border-b border-border/40 pb-1.5 text-[10px] font-mono uppercase font-bold text-muted-foreground/80">
+        <div>{t("insights.period")}</div>
+        <div className="text-right">{t("insights.avg")}</div>
+        <div className="text-right">{t("insights.low")}</div>
+        <div className="text-right">{t("insights.high")}</div>
+      </div>
+      <div className="space-y-1">
+        {rows.map((row, index) => (
+          <div
+            key={`${title}-${index}`}
+            className="grid grid-cols-4 items-center gap-2 py-1 text-xs font-mono rounded px-1 -mx-1 hover:bg-muted/30 transition-colors"
+          >
+            <div className="truncate text-muted-foreground font-medium">
+              {translatePeriod(row.period)}
+            </div>
+            <div className="text-right font-mono font-bold tabular-nums" dir="ltr">
+              <span
+                className={`rounded px-1.5 py-0.5 ${
+                  tone === "positive"
+                    ? "bg-chart-positive/10 text-chart-positive border border-chart-positive/20"
+                    : "bg-primary/10 text-primary border border-primary/20"
+                }`}
+              >
+                {format(row.avg)}
+              </span>
+            </div>
+            <div className="text-right font-mono tabular-nums text-muted-foreground/90 font-medium" dir="ltr">
+              {format(row.low)}
+            </div>
+            <div className="text-right font-mono tabular-nums text-muted-foreground/90 font-medium" dir="ltr">
+              {format(row.high)}
+            </div>
+          </div>
+        ))}
+        {rows.length === 0 && (
+          <div className="py-2 text-center text-xs text-muted-foreground/60 italic font-sans">
+            No estimate data available
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /**
  * Displays a localized stock overview with quote information, company details, financial metrics, and interactive charts for the selected ticker.
  */
@@ -337,101 +432,299 @@ export default function Index() {
   // aliases are removed so future readers don't wire them back up — news
   // styling lives in `client/components/CompanyProfile.tsx`.
 
-  return (
-    <div className="w-full bg-background dark">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Centered Header Section */}
-        <div className="mb-12 text-center">
-          {/* Anchored LTR even in the Hebrew (RTL) UI so the title row +
-              logo/price/change block keep the same left-to-right order as
-              the English version (logo left, price, change to the right).
-              Title is centered (bilingual: ticker+company+exchange in EN),
-              with the selected-language label below as a secondary line. */}
-          <div dir="ltr">
-            <PageHeader
-              eyebrow={t("nav.insights")}
-              title={`${ticker} • ${(overviewData?.companyName && overviewData.companyName.toUpperCase() !== ticker ? overviewData.companyName : undefined) ?? quoteData?.name ?? ticker}${overviewData?.exchange ? ` • ${overviewData.exchange}` : ""}`}
-              description={`${ticker} • ${(overviewData?.companyName && overviewData.companyName.toUpperCase() !== ticker ? overviewData.companyName : undefined) ?? quoteData?.name ?? ticker}${overviewData?.exchange ? ` • ${overviewData.exchange}` : ""}`}
-              centered
-              className="mb-8"
-            />
-          </div>
+  const spotlight = useMemo(
+    () =>
+      deriveSpotlightMetrics({
+        quote: quoteData,
+        profile: overviewData,
+        metrics: stockMetricsData,
+        annualFinancials: financialsData,
+        quarterlyFinancials: quarterlyFinancialsData,
+        fallback: yahooFallbackData,
+      }),
+    [
+      quoteData,
+      overviewData,
+      stockMetricsData,
+      financialsData,
+      quarterlyFinancialsData,
+      yahooFallbackData,
+    ],
+  );
 
-          {/* Stock Price — the hero number counts up when the quote lands,
-              in sync with the Analyst card below. `placeholder={null}` keeps
-              the first pre-frame paint empty rather than flashing a "—" in
-              the text-5xl headline. */}
-          <div className="mb-3 flex items-center justify-center gap-4" dir="ltr">
-            <TickerLogo
-              ticker={ticker}
-              size="xl"
-              variant="bare"
-              className="self-stretch h-auto min-h-[7.5rem] w-24"
-              ariaLabel={`${ticker} company logo`}
-            />
-            <div className="min-w-0">
-              {quoteLoading ? (
-                <HeaderPriceSkeleton />
-              ) : quoteData?.price ? (
-                <div className="flex items-center justify-center gap-3">
-                  <span
-                    className="text-5xl font-bold text-foreground tabular-nums"
-                    style={{ fontFamily: "JetBrains Mono, monospace" }}
-                    dir="ltr"
-                  >
-                    <AnimatedNumber
-                      value={quoteData.price}
-                      placeholder={null}
-                      format={(v) => `$${v.toFixed(2)}`}
-                    />
+  const sma50Delta = useMemo(() => {
+    if (!quoteData?.price || !quoteData?.priceAvg50 || quoteData.priceAvg50 <= 0) return null;
+    return ((quoteData.price - quoteData.priceAvg50) / quoteData.priceAvg50) * 100;
+  }, [quoteData?.price, quoteData?.priceAvg50]);
+
+  const sma200Delta = useMemo(() => {
+    if (!quoteData?.price || !quoteData?.priceAvg200 || quoteData.priceAvg200 <= 0) return null;
+    return ((quoteData.price - quoteData.priceAvg200) / quoteData.priceAvg200) * 100;
+  }, [quoteData?.price, quoteData?.priceAvg200]);
+
+  const year52Stats = useMemo(() => {
+    if (!quoteData?.yearLow || !quoteData?.yearHigh || !quoteData?.price) return null;
+    const range = quoteData.yearHigh - quoteData.yearLow;
+    if (range <= 0) return null;
+    const pctOfRange = Math.max(0, Math.min(100, ((quoteData.price - quoteData.yearLow) / range) * 100));
+    const distFromHigh = ((quoteData.price - quoteData.yearHigh) / quoteData.yearHigh) * 100;
+    return {
+      range,
+      pctOfRange,
+      distFromHigh,
+    };
+  }, [quoteData?.yearLow, quoteData?.yearHigh, quoteData?.price]);
+
+  const translatePeriod = (period: string) => {
+    if (period === "0q") return t("insights.currentQtr");
+    if (period === "0y") return t("insights.currentYear");
+    if (period === "+1y") return t("insights.nextYear");
+    return period;
+  };
+
+  const epsEstimates = useMemo(() => {
+    const list: EstimateRow[] = [];
+    for (const trend of analystData ?? []) {
+      if (!["0q", "0y", "+1y"].includes(trend.period)) continue;
+      if (trend.earningsEstimate) {
+        list.push({
+          period: trend.period,
+          avg: trend.earningsEstimate.avg ?? null,
+          low: trend.earningsEstimate.low ?? null,
+          high: trend.earningsEstimate.high ?? null,
+        });
+      }
+    }
+    return list;
+  }, [analystData]);
+
+  const revenueEstimates = useMemo(() => {
+    const list: EstimateRow[] = [];
+    for (const trend of analystData ?? []) {
+      if (!["0q", "0y", "+1y"].includes(trend.period)) continue;
+      if (trend.revenueEstimate) {
+        list.push({
+          period: trend.period,
+          avg: toBillions(trend.revenueEstimate.avg),
+          low: toBillions(trend.revenueEstimate.low),
+          high: toBillions(trend.revenueEstimate.high),
+        });
+      }
+    }
+    return list;
+  }, [analystData]);
+
+  return (
+    <div className="relative min-h-full w-full bg-background dark text-foreground">
+      {/* Background Graticule & Observatory Starfield Grid */}
+      <div
+        className="pointer-events-none absolute inset-0 -z-10 overflow-hidden opacity-30"
+        aria-hidden="true"
+      >
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,hsl(var(--border)/0.25)_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border)/0.25)_1px,transparent_1px)] bg-[size:48px_48px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
+        <div className="absolute -top-40 start-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-primary/5 blur-[120px] rounded-full pointer-events-none" />
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* ==================================================================== */}
+        {/* HERO OBSERVATORY SPOTLIGHT CARD */}
+        {/* ==================================================================== */}
+        <div className="mb-10 rounded-panel border border-border bg-card p-6 lg:p-8 space-y-6 shadow-xs">
+          {/* Eyebrow & Live Data Indicator */}
+          <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-border">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-chart-positive opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-chart-positive" />
+              </span>
+              <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground font-semibold">
+                {t("nav.insights")} · {ticker}
+              </span>
+              {overviewData?.exchange && (
+                <>
+                  <span className="text-border">·</span>
+                  <span className="text-xs font-mono text-muted-foreground/80">
+                    {overviewData.exchange}
                   </span>
-                  <div
-                    className="flex flex-col items-start justify-center gap-1 tabular-nums"
-                    style={{ fontFamily: "JetBrains Mono, monospace" }}
-                    dir="ltr"
-                  >
-                    <span
-                      className={`text-lg font-semibold leading-none ${quoteData.change >= 0 ? "text-chart-green" : "text-red-400"}`}
-                    >
-                      <AnimatedNumber
-                        value={quoteData.change ?? null}
-                        placeholder={null}
-                        format={(v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}`}
-                      />
-                    </span>
-                    <span
-                      className={`text-lg font-semibold leading-none ${quoteData.changesPercentage >= 0 ? "text-chart-green" : "text-red-400"}`}
-                    >
-                      <AnimatedNumber
-                        value={quoteData.changesPercentage ?? null}
-                        placeholder={null}
-                        format={(v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`}
-                      />
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center text-slate-400 text-xl">
-                  {t("index.unavailableApi")}
+                </>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              {earningsDate && (
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[4px] bg-muted/40 border border-border/60 text-xs font-mono text-muted-foreground">
+                  <span className="text-muted-foreground/70">{t("index.earnings")}:</span>
+                  <span className="text-primary font-semibold" dir="ltr">{earningsDate}</span>
                 </div>
               )}
-              <div className="flex justify-center gap-x-6 gap-y-1 text-sm text-muted-foreground mt-3">
-                <span>
-                  {t("index.earnings")}{" "}
-                  {earningsDate ? (
-                    <span className="text-blue-400" dir="ltr">
-                      {earningsDate}
+              {quoteData && (
+                <DataStatusBadge
+                  status="live"
+                  source="Yahoo Finance"
+                  updatedAt={quoteUpdatedAt}
+                  compact
+                  iconOnly
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Main Hero Grid: Left Identity & Price + Right 6 Metric Tiles */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center" dir="ltr">
+            {/* Left Column: Asset Identity & Hero Price */}
+            <div className="lg:col-span-5 space-y-5">
+              <div className="flex items-center gap-4">
+                <div className="p-2 rounded-xl bg-background border border-border/80 shadow-xs flex items-center justify-center shrink-0">
+                  <TickerLogo
+                    ticker={ticker}
+                    size="lg"
+                    className="rounded-lg"
+                    ariaLabel={`${ticker} company logo`}
+                  />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-2xl sm:text-3xl font-extrabold font-mono text-foreground tracking-tight">
+                      {ticker}
                     </span>
-                  ) : (
-                    <span className="text-slate-500" dir="ltr">
-                      —
+                    {quoteData?.changesPercentage !== undefined && (
+                      <span
+                        className={`text-xs font-mono px-2 py-0.5 rounded font-semibold border ${
+                          quoteData.changesPercentage >= 0
+                            ? "bg-chart-positive/10 text-chart-positive border-chart-positive/20"
+                            : "bg-chart-negative/10 text-chart-negative border-chart-negative/20"
+                        }`}
+                        dir="ltr"
+                      >
+                        {quoteData.changesPercentage >= 0 ? "+" : ""}
+                        {quoteData.changesPercentage.toFixed(2)}%
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-sm text-muted-foreground truncate mt-0.5">
+                    {((overviewData?.companyName && overviewData.companyName.toUpperCase() !== ticker ? overviewData.companyName : undefined) ?? quoteData?.name ?? ticker)}
+                    {overviewData?.sector && (
+                      <> · <span className="text-foreground/80 font-medium">{overviewData.sector}</span></>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Large Hero Price */}
+              <div>
+                {quoteLoading ? (
+                  <HeaderPriceSkeleton />
+                ) : quoteData?.price ? (
+                  <div className="flex items-baseline gap-3 flex-wrap">
+                    <span
+                      className="text-4xl sm:text-5xl font-extrabold text-foreground tabular-nums tracking-tight font-mono"
+                      dir="ltr"
+                    >
+                      <AnimatedNumber
+                        value={quoteData.price}
+                        placeholder={null}
+                        format={(v) => `$${v.toFixed(2)}`}
+                      />
                     </span>
-                  )}
-                </span>
+                    {quoteData.change !== undefined && (
+                      <span
+                        className={`text-base sm:text-lg font-mono font-semibold tabular-nums ${
+                          quoteData.change >= 0 ? "text-chart-positive" : "text-chart-negative"
+                        }`}
+                        dir="ltr"
+                      >
+                        <AnimatedNumber
+                          value={quoteData.change ?? null}
+                          placeholder={null}
+                          format={(v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}`}
+                        />
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-muted-foreground text-lg">
+                    {t("index.unavailableApi")}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Column: 6 Key Fundamental Readouts */}
+            <div className="lg:col-span-7">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {/* 1. Market Cap */}
+                <div className="p-3 sm:p-3.5 rounded-[6px] bg-background/60 border border-border/80 space-y-1 hover:border-primary/40 transition-colors">
+                  <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground truncate">
+                    {t("landing.spotlight.marketCap")}
+                  </div>
+                  <div className="text-base sm:text-lg font-bold font-mono text-foreground tabular-nums" dir="ltr">
+                    {quoteLoading ? "…" : spotlight.marketCap}
+                  </div>
+                </div>
+
+                {/* 2. P/E Ratio */}
+                <div className="p-3 sm:p-3.5 rounded-[6px] bg-background/60 border border-border/80 space-y-1 hover:border-primary/40 transition-colors">
+                  <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground truncate">
+                    {t("landing.spotlight.pe")}
+                  </div>
+                  <div className="text-base sm:text-lg font-bold font-mono text-foreground tabular-nums" dir="ltr">
+                    {quoteLoading || stockMetricsLoading ? "…" : spotlight.pe}
+                  </div>
+                </div>
+
+                {/* 3. 3Y Rev CAGR */}
+                <div className="p-3 sm:p-3.5 rounded-[6px] bg-background/60 border border-border/80 space-y-1 hover:border-primary/40 transition-colors">
+                  <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground truncate">
+                    {t("landing.spotlight.cagr3Y")}
+                  </div>
+                  <div
+                    className={`text-base sm:text-lg font-bold font-mono tabular-nums ${
+                      spotlight.cagr3YRaw !== null
+                        ? spotlight.cagr3YRaw >= 0
+                          ? "text-chart-positive"
+                          : "text-chart-negative"
+                        : "text-foreground"
+                    }`}
+                    dir="ltr"
+                  >
+                    {!financialsFetched && quoteLoading ? "…" : spotlight.cagr3Y}
+                  </div>
+                </div>
+
+                {/* 4. Revenue (TTM) */}
+                <div className="p-3 sm:p-3.5 rounded-[6px] bg-background/60 border border-border/80 space-y-1 hover:border-primary/40 transition-colors">
+                  <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground truncate">
+                    {t("landing.spotlight.revenue")}
+                  </div>
+                  <div className="text-base sm:text-lg font-bold font-mono text-foreground tabular-nums" dir="ltr">
+                    {!financialsFetched && quoteLoading ? "…" : spotlight.revenue}
+                  </div>
+                </div>
+
+                {/* 5. Free Cash Flow */}
+                <div className="p-3 sm:p-3.5 rounded-[6px] bg-background/60 border border-border/80 space-y-1 hover:border-primary/40 transition-colors">
+                  <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground truncate">
+                    {t("landing.spotlight.fcf")}
+                  </div>
+                  <div className="text-base sm:text-lg font-bold font-mono text-foreground tabular-nums" dir="ltr">
+                    {!financialsFetched && quoteLoading ? "…" : spotlight.fcf}
+                  </div>
+                </div>
+
+                {/* 6. Gross Margin */}
+                <div className="p-3 sm:p-3.5 rounded-[6px] bg-background/60 border border-border/80 space-y-1 hover:border-primary/40 transition-colors">
+                  <div className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground truncate">
+                    {t("landing.spotlight.grossMargin")}
+                  </div>
+                  <div className="text-base sm:text-lg font-bold font-mono text-foreground tabular-nums" dir="ltr">
+                    {stockMetricsLoading && quoteLoading ? "…" : spotlight.grossMargin}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
+          {/* Full Stock Fundamentals Strip breakdown */}
           <StockFundamentalsStrip
             quote={quoteData}
             metrics={stockMetricsData}
@@ -444,282 +737,14 @@ export default function Index() {
           />
         </div>
 
-        {/* Quality in Brief & Analyst Outlook 2-Column Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 my-10 text-left">
-          {/* Quality in Brief (News) Card */}
-          <div className="bg-card/60 border border-border/60 rounded-xl p-5 backdrop-blur-sm flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-display text-xs font-semibold uppercase tracking-[0.14em] text-foreground/90 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-chart-green animate-pulse" />
-                  {t("index.qualityInBrief")}
-                </h2>
-              </div>
-
-              {newsLoading ? (
-                <NewsCardSkeleton />
-              ) : (
-                <div className="flex flex-col gap-3.5">
-                  {newsData?.slice(0, 3).map((news) => (
-                    <div
-                      key={news.link}
-                      className="group flex flex-col gap-1 p-2.5 rounded-lg hover:bg-muted/40 transition-colors"
-                    >
-                      <a
-                        href={news.link}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-base font-medium text-foreground group-hover:text-primary transition-colors leading-snug line-clamp-2"
-                      >
-                        {news.title}
-                      </a>
-                      <div className="flex items-center gap-2 text-xs font-mono text-muted-foreground uppercase tracking-wide">
-                        <span className="px-1.5 py-0.5 rounded bg-muted/60 text-muted-foreground font-semibold">
-                          {news.publisher}
-                        </span>
-                        <span>•</span>
-                        <span>
-                          {new Date(
-                            news.providerPublishTime * 1000,
-                          ).toLocaleDateString(undefined, {
-                            month: "short",
-                            day: "numeric",
-                          })}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                  {!newsData?.length && (
-                    <div className="text-sm text-muted-foreground/60 italic p-4 text-center">
-                      No recent news available for {ticker}.
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Analyst Outlook & 52-Week Range Card */}
-          <div className="bg-card/60 border border-border/60 rounded-xl p-5 backdrop-blur-sm flex flex-col justify-between">
-            {analystCardLoading ? (
-              <AnalystCardSkeleton />
-            ) : (
-              <div>
-                <div className="flex items-center justify-between gap-3 mb-4">
-                  <h2 className="font-display text-xs font-semibold uppercase tracking-[0.14em] text-foreground/90 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-blue-400" />
-                    Analyst Outlook & Range
-                  </h2>
-                  <span
-                    className={`shrink-0 text-xs font-mono font-medium px-2 py-0.5 rounded border whitespace-nowrap tabular-nums ${
-                      targetEps != null
-                        ? "bg-blue-500/10 text-blue-400 border-blue-500/20"
-                        : "bg-muted/40 text-muted-foreground/70 border-border/40"
-                    }`}
-                  >
-                    Target EPS:{" "}
-                    <AnimatedNumber
-                      value={targetEps}
-                      format={(v) => `$${v.toFixed(2)}`}
-                    />
-                  </span>
-                </div>
-
-                {/* 52-Week Price Range Indicator */}
-                {quoteData?.yearLow &&
-                  quoteData?.yearHigh &&
-                  quoteData?.price && (
-                    <div className="mb-4 p-3.5 rounded-lg bg-muted/30 border border-border/40">
-                      <div className="flex justify-between text-sm font-medium text-muted-foreground mb-2">
-                        <span>
-                          52W Low:{" "}
-                          <strong
-                            className="text-foreground font-mono"
-                            dir="ltr"
-                          >
-                            ${quoteData.yearLow.toFixed(2)}
-                          </strong>
-                        </span>
-                        <span>
-                          52W High:{" "}
-                          <strong
-                            className="text-foreground font-mono"
-                            dir="ltr"
-                          >
-                            ${quoteData.yearHigh.toFixed(2)}
-                          </strong>
-                        </span>
-                      </div>
-
-                      {(() => {
-                        const range = quoteData.yearHigh - quoteData.yearLow;
-                        // Colors derive from the final price so they don't flash
-                        // through red→amber→green while the value counts up.
-                        const finalPct = Math.max(
-                          0,
-                          Math.min(
-                            100,
-                            range > 0
-                              ? ((quoteData.price - quoteData.yearLow) /
-                                  range) *
-                                  100
-                              : 50,
-                          ),
-                        );
-                        const barColor =
-                          finalPct > 66
-                            ? "bg-chart-green"
-                            : finalPct >= 33
-                              ? "bg-amber-400"
-                              : "bg-red-400";
-                        const textColor =
-                          finalPct > 66
-                            ? "text-chart-green"
-                            : finalPct >= 33
-                              ? "text-amber-400"
-                              : "text-red-400";
-                        const arrowColor =
-                          finalPct > 66
-                            ? "text-chart-green"
-                            : finalPct >= 33
-                              ? "text-amber-400"
-                              : "text-red-400";
-                        const pctOf = (price: number) =>
-                          Math.max(
-                            0,
-                            Math.min(
-                              100,
-                              range > 0
-                                ? ((price - quoteData.yearLow) / range) * 100
-                                : 50,
-                            ),
-                          );
-                        return (
-                          <div className="relative pb-7 pt-1">
-                            {/* Static track always rendered — the block keeps its
-                            full height even on the first paint before the
-                            animation starts. */}
-                            <div className="relative w-full h-2.5 bg-muted/80 rounded-full overflow-hidden">
-                              {/* Fill rides the animated price (AnimatedNumber
-                              render-prop) so the bar slides up from the 52W
-                              low while the card settles in sync with the EPS
-                              badge and avg tiles. */}
-                              <AnimatedNumber
-                                value={quoteData.price}
-                                placeholder={null}
-                              >
-                                {(price) => (
-                                  <div
-                                    className={`h-full rounded-full ${barColor}`}
-                                    style={{ width: `${pctOf(price)}%` }}
-                                  />
-                                )}
-                              </AnimatedNumber>
-                            </div>
-
-                            {/* Arrow Pointer & Current Price Tag — driven by the
-                            same animated price, so marker and fill stay glued
-                            together as they slide in. */}
-                            <AnimatedNumber
-                              value={quoteData.price}
-                              placeholder={null}
-                            >
-                              {(price) => (
-                                <div
-                                  className="absolute flex flex-col items-center pointer-events-none"
-                                  style={{
-                                    left: `${pctOf(price)}%`,
-                                    transform: "translateX(-50%)",
-                                    top: "14px",
-                                  }}
-                                >
-                                  <span
-                                    className={`text-xs leading-none ${arrowColor}`}
-                                  >
-                                    ▲
-                                  </span>
-                                  <span
-                                    className={`text-xs font-mono font-bold whitespace-nowrap tabular-nums ${textColor}`}
-                                    dir="ltr"
-                                  >
-                                    ${price.toFixed(2)}
-                                  </span>
-                                </div>
-                              )}
-                            </AnimatedNumber>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
-
-                {/* Analyst Consensus EPS & Averages */}
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="p-3 rounded-lg bg-muted/20 border border-border/30">
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold block mb-1">
-                      50-Day Avg
-                    </span>
-                    <span
-                      className="font-mono font-medium text-foreground text-sm tabular-nums"
-                      dir="ltr"
-                    >
-                      <AnimatedNumber
-                        value={quoteData?.priceAvg50 ?? null}
-                        format={(v) => `$${v.toFixed(2)}`}
-                      />
-                    </span>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/20 border border-border/30">
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold block mb-1">
-                      200-Day Avg
-                    </span>
-                    <span
-                      className="font-mono font-medium text-foreground text-sm tabular-nums"
-                      dir="ltr"
-                    >
-                      <AnimatedNumber
-                        value={quoteData?.priceAvg200 ?? null}
-                        format={(v) => `$${v.toFixed(2)}`}
-                      />
-                    </span>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/20 border border-border/30">
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold block mb-1">
-                      EPS Est. (Curr Qtr)
-                    </span>
-                    <span
-                      className="font-mono font-medium text-foreground text-sm"
-                      dir="ltr"
-                    >
-                      {analystData?.[0]?.earningsEstimate?.avg != null
-                        ? `$${analystData[0].earningsEstimate.avg.toFixed(2)}`
-                        : "—"}
-                    </span>
-                  </div>
-                  <div className="p-3 rounded-lg bg-muted/20 border border-border/30">
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold block mb-1">
-                      Revenue Est. (Avg)
-                    </span>
-                    <span
-                      className="font-mono font-medium text-foreground text-sm"
-                      dir="ltr"
-                    >
-                      {analystData?.[0]?.revenueEstimate?.avg
-                        ? `$${(analystData[0].revenueEstimate.avg / 1e9).toFixed(2)}B`
-                        : "—"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* Charts Grid - 4x2 — three render states driven by query fetch status */}
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div className="mb-5 mt-10 flex flex-wrap items-end justify-between gap-3 text-left">
           <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="font-display text-sm font-semibold text-foreground">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="p-1.5 rounded-lg bg-primary/10 border border-primary/25 text-primary">
+                <BarChart3 className="w-4 h-4" />
+              </div>
+              <h2 className="font-display text-base sm:text-lg font-bold text-foreground tracking-tight">
                 {t("index.financialMetricsTitle")}
               </h2>
               {financialsData && (
@@ -732,14 +757,14 @@ export default function Index() {
                 />
               )}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1.5 text-xs text-muted-foreground/80">
               {showYahooFallback
                 ? "Historical statements are unavailable; no synthetic series is shown."
                 : "Only recently fetched provider statement data is displayed."}
             </p>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10 text-left">
           {/* Cache-key switch (e.g. /stock/AAPL → /stock/MSFT) resets isFetched
               to false even though we may have stale data on disk; the skeleton
               flash masks the cache-miss transition so don't add an enabled:
@@ -846,6 +871,244 @@ export default function Index() {
               );
             })
           )}
+        </div>
+
+        {/* Unified Wall Street Analyst & Technical Momentum 2-Column Section */}
+        <div className="my-10 text-left">
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <div className="p-1.5 rounded-lg bg-primary/10 border border-primary/25 text-primary shadow-xs">
+                  <ChartNoAxesCombined className="w-4 h-4" />
+                </div>
+                <h2 className="font-display text-base sm:text-lg font-bold text-foreground tracking-tight">
+                  {t("insights.analystEstimates")} & Price Corridor
+                </h2>
+                {analystData && analystData.length > 0 && (
+                  <DataStatusBadge
+                    status="live"
+                    source="Yahoo Finance consensus"
+                    compact
+                    iconOnly
+                  />
+                )}
+              </div>
+              <p className="mt-1.5 text-xs text-muted-foreground/80">
+                Wall Street price corridor, technical moving averages, and forward consensus estimates.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+            {/* Card 1: Technical Momentum & Wall St. Corridor */}
+            <div className="rounded-panel border border-border/70 bg-card/80 p-5 sm:p-6 backdrop-blur-md flex flex-col justify-between space-y-4 shadow-xs hover:border-border transition-all">
+              {analystCardLoading ? (
+                <AnalystCardSkeleton />
+              ) : (
+                <div className="space-y-4">
+                  {/* Header */}
+                  <div className="flex items-center justify-between pb-3.5 border-b border-border/50">
+                    <div className="flex items-center gap-2">
+                      <span className="relative flex h-2 w-2">
+                        <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-400" />
+                      </span>
+                      <h3 className="font-display text-xs font-bold uppercase tracking-[0.14em] text-foreground flex items-center gap-1.5">
+                        <Activity className="w-3.5 h-3.5 text-primary" />
+                        <span>Price Corridor & Momentum</span>
+                      </h3>
+                    </div>
+                    <span
+                      className={`shrink-0 text-xs font-mono font-bold px-2.5 py-1 rounded-[4px] border whitespace-nowrap tabular-nums ${
+                        targetEps != null
+                          ? "bg-sky-500/10 text-sky-400 border-sky-500/30"
+                          : "bg-muted/40 text-muted-foreground/70 border-border/40"
+                      }`}
+                    >
+                      Target EPS:{" "}
+                      <AnimatedNumber
+                        value={targetEps}
+                        format={(v) => `$${v.toFixed(2)}`}
+                      />
+                    </span>
+                  </div>
+
+                  {/* 52-Week Price Range Corridor */}
+                  {quoteData?.yearLow &&
+                    quoteData?.yearHigh &&
+                    quoteData?.price && (
+                      <div className="p-3.5 rounded-lg bg-background/50 border border-border/50 space-y-2.5">
+                        <div className="flex items-center justify-between text-xs font-mono">
+                          <span className="text-muted-foreground font-medium">52W Corridor</span>
+                          {year52Stats && (
+                            <span className="text-[11px] font-semibold text-foreground/80 px-1.5 py-0.5 rounded bg-muted/60 border border-border/40">
+                              {year52Stats.pctOfRange.toFixed(0)}% of 52W Range
+                            </span>
+                          )}
+                        </div>
+
+                        {(() => {
+                          const range = quoteData.yearHigh - quoteData.yearLow;
+                          const finalPct = Math.max(
+                            0,
+                            Math.min(
+                              100,
+                              range > 0
+                                ? ((quoteData.price - quoteData.yearLow) /
+                                    range) *
+                                    100
+                                : 50,
+                            ),
+                          );
+                          const barColor =
+                            finalPct > 66
+                              ? "bg-chart-positive"
+                              : finalPct >= 33
+                                ? "bg-amber-400"
+                                : "bg-chart-negative";
+                          const textColor =
+                            finalPct > 66
+                              ? "text-chart-positive"
+                              : finalPct >= 33
+                                ? "text-amber-400"
+                                : "text-chart-negative";
+                          const pctOf = (price: number) =>
+                            Math.max(
+                              0,
+                              Math.min(
+                                100,
+                                range > 0
+                                  ? ((price - quoteData.yearLow) / range) * 100
+                                  : 50,
+                              ),
+                            );
+
+                          return (
+                            <div className="space-y-1.5 pt-1">
+                              <div className="relative w-full h-2.5 bg-muted/80 rounded-full overflow-hidden">
+                                <AnimatedNumber
+                                  value={quoteData.price}
+                                  placeholder={null}
+                                >
+                                  {(price) => (
+                                    <div
+                                      className={`h-full rounded-full transition-all ${barColor}`}
+                                      style={{ width: `${pctOf(price)}%` }}
+                                    />
+                                  )}
+                                </AnimatedNumber>
+                              </div>
+                              <div className="flex items-center justify-between text-xs font-mono tabular-nums text-muted-foreground pt-0.5">
+                                <span>
+                                  Low: <strong className="text-foreground font-bold" dir="ltr">${quoteData.yearLow.toFixed(2)}</strong>
+                                </span>
+                                <span className="text-center font-bold text-foreground" dir="ltr">
+                                  Current: <span className={textColor}>${quoteData.price.toFixed(2)}</span>
+                                </span>
+                                <span>
+                                  High: <strong className="text-foreground font-bold" dir="ltr">${quoteData.yearHigh.toFixed(2)}</strong>
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+
+                  {/* 2 Moving Averages */}
+                  <div className="grid grid-cols-2 gap-2.5 text-xs">
+                    {/* 50-Day Moving Average */}
+                    <div className="p-3 rounded-lg bg-background/50 border border-border/50 space-y-1 hover:border-border transition-colors">
+                      <div className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground font-semibold flex items-center justify-between">
+                        <span>50-Day SMA</span>
+                        {sma50Delta !== null && (
+                          <span
+                            className={`text-[10px] font-bold ${
+                              sma50Delta >= 0 ? "text-chart-positive" : "text-chart-negative"
+                            }`}
+                            dir="ltr"
+                          >
+                            {sma50Delta >= 0 ? "+" : ""}{sma50Delta.toFixed(1)}%
+                          </span>
+                        )}
+                      </div>
+                      <div className="font-mono font-bold text-foreground text-sm sm:text-base tabular-nums" dir="ltr">
+                        <AnimatedNumber
+                          value={quoteData?.priceAvg50 ?? null}
+                          format={(v) => `$${v.toFixed(2)}`}
+                        />
+                      </div>
+                    </div>
+
+                    {/* 200-Day Moving Average */}
+                    <div className="p-3 rounded-lg bg-background/50 border border-border/50 space-y-1 hover:border-border transition-colors">
+                      <div className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground font-semibold flex items-center justify-between">
+                        <span>200-Day SMA</span>
+                        {sma200Delta !== null && (
+                          <span
+                            className={`text-[10px] font-bold ${
+                              sma200Delta >= 0 ? "text-chart-positive" : "text-chart-negative"
+                            }`}
+                            dir="ltr"
+                          >
+                            {sma200Delta >= 0 ? "+" : ""}{sma200Delta.toFixed(1)}%
+                          </span>
+                        )}
+                      </div>
+                      <div className="font-mono font-bold text-foreground text-sm sm:text-base tabular-nums" dir="ltr">
+                        <AnimatedNumber
+                          value={quoteData?.priceAvg200 ?? null}
+                          format={(v) => `$${v.toFixed(2)}`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Card 2: Multi-Period Forward Consensus Forecasts (EPS & Revenue) */}
+            <div className="rounded-panel border border-border/70 bg-card/80 p-5 sm:p-6 backdrop-blur-md flex flex-col justify-between space-y-4 shadow-xs hover:border-border transition-all">
+              <div>
+                <div className="flex items-center justify-between pb-3.5 border-b border-border/50 mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2 w-2">
+                      <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-chart-positive opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-chart-positive" />
+                    </span>
+                    <h3 className="font-display text-xs font-bold uppercase tracking-[0.14em] text-foreground flex items-center gap-1.5">
+                      <TrendingUp className="w-3.5 h-3.5 text-primary" />
+                      <span>Forward Estimates Table</span>
+                    </h3>
+                  </div>
+                  {analystData && analystData.length > 0 && (
+                    <span className="text-[10px] font-mono text-muted-foreground/80 px-2 py-0.5 rounded bg-muted/60 border border-border/40 uppercase">
+                      Consensus
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-3.5">
+                  <IndexEstimateTable
+                    title="EPS Consensus"
+                    rows={epsEstimates}
+                    format={formatEstimate}
+                    tone="primary"
+                    translatePeriod={translatePeriod}
+                    t={t}
+                  />
+                  <IndexEstimateTable
+                    title="Revenue Consensus ($B)"
+                    rows={revenueEstimates}
+                    format={formatRevenueEstimate}
+                    tone="positive"
+                    translatePeriod={translatePeriod}
+                    t={t}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Company Profile Section */}

@@ -70,19 +70,12 @@ export function getChartAvailability(values: unknown[], expectedCount: number) {
  * not as the chart's top/bottom border, while preserving the data's scale.
  */
 function niceStep(range: number, targetTicks = 5): number {
+  if (range <= 0) return 1;
   const raw = range / Math.max(targetTicks - 1, 1);
   const power = 10 ** Math.floor(Math.log10(raw));
   const normalized = raw / power;
   const factor = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
   return factor * power;
-}
-
-function floorToStep(value: number, step: number): number {
-  return Math.floor(value / step) * step;
-}
-
-function ceilToStep(value: number, step: number): number {
-  return Math.ceil(value / step) * step;
 }
 
 export function calculateChartDomain(values: unknown[]): [number, number] {
@@ -95,24 +88,26 @@ export function calculateChartDomain(values: unknown[]): [number, number] {
   const max = Math.max(...finiteValues);
   if (min === 0 && max === 0) return [-1, 1];
 
-  const rawRange = Math.max(max - min, Math.abs(min), Math.abs(max), 1);
-
-  if (max <= 0) {
-    // Use the series magnitude for rounding so a -4.6 bar becomes roughly
-    // [-5, 1], not [-10, 10]. Zero remains an explicit visual boundary with
-    // a small positive band, rather than the top edge of the plot.
-    const step = 10 ** Math.floor(Math.log10(Math.max(Math.abs(min), 1)));
-    const headroom = Math.max(Math.abs(min) * 0.15, step * 0.5);
-    return [floorToStep(min - step * 0.05, step), ceilToStep(headroom, step)];
-  }
-
+  // Non-negative series: start strictly at Y = 0
   if (min >= 0) {
-    const step = 10 ** Math.floor(Math.log10(Math.max(max, 1)));
-    const headroom = Math.max(max * 0.15, step * 0.5);
-    return [floorToStep(-headroom, step), ceilToStep(max + step * 0.05, step)];
+    const rawRange = max || 1;
+    const step = niceStep(rawRange, 5);
+    const upper = Math.ceil((max * 1.12) / step) * step;
+    return [0, Math.max(upper, step)];
   }
 
-  const step = niceStep(rawRange * 1.15);
-  const padding = step * 0.15;
-  return [floorToStep(min - padding, step), ceilToStep(max + padding, step)];
+  // Non-positive series: cap strictly at Y = 0
+  if (max <= 0) {
+    const rawRange = Math.abs(min) || 1;
+    const step = niceStep(rawRange, 5);
+    const lower = Math.floor((min * 1.12) / step) * step;
+    return [Math.min(lower, -step), 0];
+  }
+
+  // Mixed positive & negative series: span across zero
+  const rawRange = max - min;
+  const step = niceStep(rawRange, 5);
+  const lower = Math.floor((min * 1.1) / step) * step;
+  const upper = Math.ceil((max * 1.1) / step) * step;
+  return [lower, upper];
 }

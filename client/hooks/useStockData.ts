@@ -834,6 +834,7 @@ export function useScreenerSearch(query: string, limit: number = 10) {
 
 export function useScreenerFilter(
   filters: {
+    q?: string;
     sector?: string[];
     industry?: string[];
     country?: string[];
@@ -849,6 +850,7 @@ export function useScreenerFilter(
     limit: limit.toString(),
     offset: offset.toString(),
   });
+  if (filters.q?.trim()) queryParams.set("q", filters.q.trim());
   if (filters.sector?.length) queryParams.set("sector", filters.sector.join(","));
   if (filters.industry?.length) queryParams.set("industry", filters.industry.join(","));
   if (filters.country?.length) queryParams.set("country", filters.country.join(","));
