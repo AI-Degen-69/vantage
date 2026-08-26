@@ -226,6 +226,24 @@ const en = {
   "dcf.sensitivityClickHint": "Click any cell to apply that valuation scenario to the sandbox.",
   "dcf.viewSensitivityMatrix": "Sensitivity Matrix",
 
+  // Reverse DCF Engine
+  "dcf.reverseDcfTitle": "Reverse DCF Expectation Solver",
+  "dcf.reverseDcfSubtitle": "Calculates the exact 5-year growth rate the current stock price is pricing in.",
+  "dcf.reverseDcfTooltip": "Inverts the DCF formula to solve for the market-implied growth rate. Compare this against your expectations to assess whether the stock is priced for perfection or under-appreciated.",
+  "dcf.marketImpliedGrowth": "Market-Implied 5Y CAGR",
+  "dcf.userAssumedGrowth": "Your Assumption",
+  "dcf.expectationDelta": "Expectation Spread",
+  "dcf.impliedTerminalMetric": "Implied Year 5 Base",
+  "dcf.applyImpliedToSandbox": "Apply Implied Growth to DCF",
+  "dcf.viewReverseDcf": "Reverse DCF",
+  "dcf.regimeHyper": "Aggressive / Priced for Perfection",
+  "dcf.regimeHigh": "High Growth Expected",
+  "dcf.regimeModerate": "Moderate Growth Expected",
+  "dcf.regimeLow": "Low Growth Expected",
+  "dcf.regimeContraction": "Contraction Priced In",
+  "dcf.headroomDescription": "You expect {{spread}}% higher growth than the market is pricing in (undervaluation cushion).",
+  "dcf.deficitDescription": "The market price requires {{spread}}% higher growth than your current assumption.",
+
   // Charts page
   "charts.dayRange": "Day Range",
   "charts.weekRange": "52-Week Range",
@@ -1309,6 +1327,24 @@ const he: Record<string, string> = {
   "dcf.dimensionMultiple": "WACC × מכפיל יציאה",
   "dcf.sensitivityClickHint": "לחץ על כל תא כדי להחיל את תרחיש התמחור על מחשבון ה-DCF.",
   "dcf.viewSensitivityMatrix": "מטריצת רגישות",
+
+  // Reverse DCF Engine
+  "dcf.reverseDcfTitle": "מפענח ציפיות שוק (Reverse DCF)",
+  "dcf.reverseDcfSubtitle": "מחשב את קצב הצמיחה ל-5 שנים המגולם במחיר השוק הנוכחי.",
+  "dcf.reverseDcfTooltip": "הופך את נוסחת ה-DCF כדי לגלות מה קצב הצמיחה הנדרש להצדקת מחיר השוק. השוואה זו מראה האם השוק דורש שלמות או מתמחר בחסר.",
+  "dcf.marketImpliedGrowth": "קצב צמיחה שנתי מגולם בשוק",
+  "dcf.userAssumedGrowth": "הנחת העבודה שלך",
+  "dcf.expectationDelta": "מרווח ציפיות",
+  "dcf.impliedTerminalMetric": "תזרים/רווח נדרש בשנה 5",
+  "dcf.applyImpliedToSandbox": "החל צמיחה מגולמת על ה-DCF",
+  "dcf.viewReverseDcf": "Reverse DCF",
+  "dcf.regimeHyper": "תמחור אגרסיבי / דורש שלמות",
+  "dcf.regimeHigh": "צפי לצמיחה מהירה",
+  "dcf.regimeModerate": "צפי לצמיחה מתונה",
+  "dcf.regimeLow": "צפי לצמיחה נמוכה",
+  "dcf.regimeContraction": "השוק מגלם נסיגה/התכווצות",
+  "dcf.headroomDescription": "אתה צופה צמיחה גבוהה ב-{{spread}}% מציפיות השוק (כרית ביטחון).",
+  "dcf.deficitDescription": "מחיר השוק דורש צמיחה גבוהה ב-{{spread}}% מהנחת העבודה שלך.",
 
   // Charts page
   "charts.dayRange": "טווח יומי",
@@ -2424,8 +2460,15 @@ export function translateMarketCap(
   return trimmed;
 }
 
-export function I18nProvider({ children }: { children: React.ReactNode }) {
+export function I18nProvider({
+  children,
+  initialLang,
+}: {
+  children: React.ReactNode;
+  initialLang?: Lang;
+}) {
   const [lang, setLangState] = useState<Lang>(() => {
+    if (initialLang) return initialLang;
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored === "en" || stored === "he") return stored;
@@ -2487,7 +2530,13 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <I18nContext.Provider
-      value={{ lang, t, setLang, dir: lang === "he" ? "rtl" : "ltr" }}
+      value={{
+        lang,
+        t,
+        setLang,
+        dir: lang === "he" ? "rtl" : "ltr",
+        isRtl: lang === "he",
+      }}
     >
       {children}
     </I18nContext.Provider>

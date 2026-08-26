@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useI18n } from "@/lib/i18n";
-import { Sliders, LineChart as ChartIcon, Table2, Info, RotateCcw } from "lucide-react";
+import { Sliders, LineChart as ChartIcon, Table2, Gauge, Info, RotateCcw } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import ValuationSensitivityMatrix from "./ValuationSensitivityMatrix";
+import ReverseDCFGauge from "./ReverseDCFGauge";
 
 export interface DCFWidgetProps {
   ticker?: string;
@@ -66,8 +67,8 @@ export function DCFWidget({
 }: DCFWidgetProps) {
   const { t } = useI18n();
 
-  // Active view tab: Interactive Sandbox, 5Y Trajectory Chart, or Sensitivity Matrix
-  const [activeTab, setActiveTab] = useState<"sandbox" | "trajectory" | "sensitivity">("sandbox");
+  // Active view tab: Interactive Sandbox, 5Y Trajectory Chart, Sensitivity Matrix, or Reverse DCF Solver
+  const [activeTab, setActiveTab] = useState<"sandbox" | "trajectory" | "sensitivity" | "reverseDcf">("sandbox");
   const [valuationMode, setValuationMode] = useState<"cashFlow" | "earnings">(initialValuationMode);
 
   // Inputs
@@ -215,7 +216,7 @@ export function DCFWidget({
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Tab selector between Sandbox, Trajectory, and Sensitivity Matrix */}
+          {/* Tab selector between Sandbox, Trajectory, Sensitivity Matrix, and Reverse DCF */}
           <div className="flex items-center bg-muted/60 rounded-lg p-1 border border-border flex-wrap gap-1">
             <button
               type="button"
@@ -255,6 +256,19 @@ export function DCFWidget({
             >
               <Table2 className="w-3.5 h-3.5" />
               <span>{t("dcf.viewSensitivityMatrix")}</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={activeTab === "reverseDcf"}
+              onClick={() => setActiveTab("reverseDcf")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono font-medium transition-all ${
+                activeTab === "reverseDcf"
+                  ? "bg-primary text-primary-foreground shadow-sm font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Gauge className="w-3.5 h-3.5" />
+              <span>{t("dcf.viewReverseDcf") || "Reverse DCF"}</span>
             </button>
           </div>
         </div>
@@ -587,8 +601,16 @@ export function DCFWidget({
           </div>
         </div>
 
-        {/* Shortcut to 2D Sensitivity Matrix */}
-        <div className="pt-2 flex justify-end">
+        {/* Quick Shortcuts to Sensitivity Matrix & Reverse DCF */}
+        <div className="pt-2 flex items-center justify-end gap-4 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setActiveTab("reverseDcf")}
+            className="text-xs font-mono text-primary hover:underline flex items-center gap-1.5 transition-colors"
+          >
+            <Gauge className="w-3.5 h-3.5" />
+            <span>{t("dcf.reverseDcfTitle") || "Reverse DCF Expectation Solver"} →</span>
+          </button>
           <button
             type="button"
             onClick={() => setActiveTab("sensitivity")}
@@ -818,6 +840,25 @@ export function DCFWidget({
               if (scenario.discountRate !== undefined) setDiscountRate(scenario.discountRate);
               if (scenario.growthRate !== undefined) setGrowthRate(scenario.growthRate);
               if (scenario.multiple !== undefined) setMultiple(scenario.multiple);
+            }}
+          />
+        </div>
+      )}
+
+      {/* Tab 4: Reverse DCF Expectation Solver */}
+      {activeTab === "reverseDcf" && (
+        <div className="p-6 sm:p-8">
+          <ReverseDCFGauge
+            activeBase={activeBase}
+            currentPrice={currentPrice}
+            discountRate={discountRate}
+            multiple={multiple}
+            sharesOutstanding={sharesOutstanding}
+            userGrowthRate={growthRate}
+            valuationMode={valuationMode}
+            onApplyImpliedGrowth={(impliedG) => {
+              setGrowthRate(impliedG);
+              setActiveTab("sandbox");
             }}
           />
         </div>
