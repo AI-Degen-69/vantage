@@ -42,6 +42,7 @@ describe("EarningsCard", () => {
     expect(html).toContain("5.59");
     expect(html).toContain("5.82");
     expect(html).toContain("$24.60B");
+    expect(html).toContain('title="After Close"');
   });
 
   it("renders Before Open timing badge and miss surprise pill", () => {
@@ -66,5 +67,24 @@ describe("EarningsCard", () => {
     expect(html).toContain("0.20");
     expect(html).toContain("0.15");
     expect(html).toContain("$750M");
+    expect(html).toContain('title="Before Open"');
+  });
+
+  it("renders unknown timing gracefully with clock icon and neutral badge", () => {
+    const event: EarningsEventData = {
+      ticker: "PLTR",
+      name: "Palantir Technologies",
+      date: "Wed",
+      dateFull: "Feb 26, 2025",
+      epsEst: 0.09,
+      revEst: 0.701,
+      time: "unknown",
+      isWatchlist: false,
+    };
+
+    const html = renderWithContext(<EarningsCard event={event} />);
+
+    expect(html).toContain("PLTR");
+    expect(html).toContain("Unspecified Time");
   });
 });

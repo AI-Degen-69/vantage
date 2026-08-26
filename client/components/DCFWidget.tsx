@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useI18n } from "@/lib/i18n";
-import { Sliders, TrendingUp, Info, ArrowRight, LineChart as ChartIcon, Sparkles } from "lucide-react";
+import { Sliders, LineChart as ChartIcon } from "lucide-react";
 import {
   LineChart,
   Line,
@@ -30,6 +30,11 @@ export interface DCFWidgetProps {
  * @param currentPrice - The current price used to calculate forward return and margin of safety.
  * @param ticker - Optional ticker symbol being modeled.
  * @param companyName - Optional friendly company name.
+ * @param initialFcf - Base annual free cash flow in billions ($B)
+ * @param initialGrowth - Projected 5-year growth rate percentage
+ * @param initialMultiple - Terminal exit multiple (P/FCF)
+ * @param initialDiscount - Target discount / hurdle rate percentage
+ * @param sharesOutstanding - Diluted shares outstanding in billions
  * @returns The rendered DCF Sandbox component.
  */
 export function DCFWidget({
@@ -141,6 +146,7 @@ export function DCFWidget({
           <div className="flex items-center bg-muted/60 rounded-lg p-1 border border-border">
             <button
               type="button"
+              aria-pressed={activeTab === "sandbox"}
               onClick={() => setActiveTab("sandbox")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono font-medium transition-all ${
                 activeTab === "sandbox"
@@ -153,6 +159,7 @@ export function DCFWidget({
             </button>
             <button
               type="button"
+              aria-pressed={activeTab === "trajectory"}
               onClick={() => setActiveTab("trajectory")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono font-medium transition-all ${
                 activeTab === "trajectory"
@@ -181,7 +188,7 @@ export function DCFWidget({
           <div className="lg:col-span-7 space-y-6">
             {/* Mode selection pills */}
             <div className="flex items-center gap-2 pb-2">
-              <span className="text-xs font-mono text-muted-foreground">Mode:</span>
+              <span className="text-xs font-mono text-muted-foreground">{t("dcf.mode")}</span>
               <div className="inline-flex bg-muted/50 rounded-lg p-0.5 border border-border">
                 <button
                   type="button"
@@ -214,7 +221,7 @@ export function DCFWidget({
                 <label htmlFor="dcf-base-fcf-slider" className="text-muted-foreground font-medium">
                   {t("dcf.baseFcf")}
                 </label>
-                <span className="font-semibold text-foreground bg-secondary/60 px-2.5 py-0.5 rounded border border-border tabular-nums" dir="ltr">
+                <span className="font-semibold text-foreground bg-secondary/60 px-2.5 py-0.5 rounded border border-border tabular-nums text-sm sm:text-xs" dir="ltr">
                   ${baseFcf.toFixed(1)}B
                 </span>
               </div>
@@ -242,7 +249,7 @@ export function DCFWidget({
                 <label htmlFor="dcf-growth-slider" className="text-muted-foreground font-medium">
                   {t("dcf.growthRate5Y")}
                 </label>
-                <span className="font-semibold text-chart-positive bg-secondary/60 px-2.5 py-0.5 rounded border border-border tabular-nums" dir="ltr">
+                <span className="font-semibold text-chart-positive bg-secondary/60 px-2.5 py-0.5 rounded border border-border tabular-nums text-sm sm:text-xs" dir="ltr">
                   +{growthRate.toFixed(0)}% / yr
                 </span>
               </div>
@@ -270,7 +277,7 @@ export function DCFWidget({
                 <label htmlFor="dcf-multiple-slider" className="text-muted-foreground font-medium">
                   {t("dcf.exitMultiple")}
                 </label>
-                <span className="font-semibold text-foreground bg-secondary/60 px-2.5 py-0.5 rounded border border-border tabular-nums" dir="ltr">
+                <span className="font-semibold text-foreground bg-secondary/60 px-2.5 py-0.5 rounded border border-border tabular-nums text-sm sm:text-xs" dir="ltr">
                   {multiple.toFixed(0)}x
                 </span>
               </div>
@@ -298,7 +305,7 @@ export function DCFWidget({
                 <label htmlFor="dcf-discount-slider" className="text-muted-foreground font-medium">
                   {t("dcf.discountRate")}
                 </label>
-                <span className="font-semibold text-foreground bg-secondary/60 px-2.5 py-0.5 rounded border border-border tabular-nums" dir="ltr">
+                <span className="font-semibold text-foreground bg-secondary/60 px-2.5 py-0.5 rounded border border-border tabular-nums text-sm sm:text-xs" dir="ltr">
                   {discountRate.toFixed(0)}%
                 </span>
               </div>
@@ -357,14 +364,14 @@ export function DCFWidget({
               <div className="space-y-2 text-xs font-mono pt-4 border-t border-border/60">
                 <div className="flex justify-between items-center text-muted-foreground">
                   <span>{t("dcf.marketPrice")}</span>
-                  <span className="font-semibold text-foreground tabular-nums" dir="ltr">
+                  <span className="font-semibold text-foreground tabular-nums text-sm sm:text-xs" dir="ltr">
                     ${currentPrice.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">{t("dcf.marginOfSafety")}</span>
                   <span
-                    className={`font-bold tabular-nums ${
+                    className={`font-bold tabular-nums text-sm sm:text-xs ${
                       marginOfSafety >= 0 ? "text-chart-positive" : "text-chart-negative"
                     }`}
                     dir="ltr"
@@ -413,7 +420,9 @@ export function DCFWidget({
                   {t("dcf.reverse", { target: targetReturn })}
                 </p>
                 <div className="flex items-center gap-1.5">
-                  <label htmlFor="dcf-target-return-input" className="text-xs text-muted-foreground">Target %:</label>
+                  <label htmlFor="dcf-target-return-input" className="text-xs text-muted-foreground">
+                    {t("dcf.targetPct")}
+                  </label>
                   <input
                     id="dcf-target-return-input"
                     type="number"
@@ -438,10 +447,10 @@ export function DCFWidget({
           <div className="bg-secondary/20 border border-border rounded-xl p-6 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="text-xs font-mono font-bold uppercase tracking-wider text-foreground">
-                5-Year Value & FCF Expansion Path
+                {t("dcf.valueTrajectoryTitle")}
               </span>
               <span className="text-xs font-mono text-primary font-semibold">
-                Terminal Exit Price: ${year5Price.toFixed(2)}
+                {t("dcf.terminalExitPrice", { price: year5Price.toFixed(2) })}
               </span>
             </div>
 
@@ -473,12 +482,23 @@ export function DCFWidget({
                       fontSize: "12px",
                     }}
                   />
-                  <ReferenceLine y={currentPrice} yAxisId="left" stroke="hsl(var(--primary))" strokeDasharray="4 4" label={{ value: "Current Price", fill: "hsl(var(--primary))", fontSize: 10, position: "insideBottomLeft" }} />
+                  <ReferenceLine
+                    y={currentPrice}
+                    yAxisId="left"
+                    stroke="hsl(var(--primary))"
+                    strokeDasharray="4 4"
+                    label={{
+                      value: t("dcf.currentPriceLegend") || "Current Price",
+                      fill: "hsl(var(--primary))",
+                      fontSize: 10,
+                      position: "insideBottomLeft",
+                    }}
+                  />
                   <Line
                     yAxisId="left"
                     type="monotone"
                     dataKey="price"
-                    name="Target Stock Price"
+                    name={t("dcf.targetStockPrice") || "Target Stock Price"}
                     stroke="hsl(var(--primary))"
                     strokeWidth={2.5}
                     dot={{ fill: "hsl(var(--primary))", r: 4 }}
@@ -488,7 +508,7 @@ export function DCFWidget({
                     yAxisId="right"
                     type="monotone"
                     dataKey="fcf"
-                    name="FCF ($B)"
+                    name={t("dcf.fcfBillions") || "FCF ($B)"}
                     stroke="hsl(var(--chart-positive))"
                     strokeWidth={2}
                     dot={{ fill: "hsl(var(--chart-positive))", r: 3 }}

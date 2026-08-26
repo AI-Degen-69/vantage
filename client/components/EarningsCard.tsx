@@ -1,6 +1,6 @@
 import { useI18n } from "@/lib/i18n";
 import TickerLogo from "@/components/TickerLogo";
-import { Sun, Moon, ArrowRight } from "lucide-react";
+import { Sun, Moon, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export interface EarningsEventData {
@@ -13,7 +13,7 @@ export interface EarningsEventData {
   epsActual?: number | null;
   revEst?: number | null;
   revActual?: number | null;
-  time: "Before Open" | "After Close" | "bmo" | "amc" | string;
+  time: "Before Open" | "After Close" | "bmo" | "amc" | "unknown" | string;
   surprise?: "beat" | "miss" | "none" | string;
   marketCap?: number | string | null;
   isWatchlist?: boolean;
@@ -26,7 +26,10 @@ interface EarningsCardProps {
 }
 
 /**
- * Formats a currency amount into billions or millions string.
+ * Formats a currency amount into billions ($B) or millions ($M) string.
+ *
+ * @param val - Revenue estimate provided in billions of USD (e.g. 24.6 for $24.6B)
+ * @returns The human-readable formatted revenue string or '—' if unavailable
  */
 function formatRevenueEst(val: number | null | undefined): string {
   if (val === null || val === undefined || !Number.isFinite(val)) return "—";
@@ -48,15 +51,21 @@ function formatRevenueEst(val: number | null | undefined): string {
 export function EarningsCard({ event, isFocus = false, onSelect }: EarningsCardProps) {
   const { t } = useI18n();
 
+  const timeNormalized = (event.time || "").toLowerCase();
   const isBmo =
-    event.time === "Before Open" ||
-    event.time === "bmo" ||
-    event.time.toLowerCase().includes("open") ||
-    event.time.toLowerCase().includes("bmo");
+    timeNormalized === "before open" ||
+    timeNormalized === "bmo" ||
+    timeNormalized.includes("open");
+  const isAmc =
+    timeNormalized === "after close" ||
+    timeNormalized === "amc" ||
+    timeNormalized.includes("close");
 
   const timingLabel = isBmo
     ? t("earningsCalendar.beforeOpen")
-    : t("earningsCalendar.afterClose");
+    : isAmc
+    ? t("earningsCalendar.afterClose")
+    : t("earningsCalendar.unknownTiming");
 
   const hasActualEps = event.epsActual !== undefined && event.epsActual !== null && Number.isFinite(event.epsActual);
   const epsEstVal = event.epsEst !== undefined && event.epsEst !== null && Number.isFinite(event.epsEst) ? event.epsEst : null;
@@ -122,11 +131,22 @@ export function EarningsCard({ event, isFocus = false, onSelect }: EarningsCardP
 
           <div
             className={`p-1.5 rounded-md flex items-center justify-center ${
-              isBmo ? "bg-amber-500/15 text-amber-400" : "bg-primary/15 text-primary"
+              isBmo
+                ? "bg-amber-500/15 text-amber-400"
+                : isAmc
+                ? "bg-primary/15 text-primary"
+                : "bg-muted text-muted-foreground"
             }`}
             title={timingLabel}
+            aria-label={timingLabel}
           >
-            {isBmo ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
+            {isBmo ? (
+              <Sun className="w-3.5 h-3.5" />
+            ) : isAmc ? (
+              <Moon className="w-3.5 h-3.5" />
+            ) : (
+              <Clock className="w-3.5 h-3.5" />
+            )}
           </div>
         </div>
       </div>

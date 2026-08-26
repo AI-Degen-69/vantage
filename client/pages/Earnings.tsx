@@ -1,6 +1,6 @@
 import { useI18n } from "@/lib/i18n";
 import { useState, useMemo, useEffect } from "react";
-import { ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import EarningsCalendar, { type MarketCapFilter } from "@/components/EarningsCalendar";
 import PageHeader from "@/components/PageHeader";
@@ -57,11 +57,12 @@ function shiftRange(from: string, to: string, weeks: number): { from: string; to
  * @param to - The range's end date
  * @returns The formatted date range
  */
-function formatHumanRange(from: string, to: string): string {
+function formatHumanRange(from: string, to: string, lang: string = "en"): string {
   const f = new Date(from);
   const t = new Date(to);
+  const locale = lang === "he" ? "he-IL" : "en-US";
   const fmt = (d: Date) =>
-    d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    d.toLocaleDateString(locale, { month: "short", day: "numeric" });
   return `${fmt(f)} – ${fmt(t)}`;
 }
 
@@ -74,11 +75,12 @@ function formatHumanRange(from: string, to: string): string {
  * @returns The earnings calendar page.
  */
 export function EarningsPage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const initial = useMemo(() => currentWeekRange(), []);
   const [offset, setOffset] = useState(0); // 0 = this week
   const [marketCap, setMarketCap] = useState<MarketCapFilter>("all");
   const [watchlistOnly, setWatchlistOnly] = useState(false);
+  const [dataStatus, setDataStatus] = useState<"live" | "mock">("live");
   const [searchParams] = useSearchParams();
   const focusSymbol = searchParams.get("focus");
   const focusDate = searchParams.get("date");
@@ -111,6 +113,8 @@ export function EarningsPage() {
   const hasPrev = offset > -8; // up to 8 weeks back
   const hasNext = offset < 4; // up to 4 weeks forward
 
+  const normalizedFocusSymbol = focusSymbol ? focusSymbol.toUpperCase() : undefined;
+
   return (
     <div className="w-full bg-background dark min-h-screen p-8">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -118,11 +122,11 @@ export function EarningsPage() {
           eyebrow={t("nav.earnings")}
           title={t("earnings.title")}
           description={t("earnings.subtitle")}
-          status="live"
+          status={dataStatus}
           source="FMP & Yahoo Consensus"
           actions={
             <>
-              <DataStatusBadge status="live" source="FMP Telemetry" />
+              <DataStatusBadge status={dataStatus} source="FMP Telemetry" />
               <DataLegend />
             </>
           }
@@ -161,7 +165,7 @@ export function EarningsPage() {
               <ChevronRight className="w-5 h-5" />
             </button>
             <span className="ml-4 text-sm font-medium text-foreground font-mono" dir="ltr">
-              {t("earningsCalendar.weekOf", { range: formatHumanRange(from, to) })}
+              {t("earningsCalendar.weekOf", { range: formatHumanRange(from, to, lang) })}
             </span>
           </div>
 
@@ -176,7 +180,7 @@ export function EarningsPage() {
                 aria-label={t("earningsCalendar.marketCap") || "Market Cap"}
                 value={marketCap}
                 onChange={(e) => setMarketCap(e.target.value as MarketCapFilter)}
-                className="bg-transparent focus:outline-none text-foreground text-xs font-mono font-medium cursor-pointer"
+                className="bg-transparent focus:outline-none text-foreground text-sm sm:text-xs font-mono font-medium cursor-pointer"
               >
                 <option value="all" className="bg-popover text-popover-foreground">{t("earningsCalendar.marketCapAll")}</option>
                 <option value="large" className="bg-popover text-popover-foreground">{t("earningsCalendar.marketCapLarge")}</option>
@@ -185,12 +189,20 @@ export function EarningsPage() {
               </select>
             </div>
 
-            <label className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground cursor-pointer transition-colors px-3 py-1.5 rounded-lg bg-secondary/30 border border-border">
+            <label
+              className={`flex items-center gap-2 text-sm transition-colors px-3 py-1.5 rounded-lg border ${
+                focusSymbol
+                  ? "bg-secondary/20 border-border/50 text-muted-foreground cursor-not-allowed opacity-80"
+                  : "bg-secondary/30 border-border text-muted-foreground hover:text-foreground cursor-pointer"
+              }`}
+              title={focusSymbol ? t("earningsCalendar.watchlistLockedByFocus") : undefined}
+            >
               <input
                 type="checkbox"
                 checked={effectiveWatchlistOnly}
+                disabled={!!focusSymbol}
                 onChange={(e) => setWatchlistOnly(e.target.checked)}
-                className="rounded border-border bg-secondary text-primary focus:ring-primary cursor-pointer"
+                className="rounded border-border bg-secondary text-primary focus:ring-primary cursor-pointer disabled:cursor-not-allowed"
               />
               <span className="text-xs font-mono">{t("earningsCalendar.filterByWatchlist")}</span>
             </label>
@@ -203,8 +215,9 @@ export function EarningsPage() {
           to={to}
           marketCap={marketCap}
           watchlistOnly={effectiveWatchlistOnly}
-          focusSymbol={focusSymbol ?? undefined}
+          focusSymbol={normalizedFocusSymbol}
           focusDate={focusDate ?? undefined}
+          onStatusChange={setDataStatus}
         />
       </div>
     </div>

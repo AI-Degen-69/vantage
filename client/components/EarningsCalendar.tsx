@@ -3,7 +3,7 @@ import { defaultWatchlist } from "@/lib/mockData";
 import { useEarningsCalendar } from "@/hooks/useStockData";
 import { useEffect, useMemo, useRef, useState } from "react";
 import EarningsCard, { type EarningsEventData } from "@/components/EarningsCard";
-import { LayoutGrid, CalendarDays, Sun, Moon, Database, Sparkles } from "lucide-react";
+import { LayoutGrid, CalendarDays, Sun, Moon, Clock, Database, Sparkles } from "lucide-react";
 
 export type MarketCapFilter = "all" | "large" | "mid" | "small";
 export type DayTabFilter = "all" | "Mon" | "Tue" | "Wed" | "Thu" | "Fri";
@@ -18,6 +18,7 @@ interface EarningsCalendarProps {
   focusDate?: string;
   initialDay?: DayTabFilter;
   initialViewMode?: ViewMode;
+  onStatusChange?: (status: "live" | "mock") => void;
 }
 
 export const mockEarningsEvents: EarningsEventData[] = [
@@ -111,27 +112,32 @@ function inMarketCapBucket(mc: number | null | undefined, filter: MarketCapFilte
 }
 
 /**
- * Returns the weekday index for a YYYY-MM-DD ISO string.
+ * Returns the weekday index for a YYYY-MM-DD ISO string (0=Sun, 1=Mon, ..., 6=Sat).
  */
 function weekdayOf(isoDate: string): number {
+  if (!isoDate) return 1;
   const parts = isoDate.split("-").map(Number);
   if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) {
-    return 0;
+    return 1;
   }
   const [y, m, d] = parts;
   const dt = new Date(y, m - 1, d);
-  return Number.isFinite(dt.getTime()) ? dt.getDay() : 0;
+  return Number.isFinite(dt.getTime()) ? dt.getDay() : 1;
 }
 
 /**
- * Formats ISO date to human readable date e.g. "Feb 24, 2025".
+ * Formats ISO date to human-readable date e.g. "Feb 24, 2025".
  */
-function formatHumanDate(isoDate: string): string {
+function formatHumanDate(isoDate: string, lang: string = "en"): string {
+  if (!isoDate) return "";
   try {
     const parts = isoDate.split("-").map(Number);
-    if (parts.length === 3) {
+    if (parts.length === 3 && parts.every((n) => Number.isFinite(n))) {
       const dt = new Date(parts[0], parts[1] - 1, parts[2]);
-      return dt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      if (Number.isFinite(dt.getTime())) {
+        const locale = lang === "he" ? "he-IL" : "en-US";
+        return dt.toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric" });
+      }
     }
   } catch {
     // fallback
@@ -157,6 +163,7 @@ const weekdayToTabMap: Record<number, DayTabFilter> = {
  * @param watchlistOnly - Filter to show only watchlist events
  * @param focusSymbol - Ticker to highlight from notification / alert
  * @param focusDate - Date to highlight alongside focusSymbol
+ * @param onStatusChange - Optional callback reporting live/mock status
  * @returns The rendered earnings calendar component
  */
 export function EarningsCalendar({
@@ -168,8 +175,9 @@ export function EarningsCalendar({
   focusDate,
   initialDay = "all",
   initialViewMode = "grid",
+  onStatusChange,
 }: EarningsCalendarProps) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [activeDayTab, setActiveDayTab] = useState<DayTabFilter>(initialDay);
   const [viewMode, setViewMode] = useState<ViewMode>(initialViewMode);
 
@@ -180,41 +188,68 @@ export function EarningsCalendar({
 
   const { data, isLoading } = useEarningsCalendar(from, to);
 
+  const isMock = !data || data.length === 0;
+
+  useEffect(() => {
+    if (!isLoading && onStatusChange) {
+      onStatusChange(isMock ? "mock" : "live");
+    }
+  }, [isMock, isLoading, onStatusChange]);
+
   const eventsList = useMemo<EarningsEventData[]>(() => {
     if (data && data.length > 0) {
-      let filtered = data.filter(
-        (e: any) =>
-          watchlistSymbols.includes((e.symbol ?? "").toUpperCase()) ||
-          (e.revenueEstimated && e.revenueEstimated > 3_000_000_000) ||
-          (e.marketCap && e.marketCap > 10_000_000_000)
-      );
+      // Apply explicit marketCap filter first
+      let filtered = data.filter((e: any) => inMarketCapBucket(e.marketCap, marketCap));
 
       if (watchlistOnly) {
         filtered = filtered.filter((e: any) =>
           watchlistSymbols.includes((e.symbol ?? "").toUpperCase())
         );
+      } else if (marketCap === "all") {
+        // When viewing all caps, prioritize significant stocks and watchlist members
+        filtered = filtered.filter(
+          (e: any) =>
+            watchlistSymbols.includes((e.symbol ?? "").toUpperCase()) ||
+            (e.revenueEstimated && e.revenueEstimated > 3_000_000_000) ||
+            (e.marketCap && e.marketCap > 10_000_000_000)
+        );
       }
 
-      filtered = filtered.filter((e: any) => inMarketCapBucket(e.marketCap, marketCap));
-
-      return filtered.slice(0, 30).map((e: any) => {
+      return filtered.slice(0, 40).map((e: any) => {
         const wd = weekdayOf(e.date);
         const ticker = (e.symbol ?? "").toUpperCase();
+        const timeNorm = (e.time ?? "").toLowerCase();
+        const normalizedTime =
+          timeNorm === "amc" || timeNorm.includes("close")
+            ? "After Close"
+            : timeNorm === "bmo" || timeNorm.includes("open")
+            ? "Before Open"
+            : "unknown";
+
         return {
           ticker,
           name: e.name || e.companyName || ticker,
           date: e.date,
-          dateFull: formatHumanDate(e.date),
+          dateFull: formatHumanDate(e.date, lang),
           weekday: wd,
-          epsEst: e.epsEstimated ?? null,
-          epsActual: e.eps ?? null,
-          revEst: e.revenueEstimated ? e.revenueEstimated / 1e9 : null,
-          revActual: e.revenue ? e.revenue / 1e9 : null,
-          time: e.time === "amc" || e.time === "After Close" ? "After Close" : "Before Open",
+          epsEst: e.epsEstimated ?? e.epsEstimate ?? null,
+          epsActual: e.eps ?? e.epsActual ?? null,
+          revEst: e.revenueEstimated
+            ? e.revenueEstimated / 1e9
+            : e.revenueEstimate
+            ? e.revenueEstimate / 1e9
+            : null,
+          revActual: e.revenue ? e.revenue / 1e9 : e.revenueActual ? e.revenueActual / 1e9 : null,
+          time: normalizedTime,
           marketCap: e.marketCap,
-          surprise: e.eps != null && e.epsEstimated != null
-            ? (e.eps > e.epsEstimated ? "beat" : e.eps < e.epsEstimated ? "miss" : "none")
-            : "none",
+          surprise:
+            (e.eps ?? e.epsActual) != null && (e.epsEstimated ?? e.epsEstimate) != null
+              ? (e.eps ?? e.epsActual) > (e.epsEstimated ?? e.epsEstimate)
+                ? "beat"
+                : (e.eps ?? e.epsActual) < (e.epsEstimated ?? e.epsEstimate)
+                ? "miss"
+                : "none"
+              : "none",
           isWatchlist: watchlistSymbols.includes(ticker),
         };
       });
@@ -223,6 +258,7 @@ export function EarningsCalendar({
     // Mock fallback matching showcase events
     let mockFiltered = mockEarningsEvents.map((e) => ({
       ...e,
+      dateFull: formatHumanDate(e.dateFull || e.date, lang),
       isWatchlist: watchlistSymbols.includes(e.ticker) || e.isWatchlist,
     }));
 
@@ -239,9 +275,9 @@ export function EarningsCalendar({
 
     return mockFiltered.map((e) => ({
       ...e,
-      weekday: mockNameToWd[e.date] ?? 1,
+      weekday: typeof e.weekday === "number" ? e.weekday : mockNameToWd[e.date] ?? 1,
     }));
-  }, [data, marketCap, watchlistOnly, watchlistSymbols]);
+  }, [data, marketCap, watchlistOnly, watchlistSymbols, lang]);
 
   // Filter by active day tab if in Grid Mode
   const displayedGridEvents = useMemo(() => {
@@ -251,6 +287,9 @@ export function EarningsCalendar({
       return tabName === activeDayTab;
     });
   }, [eventsList, activeDayTab]);
+
+  // Active rendered count depending on current view mode
+  const displayedCount = viewMode === "grid" ? displayedGridEvents.length : eventsList.length;
 
   // Scroll matching card into view on focus
   const didScrollRef = useRef<string | null>(null);
@@ -272,9 +311,6 @@ export function EarningsCalendar({
       didScrollRef.current = stamp;
     }
   }, [focusSymbol, focusDate, eventsList.length, isLoading]);
-
-  const isMock = !data || data.length === 0;
-  const eventCount = eventsList.length;
 
   const days = [
     { wd: 1, tab: "Mon" as const, i18nKey: "earningsCalendar.mon" },
@@ -306,6 +342,7 @@ export function EarningsCalendar({
           <div className="flex items-center bg-muted/60 rounded-lg p-1 border border-border">
             <button
               type="button"
+              aria-pressed={viewMode === "grid"}
               onClick={() => setViewMode("grid")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono font-medium transition-all ${
                 viewMode === "grid"
@@ -318,6 +355,7 @@ export function EarningsCalendar({
             </button>
             <button
               type="button"
+              aria-pressed={viewMode === "calendar"}
               onClick={() => setViewMode("calendar")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono font-medium transition-all ${
                 viewMode === "calendar"
@@ -337,12 +375,12 @@ export function EarningsCalendar({
         <div className="flex items-center gap-2 text-muted-foreground">
           <Database className="w-3.5 h-3.5 text-primary" />
           <span>{t("earningsCalendar.dataSource")}</span>
-          <span className="w-1.5 h-1.5 rounded-full bg-chart-positive animate-pulse" />
+          <span className="w-1.5 h-1.5 rounded-full bg-chart-positive motion-safe:animate-pulse" />
         </div>
         <div className="flex items-center gap-2">
           {!isLoading && (
             <span className="text-muted-foreground bg-secondary/60 border border-border px-2 py-0.5 rounded text-[11px]">
-              {t("earningsCalendar.showing_other", { count: eventCount })}
+              {t("earningsCalendar.showing", { count: displayedCount })}
             </span>
           )}
           {isMock && !isLoading && (
@@ -358,6 +396,7 @@ export function EarningsCalendar({
         <div className="p-4 sm:px-6 bg-background/70 border-b border-border/70 flex items-center gap-1.5 overflow-x-auto">
           <button
             type="button"
+            aria-pressed={activeDayTab === "all"}
             onClick={() => setActiveDayTab("all")}
             className={`px-3.5 py-1.5 rounded-lg text-xs font-mono transition-all shrink-0 ${
               activeDayTab === "all"
@@ -371,6 +410,7 @@ export function EarningsCalendar({
             <button
               key={d.tab}
               type="button"
+              aria-pressed={activeDayTab === d.tab}
               onClick={() => setActiveDayTab(d.tab)}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-mono transition-all shrink-0 ${
                 activeDayTab === d.tab
@@ -386,13 +426,13 @@ export function EarningsCalendar({
 
       {/* Body Content: Grid View or Weekly Columns Calendar */}
       <div className="p-6">
-        {eventCount === 0 && !isLoading ? (
+        {displayedCount === 0 && !isLoading ? (
           <div className="p-12 text-center text-muted-foreground font-mono text-sm space-y-2">
             <p className="text-base text-foreground font-semibold">
               {t("earningsCalendar.noEventsThisWeek")}
             </p>
             <p className="text-xs text-muted-foreground">
-              Adjust your watchlist or market cap filters to expand event coverage.
+              {t("earningsCalendar.adjustFiltersHint")}
             </p>
           </div>
         ) : viewMode === "grid" ? (
@@ -422,6 +462,11 @@ export function EarningsCalendar({
                   e.time === "After Close" ||
                   e.time === "amc" ||
                   e.time.toLowerCase().includes("close")
+              );
+              const otherEvents = dayEvents.filter(
+                (e) =>
+                  !bmoEvents.includes(e) &&
+                  !amcEvents.includes(e)
               );
 
               return (
@@ -463,7 +508,7 @@ export function EarningsCalendar({
                       </div>
                       <div className="relative flex justify-center">
                         <span className="bg-card px-2 text-[10px] font-mono text-muted-foreground uppercase">
-                          Market Close
+                          {t("earningsCalendar.marketClose")}
                         </span>
                       </div>
                     </div>
@@ -488,6 +533,23 @@ export function EarningsCalendar({
                         ))
                       )}
                     </div>
+
+                    {/* Unspecified Timing Section (if any) */}
+                    {otherEvents.length > 0 && (
+                      <div className="space-y-2.5 pt-2 border-t border-border/40">
+                        <div className="flex items-center gap-1.5 text-[11px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>{t("earningsCalendar.unknownTiming")}</span>
+                        </div>
+                        {otherEvents.map((ev) => (
+                          <EarningsCard
+                            key={`other-${ev.ticker}-${ev.date}`}
+                            event={ev}
+                            isFocus={focusSymbol === ev.ticker && focusDate === ev.date}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
