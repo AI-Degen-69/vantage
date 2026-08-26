@@ -72,10 +72,10 @@ function getStatusMeta(status: ProviderStatus, t: (k: string, v?: Record<string,
     default:
       return {
         label: t("providerHealth.status.notConfigured"),
-        dotColor: "bg-slate-500",
-        badgeBg: "bg-slate-800 text-slate-400 border-slate-700",
+        dotColor: "bg-muted-foreground",
+        badgeBg: "bg-muted text-muted-foreground border-border",
         icon: HelpCircle,
-        iconColor: "text-slate-400",
+        iconColor: "text-muted-foreground",
       };
   }
 }
@@ -86,7 +86,7 @@ function getStatusMeta(status: ProviderStatus, t: (k: string, v?: Record<string,
  * Features at-a-glance provider chips, fallback awareness, and an expandable
  * diagnostic drawer explaining live routing and status per provider.
  */
-export default function ProviderHealthIndicator() {
+export function ProviderHealthIndicator() {
   const { t } = useI18n();
   const { data, refetch, isFetching } = useProviderHealth();
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
@@ -357,3 +357,5 @@ export default function ProviderHealthIndicator() {
     </footer>
   );
 }
+
+export default ProviderHealthIndicator;

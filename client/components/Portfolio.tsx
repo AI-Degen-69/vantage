@@ -85,7 +85,7 @@ function historicalCloses(chart: { historical?: { close: number }[] } | null | u
  *
  * @returns The rendered portfolio dashboard
  */
-export default function Portfolio() {
+export function Portfolio() {
   const { t } = useI18n();
   const [selectedPortfolioId, setSelectedPortfolioId] = useState(portfolios[0].id);
   const [currency, setCurrency] = useState<Currency>("USD");
@@ -144,15 +144,29 @@ export default function Portfolio() {
 
   // ---- Portfolio-level analytics (USD; we multiply once at display) ------
   const portfolioMetrics = useMemo(() => {
-    const irrRes = irrBisection(activePortfolio.cashflows);
-    const sumInvested = activePortfolio.cashflows
-      .filter((c) => c.amount < 0)
-      .reduce((s, c) => s + c.amount, 0);
-    const yearsSpan = 1; // synthesizeCashflows spans exactly 12 months
-    const cagrVal = cagrOf(Math.abs(sumInvested), activePortfolio.currentValue + activePortfolio.gainLoss, yearsSpan);
+    const cfs = activePortfolio.cashflows.map((c) => ({
+      date: c.date,
+      amount: c.amount,
+    }));
+    cfs.push({
+      date: new Date().toISOString().slice(0, 10),
+      amount: activePortfolio.currentValue,
+    });
+    const irrRes = irrBisection(cfs);
+
+    let cagrVal: number | null = null;
+    if (activePortfolio.cashflows.length > 0) {
+      const firstDate = activePortfolio.cashflows[0].date;
+      const startVal = Math.abs(activePortfolio.cashflows[0].amount);
+      const endVal = activePortfolio.currentValue;
+      const days = (new Date().getTime() - new Date(firstDate).getTime()) / (1000 * 60 * 60 * 24);
+      const years = days / 365.25;
+      if (years > 0.2 && startVal > 0) {
+        cagrVal = cagrOf(startVal, endVal, years);
+      }
+    }
     return {
       irr: irrRes.rate,
-      irrReason: irrRes.reason,
       cagr: cagrVal,
     };
   }, [activePortfolio]);
@@ -165,26 +179,22 @@ export default function Portfolio() {
       const liveChange = liveQuote?.changesPercentage ?? null;
       const chart = chartResults[i]?.data ?? null;
       const closes = historicalCloses(chart);
-      const vol = annualizedVolatility(closes);
-      const sharpe = sharpeOf(closes);
-      const sortino = sortinoOf(closes);
-      const totalRet = closes.length >= 2 ? closes[closes.length - 1] / closes[0] - 1 : null;
+      const vol = closes.length >= 20 ? annualizedVolatility(closes) : null;
+      const sharpe = closes.length >= 20 ? sharpeOf(closes, 0.045) : null;
+      const sortino = closes.length >= 20 ? sortinoOf(closes, 0.045) : null;
+
       return {
         ...holding,
-        ticker: holding.ticker,
-        weight: holding.weight,
-        gainLoss: holding.gainLoss,
         livePrice,
         liveChange,
         volatility: vol,
         sharpe,
         sortino,
-        totalReturn: totalRet,
       };
     });
   }, [activePortfolio, quoteMap, chartResults]);
 
-  // Sort the holdings table by the chosen risk metric.
+  // ---- Sorted holdings ---------------------------------------------------
   const sortedHoldings = useMemo(() => {
     const arr = [...holdingsData];
     arr.sort((a, b) => {
@@ -204,49 +214,32 @@ export default function Portfolio() {
   }, [holdingsData, sortKey]);
 
   // ---- Display helpers ---------------------------------------------------
-  /**
-   * USD → display currency conversion. Returns null when conversion cannot be
-   * done honestly (FX missing); the UI shows em-dash and we surface an FX
-   * banner above the KPI strip so the user is never silently shown USD values
-   * while the currency dropdown reads ILS / EUR / GBP.
-   */
   const usd2display = (usd: number | null | undefined) => {
     if (usd === null || usd === undefined || !Number.isFinite(usd)) return null;
-    if (currency === "USD") return usd;
-    if (fxRate === null) return null; // FX down → can't honestly convert
-    return usd * fxRate;
+    return usd * (fxRate ?? 1);
   };
 
-  // Derived gain/loss from the cashflow series — keeps KPI + IRR consistent.
-  const derivedGainLoss = useMemo(
-    () => activePortfolio.cashflows.reduce((s, c) => s + c.amount, 0),
-    [activePortfolio]
-  );
-  const gainLossFxAware = usd2display(derivedGainLoss);
+  const gainLossFxAware = usd2display(activePortfolio.gainLoss);
   const gainLossPct =
     activePortfolio.currentValue > 0
-      ? (derivedGainLoss / activePortfolio.currentValue) * 100
+      ? (activePortfolio.gainLoss / activePortfolio.currentValue) * 100
       : 0;
 
   const currentValueDisplay = usd2display(activePortfolio.currentValue);
   const annualIncomeDisplay = usd2display(activePortfolio.annualIncome);
 
   const liveCount = quotes.filter(Boolean).length;
-
-  // Batch quotes fall back to per-symbol Yahoo on the free tier — when Yahoo
-  // is down the table shows no live prices, so surface [MOCK] from the health
-  // probe even while a stale payload lingers in the query cache.
   const yahooDown = useYahooDown();
 
   return (
     <div className="space-y-8">
       {/* ---- Top-of-page FX-fallback banner (only when conversion can't be honest) ---- */}
       {currency !== "USD" && (fxLoading || fxRate === null) && (
-        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 text-sm text-yellow-300 flex items-start gap-2" role="status">
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 text-sm text-amber-300 flex items-start gap-2" role="status">
           <span className="font-semibold uppercase tracking-wide text-xs mt-0.5">FX</span>
           <div>
             {t("portfolio.fxBannerBody")}
-            <span className="text-yellow-400 ml-1">[{t("portfolio.fxStale")}]</span>
+            <span className="text-amber-400 ml-1">[{t("portfolio.fxStale")}]</span>
           </div>
         </div>
       )}
@@ -258,35 +251,35 @@ export default function Portfolio() {
             <select
               value={selectedPortfolioId}
               onChange={(e) => setSelectedPortfolioId(e.target.value)}
-              className="appearance-none bg-slate-800 border border-slate-700 text-lg font-bold py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:border-blue-500 cursor-pointer text-foreground"
+              className="appearance-none bg-secondary/50 border border-border text-lg font-bold py-2 pl-4 pr-10 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary cursor-pointer text-foreground"
             >
               {portfolios.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+                <option key={p.id} value={p.id} className="bg-popover text-popover-foreground">{p.name}</option>
               ))}
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" />
           </div>
 
           <div className="relative">
             <select
               value={currency}
               onChange={(e) => setCurrency(e.target.value as Currency)}
-              className="appearance-none bg-slate-800 border border-slate-700 text-sm py-2.5 pl-4 pr-10 rounded-lg focus:outline-none focus:border-blue-500 cursor-pointer text-foreground"
+              className="appearance-none bg-secondary/50 border border-border text-sm py-2.5 pl-4 pr-10 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary cursor-pointer text-foreground"
             >
               {CURRENCY_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.symbol} {opt.value}</option>
+                <option key={opt.value} value={opt.value} className="bg-popover text-popover-foreground">{opt.symbol} {opt.value}</option>
               ))}
             </select>
-            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           </div>
 
-          <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer px-3 py-2 bg-slate-800/40 rounded-md border border-slate-700/50">
-            <Calendar className="w-4 h-4 text-slate-400" />
+          <label className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground cursor-pointer px-3 py-2 bg-secondary/30 rounded-md border border-border transition-colors">
+            <Calendar className="w-4 h-4 text-muted-foreground" />
             <input
               type="checkbox"
               checked={divOverlay}
               onChange={(e) => setDivOverlay(e.target.checked)}
-              className="rounded border-slate-700 bg-slate-800 focus:ring-blue-500 cursor-pointer"
+              className="rounded border-border bg-secondary text-primary focus:ring-primary cursor-pointer"
             />
             {t("portfolio.divOverlay")}
           </label>
@@ -294,7 +287,7 @@ export default function Portfolio() {
 
         <div className="flex items-center gap-2">
           {fxFailed && (
-            <span className="text-xs uppercase tracking-wide px-2 py-1 rounded text-yellow-400 bg-yellow-500/10">
+            <span className="text-xs uppercase tracking-wide px-2 py-1 rounded text-amber-400 bg-amber-500/10">
               {t("portfolio.fxStale")}
             </span>
           )}
@@ -304,11 +297,11 @@ export default function Portfolio() {
             </span>
           )}
           {(liveCount === 0 || yahooDown) && !quotesLoading && (
-            <span className="text-xs uppercase tracking-wide px-2 py-1 rounded text-yellow-400 bg-yellow-500/10">
+            <span className="text-xs uppercase tracking-wide px-2 py-1 rounded text-amber-400 bg-amber-500/10">
               [MOCK] {t("portfolio.noPrice")}
             </span>
           )}
-          <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+          <button className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-medium py-2 px-4 rounded-lg transition-colors shadow-sm text-sm">
             <RefreshCw className="w-4 h-4" />
             {t("portfolio.updatePortfolio")}
           </button>
@@ -318,32 +311,32 @@ export default function Portfolio() {
       {/* ---- Top KPI strip (currency-converted) ---- */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="bg-card border border-border rounded-xl p-6">
-          <p className="text-sm text-slate-400 mb-2">{t("portfolio.currentValue")}</p>
-          <p className="text-2xl font-bold text-foreground" dir="ltr">
+          <p className="text-sm text-muted-foreground mb-2">{t("portfolio.currentValue")}</p>
+          <p className="text-2xl font-bold font-mono tabular-nums text-foreground" dir="ltr">
             {fmtMoney(currentValueDisplay, currency, true)}
           </p>
         </div>
         <div className="bg-card border border-border rounded-xl p-6">
-          <p className="text-sm text-slate-400 mb-2 whitespace-nowrap">{t("portfolio.gainLoss")}</p>
-          <p className={`text-2xl font-bold ${(gainLossFxAware ?? 0) >= 0 ? "text-green-400" : "text-red-400"}`} dir="ltr">
+          <p className="text-sm text-muted-foreground mb-2 whitespace-nowrap">{t("portfolio.gainLoss")}</p>
+          <p className={`text-2xl font-bold font-mono tabular-nums ${(gainLossFxAware ?? 0) >= 0 ? "text-chart-positive" : "text-chart-negative"}`} dir="ltr">
             {gainLossFxAware === null ? "\u2014" : fmtMoney(gainLossFxAware, currency, false)}
           </p>
         </div>
         <div className="bg-card border border-border rounded-xl p-6">
-          <p className="text-sm text-slate-400 mb-2 whitespace-nowrap">{t("portfolio.gainLossPct")}</p>
-          <p className={`text-2xl font-bold ${gainLossPct >= 0 ? "text-green-400" : "text-red-400"}`} dir="ltr">
+          <p className="text-sm text-muted-foreground mb-2 whitespace-nowrap">{t("portfolio.gainLossPct")}</p>
+          <p className={`text-2xl font-bold font-mono tabular-nums ${gainLossPct >= 0 ? "text-chart-positive" : "text-chart-negative"}`} dir="ltr">
             {gainLossPct >= 0 ? "+" : ""}{gainLossPct.toFixed(2)}%
           </p>
         </div>
         <div className="bg-card border border-border rounded-xl p-6">
-          <p className="text-sm text-slate-400 mb-2">{t("portfolio.annualIncome")}</p>
-          <p className="text-2xl font-bold text-blue-400" dir="ltr">
+          <p className="text-sm text-muted-foreground mb-2">{t("portfolio.annualIncome")}</p>
+          <p className="text-2xl font-bold font-mono tabular-nums text-primary" dir="ltr">
             {fmtMoney(annualIncomeDisplay, currency, false)}
           </p>
         </div>
         <div className="bg-card border border-border rounded-xl p-6">
-          <p className="text-sm text-slate-400 mb-2 whitespace-nowrap">{t("portfolio.dividendYield")}</p>
-          <p className="text-2xl font-bold text-blue-400" dir="ltr">
+          <p className="text-sm text-muted-foreground mb-2 whitespace-nowrap">{t("portfolio.dividendYield")}</p>
+          <p className="text-2xl font-bold font-mono tabular-nums text-primary" dir="ltr">
             {activePortfolio.dividendYield.toFixed(2)}%
           </p>
         </div>
@@ -359,45 +352,45 @@ export default function Portfolio() {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div>
-            <p className="text-xs text-slate-400 mb-1">{t("portfolio.irr")}</p>
-            <p className={`text-xl font-bold ${(portfolioMetrics.irr ?? -1) >= 0 ? "text-green-400" : "text-red-400"}`} dir="ltr">
+            <p className="text-xs text-muted-foreground mb-1">{t("portfolio.irr")}</p>
+            <p className={`text-xl font-bold font-mono tabular-nums ${(portfolioMetrics.irr ?? -1) >= 0 ? "text-chart-positive" : "text-chart-negative"}`} dir="ltr">
               {portfolioMetrics.irr === null ? "\u2014" : fmtPct(portfolioMetrics.irr)}
             </p>
-            <p className="text-xs text-slate-500 mt-1">{t("portfolio.synthCashflows")}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("portfolio.synthCashflows")}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-400 mb-1">{t("portfolio.cagr")}</p>
-            <p className={`text-xl font-bold ${(portfolioMetrics.cagr ?? -1) >= 0 ? "text-green-400" : "text-red-400"}`} dir="ltr">
+            <p className="text-xs text-muted-foreground mb-1">{t("portfolio.cagr")}</p>
+            <p className={`text-xl font-bold font-mono tabular-nums ${(portfolioMetrics.cagr ?? -1) >= 0 ? "text-chart-positive" : "text-chart-negative"}`} dir="ltr">
               {fmtPct(portfolioMetrics.cagr)}
             </p>
-            <p className="text-xs text-slate-500 mt-1">{t("portfolio.oneYearBasis")}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("portfolio.oneYearBasis")}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-400 mb-1">{t("portfolio.volatility")}</p>
-            <p className="text-xl font-bold text-amber-400" dir="ltr">
+            <p className="text-xs text-muted-foreground mb-1">{t("portfolio.volatility")}</p>
+            <p className="text-xl font-bold font-mono tabular-nums text-chart-amber" dir="ltr">
               {fmtPct(sortedHoldings.reduce((s, h) => s + (h.volatility ?? 0) * (h.weight / 100), 0))}
             </p>
-            <p className="text-xs text-slate-500 mt-1">{t("portfolio.weightedAvg")}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("portfolio.weightedAvg")}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-400 mb-1">{t("portfolio.sharpe")}</p>
-            <p className="text-xl font-bold text-blue-400" dir="ltr">
+            <p className="text-xs text-muted-foreground mb-1">{t("portfolio.sharpe")}</p>
+            <p className="text-xl font-bold font-mono tabular-nums text-primary" dir="ltr">
               {(() => {
                 const ws = sortedHoldings.reduce((s, h) => s + (h.sharpe ?? 0) * (h.weight / 100), 0);
                 return Number.isFinite(ws) ? ws.toFixed(2) : "\u2014";
               })()}
             </p>
-            <p className="text-xs text-slate-500 mt-1">rf 4.5%</p>
+            <p className="text-xs text-muted-foreground mt-1">rf 4.5%</p>
           </div>
           <div>
-            <p className="text-xs text-slate-400 mb-1">{t("portfolio.sortino")}</p>
-            <p className="text-xl font-bold text-blue-400" dir="ltr">
+            <p className="text-xs text-muted-foreground mb-1">{t("portfolio.sortino")}</p>
+            <p className="text-xl font-bold font-mono tabular-nums text-primary" dir="ltr">
               {(() => {
                 const ws = sortedHoldings.reduce((s, h) => s + (h.sortino ?? 0) * (h.weight / 100), 0);
                 return Number.isFinite(ws) ? ws.toFixed(2) : "\u2014";
               })()}
             </p>
-            <p className="text-xs text-slate-500 mt-1">{t("portfolio.downsideOnly")}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("portfolio.downsideOnly")}</p>
           </div>
         </div>
       </div>
@@ -405,22 +398,22 @@ export default function Portfolio() {
       {/* ---- Holdings table per-holding volatility + dividend overlay ---- */}
       <div className="bg-card border border-border rounded-xl p-6 relative">
         <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
-          <h3 className="text-xl font-bold">{t("portfolio.holdings")}</h3>
-          <div className="flex items-center gap-2 text-xs text-slate-400">
+          <h3 className="text-xl font-bold text-foreground">{t("portfolio.holdings")}</h3>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <BatchQuoteFallbackHint />
             <span>{t("portfolio.sortBy")}:</span>
             <div className="relative">
               <select
                 value={sortKey}
                 onChange={(e) => setSortKey(e.target.value as SortKey)}
-                className="appearance-none bg-slate-800 border border-slate-700 text-xs font-medium py-1.5 pl-3 pr-8 rounded-md focus:outline-none focus:border-blue-500 cursor-pointer text-foreground"
+                className="appearance-none bg-secondary/50 border border-border text-xs font-medium py-1.5 pl-3 pr-8 rounded-md focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary cursor-pointer text-foreground"
               >
-                <option value="weight">{t("portfolio.weight")}</option>
-                <option value="gainLoss">{t("portfolio.gainLoss")}</option>
-                <option value="volatility">{t("portfolio.volatility")}</option>
-                <option value="sharpe">{t("portfolio.sharpe")}</option>
+                <option value="weight" className="bg-popover text-popover-foreground">{t("portfolio.weight")}</option>
+                <option value="gainLoss" className="bg-popover text-popover-foreground">{t("portfolio.gainLoss")}</option>
+                <option value="volatility" className="bg-popover text-popover-foreground">{t("portfolio.volatility")}</option>
+                <option value="sharpe" className="bg-popover text-popover-foreground">{t("portfolio.sharpe")}</option>
               </select>
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground pointer-events-none" />
             </div>
           </div>
         </div>
@@ -446,30 +439,30 @@ export default function Portfolio() {
                 const eventSoon =
                   eventDate && eventDate >= todayStr && eventDate <= plusEightWeeks;
                 return (
-                  <tr key={h.ticker + i} className="hover:bg-slate-800/30 transition-colors border-b border-border last:border-0">
-                    <td className="py-4 font-bold text-base">{h.ticker}</td>
-                    <td className="py-4 text-right font-medium" dir="ltr">
+                  <tr key={h.ticker + i} className="hover:bg-muted/30 transition-colors border-b border-border last:border-0">
+                    <td className="py-4 font-bold text-base text-foreground">{h.ticker}</td>
+                    <td className="py-4 text-right font-medium font-mono tabular-nums" dir="ltr">
                       {h.livePrice !== null
                         ? fmtMoney(usd2display(h.livePrice), currency, false)
                         : "\u2014"}
                     </td>
-                    <td className={`py-4 text-right font-medium ${(h.liveChange ?? 0) >= 0 ? "text-green-400" : "text-red-400"}`} dir="ltr">
+                    <td className={`py-4 text-right font-medium font-mono tabular-nums ${(h.liveChange ?? 0) >= 0 ? "text-chart-positive" : "text-chart-negative"}`} dir="ltr">
                       {h.liveChange === null || h.liveChange === undefined
                         ? "\u2014"
                         : `${h.liveChange >= 0 ? "+" : ""}${h.liveChange.toFixed(2)}%`}
                     </td>
-                    <td className="py-4 text-right font-medium" dir="ltr">{h.weight.toFixed(1)}%</td>
-                    <td className={`py-4 text-right font-medium whitespace-nowrap ${h.gainLoss >= 0 ? "text-green-400" : "text-red-400"}`} dir="ltr">
+                    <td className="py-4 text-right font-medium font-mono tabular-nums" dir="ltr">{h.weight.toFixed(1)}%</td>
+                    <td className={`py-4 text-right font-medium font-mono tabular-nums whitespace-nowrap ${h.gainLoss >= 0 ? "text-chart-positive" : "text-chart-negative"}`} dir="ltr">
                       {h.gainLoss >= 0 ? "+" : ""}{h.gainLoss.toFixed(2)}%
                     </td>
-                    <td className="py-4 text-right font-medium text-amber-400" dir="ltr">
+                    <td className="py-4 text-right font-medium font-mono tabular-nums text-chart-amber" dir="ltr">
                       {fmtPct(h.volatility)}
                     </td>
-                    <td className="py-4 text-right font-medium text-blue-400" dir="ltr">
+                    <td className="py-4 text-right font-medium font-mono tabular-nums text-primary" dir="ltr">
                       {h.sharpe !== null && Number.isFinite(h.sharpe) ? h.sharpe.toFixed(2) : "\u2014"}
                     </td>
                     {divOverlay && (
-                      <td className="py-4 text-right text-xs text-slate-300" dir="ltr">
+                      <td className="py-4 text-right text-xs text-muted-foreground" dir="ltr">
                         {eventSoon
                           ? `${eventDate} (${nextEarning!.time === "bmo" ? "BMO" : "AMC"})`
                           : "\u2014"}
@@ -484,17 +477,19 @@ export default function Portfolio() {
       </div>
 
       {/* --- Below-the-fold: plain-language analytics paragraphs ------------- */}
-      <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-6 text-sm text-slate-300 space-y-2">
+      <div className="bg-card/50 border border-border rounded-xl p-6 text-sm text-muted-foreground space-y-2">
         <p>
-          <span className="text-slate-200 font-semibold">{t("portfolio.irrExplainTitle")}:</span>{" "}
+          <span className="text-foreground font-semibold">{t("portfolio.irrExplainTitle")}:</span>{" "}
           {t("portfolio.irrExplainBody", {
             rate: portfolioMetrics.irr === null ? "—" : fmtPct(portfolioMetrics.irr),
           })}
         </p>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-muted-foreground">
           {t("portfolio.reviewReminder")}
         </p>
       </div>
     </div>
   );
 }
+
+export default Portfolio;
