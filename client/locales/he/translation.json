@@ -72,12 +72,15 @@
       "discountInput": "תשואת יעד / שיעור היוון (%)",
       "sharesInput": "מניות מונפקות (מיליארד)",
       "computedFairValue": "שווי הוגן מחושב",
+      "perShare": "(למניה)",
+      "totalEnterpriseValue": "שווי פעילות כולל:",
       "marketPrice": "מחיר שוק נוכחי",
       "upside": "מרווח ביטחון צפוי",
       "undervalued": "מתחת לשווי (הזדמנות)",
       "fairValue": "שווי הוגן",
       "overvalued": "מעל השווי",
-      "openDcfTool": "פתח כלי DCF מלא במרחב המחקר ←"
+      "openDcfTool": "פתח כלי DCF מלא במרחב המחקר ←",
+      "openInCharts": "פתח הערכת DCF בגרפים ←"
     },
     "features": {
       "badge": "ערכת המכשירים",

@@ -72,12 +72,15 @@
       "discountInput": "Target Discount Rate (%)",
       "sharesInput": "Shares Outstanding (B)",
       "computedFairValue": "Estimated Fair Value",
+      "perShare": "(Per Share)",
+      "totalEnterpriseValue": "Total Enterprise Value:",
       "marketPrice": "Market Price",
       "upside": "Projected Margin of Safety",
       "undervalued": "Undervalued",
       "fairValue": "Fairly Valued",
       "overvalued": "Overvalued",
-      "openDcfTool": "Open Full DCF Tool in Workspace →"
+      "openDcfTool": "Open Full DCF Tool in Workspace →",
+      "openInCharts": "Open DCF Valuation in Charts →"
     },
     "features": {
       "badge": "The Instrument Suite",

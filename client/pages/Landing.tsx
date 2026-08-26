@@ -355,6 +355,7 @@ export default function Landing() {
     const marginOfSafety = ((fairValuePerShare - currentPriceRef) / currentPriceRef) * 100;
 
     return {
+      enterpriseValue,
       fairValue: Math.max(0, fairValuePerShare),
       marginOfSafety,
       isUndervalued: marginOfSafety > 5,
@@ -900,12 +901,6 @@ export default function Landing() {
                 {t("landing.dcfSandbox.subtitle")}
               </p>
             </div>
-            <Link
-              to="/stock/AAPL"
-              className="inline-flex items-center gap-1.5 text-xs font-mono text-primary hover:underline shrink-0"
-            >
-              <span>{t("landing.dcfSandbox.openDcfTool")}</span>
-            </Link>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
@@ -1024,7 +1019,7 @@ export default function Landing() {
             <div className="lg:col-span-5 p-6 rounded-[6px] bg-background/90 border border-border space-y-5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                  {t("landing.dcfSandbox.computedFairValue")}
+                  {t("landing.dcfSandbox.computedFairValue")} {t("landing.dcfSandbox.perShare")}
                 </span>
 
                 <span
@@ -1066,13 +1061,20 @@ export default function Landing() {
                     {computedDcf.marginOfSafety.toFixed(1)}%
                   </span>
                 </div>
+
+                <div className="flex justify-between text-muted-foreground/80 pt-1 border-t border-border/40 text-[11px]">
+                  <span>{t("landing.dcfSandbox.totalEnterpriseValue")}</span>
+                  <span className="font-semibold text-foreground" dir="ltr">
+                    ${(computedDcf.enterpriseValue / 1e3).toFixed(2)}T (${computedDcf.enterpriseValue.toFixed(0)}B)
+                  </span>
+                </div>
               </div>
 
               <button
-                onClick={() => navigate("/stock/AAPL")}
+                onClick={() => navigate("/charts?ticker=AAPL")}
                 className="w-full py-2.5 px-4 rounded-[4px] bg-primary text-primary-foreground font-semibold text-xs hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5"
               >
-                <span>Model Full Financials in Workspace →</span>
+                <span>{t("landing.dcfSandbox.openInCharts")}</span>
               </button>
             </div>
           </div>

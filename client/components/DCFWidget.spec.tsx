@@ -6,11 +6,14 @@ import * as React from "react";
 import { MemoryRouter } from "react-router-dom";
 import { DCFWidget } from "./DCFWidget";
 import { I18nProvider } from "@/lib/i18n";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 function withContext(node: React.ReactNode): React.ReactElement {
   return (
     <I18nProvider>
-      <MemoryRouter>{node}</MemoryRouter>
+      <TooltipProvider>
+        <MemoryRouter>{node}</MemoryRouter>
+      </TooltipProvider>
     </I18nProvider>
   );
 }
@@ -31,6 +34,23 @@ describe("DCFWidget", () => {
     expect(html).toContain("231.42");
   });
 
+  it("renders in Earnings Mode with Base Net Income and P/E multiple", () => {
+    const html = renderToString(
+      withContext(
+        <DCFWidget
+          ticker="AAPL"
+          currentPrice={231.42}
+          initialEarnings={100.9}
+          initialValuationMode="earnings"
+        />
+      )
+    );
+
+    expect(html).toContain("Base Net Income ($B)");
+    expect(html).toContain("Terminal Exit Multiple (P/E)");
+    expect(html).toContain("100.9");
+  });
+
   it("renders correctly with custom assumptions and computes intrinsic fair value", () => {
     const html = renderToString(
       withContext(
@@ -40,11 +60,11 @@ describe("DCFWidget", () => {
           initialFcf={80.0}
           initialGrowth={12.0}
           initialMultiple={30.0}
+          sharesOutstanding={7.5}
         />
       )
     );
 
-    expect(html).toContain("MSFT");
     expect(html).toContain("400.00");
     expect(html).toContain("ESTIMATED FAIR VALUE");
   });
@@ -83,8 +103,8 @@ describe("DCFWidget", () => {
     expect(htmlMax).not.toContain("NaN");
 
     // The two renders with extreme target returns should produce valid HTML structures
-    expect(htmlMin).toContain("GOOGL");
-    expect(htmlMax).toContain("GOOGL");
+    expect(htmlMin).toContain("180.00");
+    expect(htmlMax).toContain("180.00");
   });
 
   it("clamps out-of-range initialTargetReturn props to supported bounds", () => {

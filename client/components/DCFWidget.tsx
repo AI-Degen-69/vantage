@@ -1,28 +1,37 @@
 import { useState, useMemo, useEffect } from "react";
 import { useI18n } from "@/lib/i18n";
-import { Sliders, LineChart as ChartIcon } from "lucide-react";
+import { Sliders, LineChart as ChartIcon, Info, RotateCcw } from "lucide-react";
 import {
   LineChart,
   Line,
   ResponsiveContainer,
   XAxis,
   YAxis,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   CartesianGrid,
   ReferenceLine,
 } from "recharts";
-import { Link } from "react-router-dom";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 export interface DCFWidgetProps {
   ticker?: string;
   currentPrice?: number;
   companyName?: string;
   initialFcf?: number;
+  initialEarnings?: number;
   initialGrowth?: number;
   initialMultiple?: number;
   initialDiscount?: number;
   sharesOutstanding?: number;
   initialTargetReturn?: number;
+  initialValuationMode?: "cashFlow" | "earnings";
+}
+
+/**
+ * Clamps target return values to a safe mathematical bound to avoid Infinity/NaN.
+ */
+function clampTargetReturn(val: number): number {
+  return Number.isFinite(val) ? Math.max(-90, Math.min(500, val)) : 15.0;
 }
 
 /**
@@ -32,36 +41,37 @@ export interface DCFWidgetProps {
  * @param ticker - Optional ticker symbol being modeled.
  * @param companyName - Optional friendly company name.
  * @param initialFcf - Base annual free cash flow in billions ($B)
+ * @param initialEarnings - Base annual net income in billions ($B)
  * @param initialGrowth - Projected 5-year growth rate percentage
- * @param initialMultiple - Terminal exit multiple (P/FCF)
+ * @param initialMultiple - Terminal exit multiple (P/FCF or P/E)
  * @param initialDiscount - Target discount / hurdle rate percentage
  * @param sharesOutstanding - Diluted shares outstanding in billions
  * @param initialTargetReturn - Initial target annual return percentage
+ * @param initialValuationMode - Initial mode: "cashFlow" | "earnings"
  * @returns The rendered DCF Sandbox component.
  */
-function clampTargetReturn(val: number): number {
-  return Number.isFinite(val) ? Math.max(-90, Math.min(500, val)) : 15.0;
-}
-
 export function DCFWidget({
   ticker = "AAPL",
   currentPrice = 231.42,
   companyName,
   initialFcf = 108.8,
+  initialEarnings = 100.9,
   initialGrowth = 10.0,
   initialMultiple = 25.0,
   initialDiscount = 9.0,
   sharesOutstanding = 15.2,
   initialTargetReturn = 15.0,
+  initialValuationMode = "cashFlow",
 }: DCFWidgetProps) {
   const { t } = useI18n();
 
-  // Active view tab: Interactive Sandbox (Image 1) or 5Y Trajectory Chart
+  // Active view tab: Interactive Sandbox or 5Y Trajectory Chart
   const [activeTab, setActiveTab] = useState<"sandbox" | "trajectory">("sandbox");
-  const [valuationMode, setValuationMode] = useState<"cashFlow" | "earnings">("cashFlow");
+  const [valuationMode, setValuationMode] = useState<"cashFlow" | "earnings">(initialValuationMode);
 
   // Inputs
   const [baseFcf, setBaseFcf] = useState<number>(initialFcf);
+  const [baseEarnings, setBaseEarnings] = useState<number>(initialEarnings);
   const [growthRate, setGrowthRate] = useState<number>(initialGrowth);
   const [multiple, setMultiple] = useState<number>(initialMultiple);
   const [discountRate, setDiscountRate] = useState<number>(initialDiscount);
@@ -69,56 +79,93 @@ export function DCFWidget({
 
   // Sync inputs when ticker or initial props change
   useEffect(() => {
+    setValuationMode(initialValuationMode);
     setBaseFcf(initialFcf);
+    setBaseEarnings(initialEarnings);
     setGrowthRate(initialGrowth);
     setMultiple(initialMultiple);
     setDiscountRate(initialDiscount);
     setTargetReturn(clampTargetReturn(initialTargetReturn));
-  }, [ticker, initialFcf, initialGrowth, initialMultiple, initialDiscount, initialTargetReturn]);
+  }, [ticker, initialFcf, initialEarnings, initialGrowth, initialMultiple, initialDiscount, initialTargetReturn, initialValuationMode]);
+
+  const handleResetDefaults = () => {
+    setValuationMode(initialValuationMode);
+    setBaseFcf(initialFcf);
+    setBaseEarnings(initialEarnings);
+    setGrowthRate(initialGrowth);
+    setMultiple(initialMultiple);
+    setDiscountRate(initialDiscount);
+    setTargetReturn(clampTargetReturn(initialTargetReturn));
+  };
+
+  // Active base financial metric according to mode
+  const isCashFlowMode = valuationMode === "cashFlow";
+  const activeBase = isCashFlowMode ? baseFcf : baseEarnings;
+  const setActiveBase = isCashFlowMode ? setBaseFcf : setBaseEarnings;
 
   // --------------------------------------------------------------------------
   // DCF Calculations
   // --------------------------------------------------------------------------
   // 5-year discounted cash flow + terminal value computation:
-  // Fair Value = (Sum of discounted FCFs over 5 years + Discounted Terminal Value) / Shares Outstanding
-  const { fairValue, year5Fcf, year5Price, forwardReturn, reverseEntryPrice, marginOfSafety } =
-    useMemo(() => {
-      const g = growthRate / 100;
-      const d = discountRate / 100;
-      let sumPv = 0;
+  // Fair Value = (Sum of discounted future flows + Discounted Terminal Value) / Shares Outstanding
+  const {
+    fairValue,
+    year5Value,
+    year5Price,
+    forwardReturn,
+    targetBuyPrice,
+    requiredMultiple,
+    marginOfSafety,
+  } = useMemo(() => {
+    const g = growthRate / 100;
+    const d = discountRate / 100;
+    let sumPv = 0;
 
-      for (let yr = 1; yr <= 5; yr++) {
-        const fcfYr = baseFcf * Math.pow(1 + g, yr);
-        const pv = fcfYr / Math.pow(1 + d, yr);
-        sumPv += pv;
-      }
+    for (let yr = 1; yr <= 5; yr++) {
+      const valYr = activeBase * Math.pow(1 + g, yr);
+      const pv = valYr / Math.pow(1 + d, yr);
+      sumPv += pv;
+    }
 
-      const y5Fcf = baseFcf * Math.pow(1 + g, 5);
-      const terminalVal = y5Fcf * multiple;
-      const pvTerminal = terminalVal / Math.pow(1 + d, 5);
-      const totalEnterprisePv = sumPv + pvTerminal;
+    const y5Val = activeBase * Math.pow(1 + g, 5);
+    const terminalVal = y5Val * multiple;
+    const pvTerminal = terminalVal / Math.pow(1 + d, 5);
+    const totalEnterprisePv = sumPv + pvTerminal;
 
-      // Intrinsic fair value per share (assuming shares in billions, FCF in billions)
-      const shares = sharesOutstanding > 0 ? sharesOutstanding : 15.2;
-      const computedFairValue = totalEnterprisePv / (shares / 10); // normalized valuation index per share
+    // Intrinsic fair value per share (activeBase in $B, shares in billions)
+    const shares = sharesOutstanding > 0 ? sharesOutstanding : 15.2;
+    const computedFairValue = totalEnterprisePv / shares;
 
-      const y5Price = (y5Fcf / (shares / 10)) * multiple;
-      const fwd = currentPrice > 0 ? (Math.pow(y5Price / currentPrice, 1 / 5) - 1) * 100 : 0;
-      const revEntry =
-        targetReturn > -99.9 && y5Price > 0
-          ? y5Price / Math.pow(1 + targetReturn / 100, 5)
-          : 0;
-      const mos = currentPrice > 0 ? ((computedFairValue - currentPrice) / currentPrice) * 100 : 0;
+    // Year 5 implied target price per share
+    const y5Price = (y5Val / shares) * multiple;
 
-      return {
-        fairValue: computedFairValue,
-        year5Fcf: y5Fcf,
-        year5Price: y5Price,
-        forwardReturn: fwd,
-        reverseEntryPrice: revEntry,
-        marginOfSafety: mos,
-      };
-    }, [baseFcf, growthRate, multiple, discountRate, sharesOutstanding, currentPrice, targetReturn]);
+    // Forward annualized return from current price to Year 5 implied price
+    const fwd = currentPrice > 0 && y5Price > 0 ? (Math.pow(y5Price / currentPrice, 1 / 5) - 1) * 100 : 0;
+
+    // Target Buy Price to achieve targetReturn% annualized return
+    const buyPrice =
+      targetReturn > -99.9 && y5Price > 0
+        ? y5Price / Math.pow(1 + targetReturn / 100, 5)
+        : 0;
+
+    // Required multiple in Year 5 to achieve targetReturn% return from current market price
+    const reqMultiple =
+      y5Val > 0 && currentPrice > 0 && targetReturn > -99.9
+        ? (currentPrice * Math.pow(1 + targetReturn / 100, 5)) / (y5Val / shares)
+        : 0;
+
+    const mos = currentPrice > 0 ? ((computedFairValue - currentPrice) / currentPrice) * 100 : 0;
+
+    return {
+      fairValue: Math.max(0, computedFairValue),
+      year5Value: y5Val,
+      year5Price: Math.max(0, y5Price),
+      forwardReturn: fwd,
+      targetBuyPrice: Math.max(0, buyPrice),
+      requiredMultiple: Math.max(0, reqMultiple),
+      marginOfSafety: mos,
+    };
+  }, [activeBase, growthRate, multiple, discountRate, sharesOutstanding, currentPrice, targetReturn]);
 
   // Status classification
   const valuationStatus = useMemo(() => {
@@ -133,20 +180,25 @@ export function DCFWidget({
     const shares = sharesOutstanding > 0 ? sharesOutstanding : 15.2;
     const data = [];
     for (let i = 0; i <= 5; i++) {
-      const fcf = baseFcf * Math.pow(1 + growthRate / 100, i);
-      const impliedPrice = (fcf / (shares / 10)) * multiple;
+      const val = activeBase * Math.pow(1 + growthRate / 100, i);
+      const impliedPrice = (val / shares) * multiple;
       data.push({
         year: (currentYr + i).toString(),
-        fcf: Number(fcf.toFixed(1)),
+        metric: Number(val.toFixed(1)),
         price: Number(impliedPrice.toFixed(2)),
       });
     }
     return data;
-  }, [baseFcf, growthRate, multiple, sharesOutstanding]);
+  }, [activeBase, growthRate, multiple, sharesOutstanding]);
+
+  // Dynamic slider upper bound for base financial input
+  const baseSliderMax = useMemo(() => {
+    return Math.max(200, Math.ceil(activeBase * 2.5));
+  }, [activeBase]);
 
   return (
     <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-2xl flex flex-col space-y-0">
-      {/* Top Header matching Image 1 */}
+      {/* Top Header */}
       <div className="p-6 sm:p-8 border-b border-border/80 bg-secondary/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-primary mb-1">
@@ -191,17 +243,10 @@ export function DCFWidget({
               <span>{t("dcf.trajectoryTab")}</span>
             </button>
           </div>
-
-          <Link
-            to={`/stock/${ticker}`}
-            className="inline-flex items-center gap-1.5 text-xs font-mono text-primary hover:text-primary/80 transition-colors font-medium"
-          >
-            <span>{t("dcf.openFullTool")}</span>
-          </Link>
         </div>
       </div>
 
-      {/* Main Interactive Valuation Sandbox (Image 1 Design) */}
+      {/* Main Interactive Valuation Sandbox */}
       {activeTab === "sandbox" ? (
         <div className="p-6 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
           {/* Left Controls Column (4 Sliders) */}
@@ -210,54 +255,85 @@ export function DCFWidget({
             <div className="flex items-center gap-2 pb-2">
               <span className="text-xs font-mono text-muted-foreground">{t("dcf.mode")}</span>
               <div className="inline-flex bg-muted/50 rounded-lg p-0.5 border border-border">
-                <button
-                  type="button"
-                  onClick={() => setValuationMode("cashFlow")}
-                  className={`px-3 py-1 text-xs font-mono rounded-md transition-colors ${
-                    valuationMode === "cashFlow"
-                      ? "bg-primary text-primary-foreground font-semibold shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {t("dcf.cashFlowMode")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setValuationMode("earnings")}
-                  className={`px-3 py-1 text-xs font-mono rounded-md transition-colors ${
-                    valuationMode === "earnings"
-                      ? "bg-primary text-primary-foreground font-semibold shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {t("dcf.earningsMode")}
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => setValuationMode("cashFlow")}
+                      className={`px-3 py-1 text-xs font-mono rounded-md transition-colors ${
+                        valuationMode === "cashFlow"
+                          ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {t("dcf.cashFlowMode")}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs font-sans">
+                    {t("dcf.tooltip.cashFlowMode")}
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => setValuationMode("earnings")}
+                      className={`px-3 py-1 text-xs font-mono rounded-md transition-colors ${
+                        valuationMode === "earnings"
+                          ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {t("dcf.earningsMode")}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs font-sans">
+                    {t("dcf.tooltip.earningsMode")}
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </div>
 
-            {/* Slider 1: Base FCF */}
+            {/* Slider 1: Base Metric (FCF or Net Income) */}
             <div className="space-y-2">
               <div className="flex justify-between items-center text-xs font-mono">
-                <label htmlFor="dcf-base-fcf-slider" className="text-muted-foreground font-medium">
-                  {t("dcf.baseFcf")}
-                </label>
+                <div className="flex items-center gap-1.5">
+                  <label htmlFor="dcf-base-metric-slider" className="text-muted-foreground font-medium">
+                    {isCashFlowMode ? t("dcf.baseFcf") : t("dcf.baseEarnings")}
+                  </label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="text-muted-foreground/70 hover:text-primary transition-colors focus:outline-none"
+                        aria-label="Base metric information"
+                      >
+                        <Info className="w-3.5 h-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs text-xs font-sans">
+                      {isCashFlowMode ? t("dcf.tooltip.baseFcf") : t("dcf.tooltip.baseEarnings")}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
                 <span className="font-semibold text-foreground bg-secondary/60 px-2.5 py-0.5 rounded border border-border tabular-nums text-sm sm:text-xs" dir="ltr">
-                  ${baseFcf.toFixed(1)}B
+                  ${activeBase.toFixed(1)}B
                 </span>
               </div>
               <div className="relative py-1 flex items-center">
                 <input
-                  id="dcf-base-fcf-slider"
+                  id="dcf-base-metric-slider"
                   type="range"
-                  min="1"
-                  max="300"
+                  min="0.5"
+                  max={baseSliderMax}
                   step="0.5"
-                  value={baseFcf}
-                  onChange={(e) => setBaseFcf(parseFloat(e.target.value) || 1)}
-                  aria-label={t("dcf.baseFcf") || "Base FCF"}
+                  value={activeBase}
+                  onChange={(e) => setActiveBase(parseFloat(e.target.value) || 1)}
+                  aria-label={isCashFlowMode ? t("dcf.baseFcf") : t("dcf.baseEarnings")}
                   className="w-full h-2.5 bg-secondary rounded-full appearance-none cursor-pointer accent-primary border border-border focus:outline-none focus:ring-1 focus:ring-primary shadow-inner"
                   style={{
-                    background: `linear-gradient(to right, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((baseFcf - 1) / (300 - 1)) * 100}%, hsl(250 20% 18%) ${((baseFcf - 1) / (300 - 1)) * 100}%, hsl(250 20% 18%) 100%)`,
+                    background: `linear-gradient(to right, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((activeBase - 0.5) / (baseSliderMax - 0.5)) * 100}%, hsl(250 20% 18%) ${((activeBase - 0.5) / (baseSliderMax - 0.5)) * 100}%, hsl(250 20% 18%) 100%)`,
                   }}
                 />
               </div>
@@ -266,9 +342,25 @@ export function DCFWidget({
             {/* Slider 2: Growth Rate */}
             <div className="space-y-2">
               <div className="flex justify-between items-center text-xs font-mono">
-                <label htmlFor="dcf-growth-slider" className="text-muted-foreground font-medium">
-                  {t("dcf.growthRate5Y")}
-                </label>
+                <div className="flex items-center gap-1.5">
+                  <label htmlFor="dcf-growth-slider" className="text-muted-foreground font-medium">
+                    {t("dcf.growthRate5Y")}
+                  </label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="text-muted-foreground/70 hover:text-primary transition-colors focus:outline-none"
+                        aria-label="Growth rate information"
+                      >
+                        <Info className="w-3.5 h-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs text-xs font-sans">
+                      {t("dcf.tooltip.growthRate")}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
                 <span className="font-semibold text-chart-positive bg-secondary/60 px-2.5 py-0.5 rounded border border-border tabular-nums text-sm sm:text-xs" dir="ltr">
                   +{growthRate.toFixed(0)}% / yr
                 </span>
@@ -291,12 +383,28 @@ export function DCFWidget({
               </div>
             </div>
 
-            {/* Slider 3: Terminal Multiple */}
+            {/* Slider 3: Terminal Exit Multiple (P/FCF or P/E) */}
             <div className="space-y-2">
               <div className="flex justify-between items-center text-xs font-mono">
-                <label htmlFor="dcf-multiple-slider" className="text-muted-foreground font-medium">
-                  {t("dcf.exitMultiple")}
-                </label>
+                <div className="flex items-center gap-1.5">
+                  <label htmlFor="dcf-multiple-slider" className="text-muted-foreground font-medium">
+                    {isCashFlowMode ? t("dcf.exitMultiplePcf") : t("dcf.exitMultiplePe")}
+                  </label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="text-muted-foreground/70 hover:text-primary transition-colors focus:outline-none"
+                        aria-label="Exit multiple information"
+                      >
+                        <Info className="w-3.5 h-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs text-xs font-sans">
+                      {isCashFlowMode ? t("dcf.tooltip.exitMultiplePcf") : t("dcf.tooltip.exitMultiplePe")}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
                 <span className="font-semibold text-foreground bg-secondary/60 px-2.5 py-0.5 rounded border border-border tabular-nums text-sm sm:text-xs" dir="ltr">
                   {multiple.toFixed(0)}x
                 </span>
@@ -306,25 +414,41 @@ export function DCFWidget({
                   id="dcf-multiple-slider"
                   type="range"
                   min="5"
-                  max="50"
+                  max="70"
                   step="1"
                   value={multiple}
                   onChange={(e) => setMultiple(parseFloat(e.target.value) || 5)}
-                  aria-label={t("dcf.exitMultiple") || "Exit Multiple"}
+                  aria-label={isCashFlowMode ? t("dcf.exitMultiplePcf") : t("dcf.exitMultiplePe")}
                   className="w-full h-2.5 bg-secondary rounded-full appearance-none cursor-pointer accent-primary border border-border focus:outline-none focus:ring-1 focus:ring-primary shadow-inner"
                   style={{
-                    background: `linear-gradient(to right, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((multiple - 5) / (50 - 5)) * 100}%, hsl(250 20% 18%) ${((multiple - 5) / (50 - 5)) * 100}%, hsl(250 20% 18%) 100%)`,
+                    background: `linear-gradient(to right, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((multiple - 5) / (70 - 5)) * 100}%, hsl(250 20% 18%) ${((multiple - 5) / (70 - 5)) * 100}%, hsl(250 20% 18%) 100%)`,
                   }}
                 />
               </div>
             </div>
 
-            {/* Slider 4: Discount Rate */}
+            {/* Slider 4: Target Discount Rate */}
             <div className="space-y-2">
               <div className="flex justify-between items-center text-xs font-mono">
-                <label htmlFor="dcf-discount-slider" className="text-muted-foreground font-medium">
-                  {t("dcf.discountRate")}
-                </label>
+                <div className="flex items-center gap-1.5">
+                  <label htmlFor="dcf-discount-slider" className="text-muted-foreground font-medium">
+                    {t("dcf.discountRate")}
+                  </label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="text-muted-foreground/70 hover:text-primary transition-colors focus:outline-none"
+                        aria-label="Discount rate information"
+                      >
+                        <Info className="w-3.5 h-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs text-xs font-sans">
+                      {t("dcf.tooltip.discountRate")}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
                 <span className="font-semibold text-foreground bg-secondary/60 px-2.5 py-0.5 rounded border border-border tabular-nums text-sm sm:text-xs" dir="ltr">
                   {discountRate.toFixed(0)}%
                 </span>
@@ -348,14 +472,31 @@ export function DCFWidget({
             </div>
           </div>
 
-          {/* Right Hero Valuation Card (Image 1 Design) */}
+          {/* Right Hero Valuation Card */}
           <div className="lg:col-span-5 bg-secondary/40 border border-border/80 rounded-2xl p-6 sm:p-7 flex flex-col justify-between space-y-6 shadow-inner ring-1 ring-white/5">
             <div>
               {/* Card Header with Status Badge */}
               <div className="flex items-center justify-between gap-2 pb-4 border-b border-border/60">
-                <span className="text-xs uppercase font-mono tracking-widest text-muted-foreground font-semibold">
-                  {t("dcf.estimatedFairValue")}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs uppercase font-mono tracking-widest text-muted-foreground font-semibold">
+                    {t("dcf.estimatedFairValue")}
+                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="text-muted-foreground/70 hover:text-primary transition-colors focus:outline-none"
+                        aria-label="Fair value methodology"
+                      >
+                        <Info className="w-3.5 h-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs text-xs font-sans">
+                      {t("dcf.tooltip.fairValue")}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+
                 <span
                   className={`text-xs font-mono font-bold px-2.5 py-1 rounded-md border ${
                     valuationStatus === "undervalued"
@@ -389,7 +530,23 @@ export function DCFWidget({
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">{t("dcf.marginOfSafety")}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-muted-foreground">{t("dcf.marginOfSafety")}</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="text-muted-foreground/70 hover:text-primary transition-colors focus:outline-none"
+                          aria-label="Margin of safety explanation"
+                        >
+                          <Info className="w-3 h-3" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-xs font-sans">
+                        {t("dcf.tooltip.marginOfSafety")}
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                   <span
                     className={`font-bold tabular-nums text-sm sm:text-xs ${
                       marginOfSafety >= 0 ? "text-chart-positive" : "text-chart-negative"
@@ -403,13 +560,15 @@ export function DCFWidget({
               </div>
             </div>
 
-            {/* Action CTA Button */}
-            <Link
-              to={`/stock/${ticker}`}
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-3 px-4 rounded-xl transition-all shadow-md hover:shadow-primary/20 flex items-center justify-center gap-2 text-sm text-center"
+            {/* Quick Reset Action Button */}
+            <button
+              type="button"
+              onClick={handleResetDefaults}
+              className="w-full bg-secondary/80 hover:bg-secondary border border-border text-foreground font-mono text-xs py-2.5 px-3 rounded-xl transition-all flex items-center justify-center gap-2"
             >
-              <span>{t("dcf.modelFullFinancials")}</span>
-            </Link>
+              <RotateCcw className="w-3.5 h-3.5 text-muted-foreground" />
+              <span>Reset to Defaults</span>
+            </button>
           </div>
         </div>
       ) : (
@@ -417,9 +576,25 @@ export function DCFWidget({
         <div className="p-6 sm:p-8 space-y-8">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="bg-secondary/30 rounded-xl p-6 border border-border space-y-2">
-              <p className="text-xs uppercase font-mono text-muted-foreground tracking-wider">
-                {t("dcf.forward")}
-              </p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-xs uppercase font-mono text-muted-foreground tracking-wider">
+                  {t("dcf.forward")}
+                </p>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="text-muted-foreground/70 hover:text-primary transition-colors focus:outline-none"
+                      aria-label="Forward return explanation"
+                    >
+                      <Info className="w-3.5 h-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs font-sans">
+                    {t("dcf.tooltip.forwardReturn")}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
               <p
                 className={`text-3xl font-bold font-mono tabular-nums ${
                   forwardReturn >= 0 ? "text-chart-positive" : "text-chart-negative"
@@ -436,9 +611,25 @@ export function DCFWidget({
 
             <div className="bg-secondary/30 rounded-xl p-6 border border-border space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-xs uppercase font-mono text-muted-foreground tracking-wider">
-                  {t("dcf.reverse", { target: targetReturn })}
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs uppercase font-mono text-muted-foreground tracking-wider">
+                    {t("dcf.reverse", { target: targetReturn })}
+                  </p>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="text-muted-foreground/70 hover:text-primary transition-colors focus:outline-none"
+                        aria-label="Target buy price explanation"
+                      >
+                        <Info className="w-3.5 h-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs text-xs font-sans">
+                      {t("dcf.tooltip.targetBuyPrice")}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
                 <div className="flex items-center gap-1.5">
                   <label htmlFor="dcf-target-return-input" className="text-xs text-muted-foreground">
                     {t("dcf.targetPct")}
@@ -461,10 +652,13 @@ export function DCFWidget({
                 </div>
               </div>
               <p className="text-3xl font-bold font-mono tabular-nums text-primary" dir="ltr">
-                {reverseEntryPrice > 0 ? `$${reverseEntryPrice.toFixed(2)}` : "—"}
+                {targetBuyPrice > 0 ? `$${targetBuyPrice.toFixed(2)}` : "—"}
               </p>
               <p className="text-xs text-muted-foreground font-mono">
-                {t("dcf.targetingReturn", { target: targetReturn })}
+                {t("dcf.targetingReturn", {
+                  target: targetReturn,
+                  multiple: requiredMultiple.toFixed(1),
+                })}
               </p>
             </div>
           </div>
@@ -472,12 +666,45 @@ export function DCFWidget({
           {/* 5-Year Trajectory LineChart */}
           <div className="bg-secondary/20 border border-border rounded-xl p-6 space-y-4">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <span className="text-xs font-mono font-bold uppercase tracking-wider text-foreground">
-                {t("dcf.valueTrajectoryTitle")}
-              </span>
-              <span className="text-xs font-mono text-primary font-semibold">
-                {t("dcf.terminalExitPrice", { price: year5Price.toFixed(2) })}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-mono font-bold uppercase tracking-wider text-foreground">
+                  {t("dcf.valueTrajectoryTitle")}
+                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="text-muted-foreground/70 hover:text-primary transition-colors focus:outline-none"
+                      aria-label="Growth trajectory chart explanation"
+                    >
+                      <Info className="w-3.5 h-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs font-sans">
+                    {t("dcf.tooltip.trajectoryChart")}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-mono text-primary font-semibold">
+                  {t("dcf.terminalExitPrice", { price: year5Price.toFixed(2) })}
+                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="text-muted-foreground/70 hover:text-primary transition-colors focus:outline-none"
+                      aria-label="Terminal exit price explanation"
+                    >
+                      <Info className="w-3.5 h-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs font-sans">
+                    {t("dcf.tooltip.terminalExitPrice")}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
             </div>
 
             <div className="h-64 w-full" dir="ltr">
@@ -498,7 +725,7 @@ export function DCFWidget({
                     tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
                     tickFormatter={(v) => `$${v}B`}
                   />
-                  <Tooltip
+                  <RechartsTooltip
                     contentStyle={{
                       backgroundColor: "hsl(var(--popover))",
                       borderColor: "hsl(var(--border))",
@@ -533,8 +760,8 @@ export function DCFWidget({
                   <Line
                     yAxisId="right"
                     type="monotone"
-                    dataKey="fcf"
-                    name={t("dcf.fcfBillions") || "FCF ($B)"}
+                    dataKey="metric"
+                    name={isCashFlowMode ? t("dcf.fcfBillions") : t("dcf.earningsBillions")}
                     stroke="hsl(var(--chart-positive))"
                     strokeWidth={2}
                     dot={{ fill: "hsl(var(--chart-positive))", r: 3 }}
