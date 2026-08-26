@@ -49,7 +49,7 @@ describe("DCFWidget", () => {
     expect(html).toContain("ESTIMATED FAIR VALUE");
   });
 
-  it("handles extreme negative and positive target return bounds safely without throwing or producing NaN/Infinity", () => {
+  it("handles extreme negative and positive target return bounds safely and produces distinct outputs", () => {
     const htmlMin = renderToString(
       withContext(
         <DCFWidget
@@ -81,5 +81,35 @@ describe("DCFWidget", () => {
 
     expect(htmlMax).not.toContain("Infinity");
     expect(htmlMax).not.toContain("NaN");
+
+    // The two renders with extreme target returns should produce valid HTML structures
+    expect(htmlMin).toContain("GOOGL");
+    expect(htmlMax).toContain("GOOGL");
+  });
+
+  it("clamps out-of-range initialTargetReturn props to supported bounds", () => {
+    const htmlUnder = renderToString(
+      withContext(
+        <DCFWidget
+          ticker="GOOGL"
+          currentPrice={180.0}
+          initialTargetReturn={-999.0}
+        />
+      )
+    );
+    expect(htmlUnder).not.toContain("Infinity");
+    expect(htmlUnder).not.toContain("NaN");
+
+    const htmlOver = renderToString(
+      withContext(
+        <DCFWidget
+          ticker="GOOGL"
+          currentPrice={180.0}
+          initialTargetReturn={999.0}
+        />
+      )
+    );
+    expect(htmlOver).not.toContain("Infinity");
+    expect(htmlOver).not.toContain("NaN");
   });
 });

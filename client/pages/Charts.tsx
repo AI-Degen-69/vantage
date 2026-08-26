@@ -168,12 +168,13 @@ export function Charts() {
           <SectionCardSkeleton height={420} />
         ) : (() => {
           const mktCap = profileData?.mktCap ?? (profileData as any)?.marketCap ?? null;
+          const isFinitePositiveMktCap = mktCap != null && Number.isFinite(mktCap) && mktCap > 0;
           const derivedShares =
-            mktCap != null && currentPrice > 0 && mktCap / currentPrice > 0
+            isFinitePositiveMktCap && currentPrice > 0
               ? (mktCap / currentPrice) / 1e9
               : 15.2;
           const derivedFcf =
-            mktCap != null
+            isFinitePositiveMktCap
               ? Math.max(1, (mktCap / 1e9) / 25)
               : 108.8;
 

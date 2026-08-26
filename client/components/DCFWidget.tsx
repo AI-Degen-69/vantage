@@ -39,6 +39,10 @@ export interface DCFWidgetProps {
  * @param initialTargetReturn - Initial target annual return percentage
  * @returns The rendered DCF Sandbox component.
  */
+function clampTargetReturn(val: number): number {
+  return Number.isFinite(val) ? Math.max(-90, Math.min(500, val)) : 15.0;
+}
+
 export function DCFWidget({
   ticker = "AAPL",
   currentPrice = 231.42,
@@ -61,7 +65,7 @@ export function DCFWidget({
   const [growthRate, setGrowthRate] = useState<number>(initialGrowth);
   const [multiple, setMultiple] = useState<number>(initialMultiple);
   const [discountRate, setDiscountRate] = useState<number>(initialDiscount);
-  const [targetReturn, setTargetReturn] = useState<number>(initialTargetReturn);
+  const [targetReturn, setTargetReturn] = useState<number>(() => clampTargetReturn(initialTargetReturn));
 
   // Sync inputs when ticker or initial props change
   useEffect(() => {
@@ -69,7 +73,7 @@ export function DCFWidget({
     setGrowthRate(initialGrowth);
     setMultiple(initialMultiple);
     setDiscountRate(initialDiscount);
-    setTargetReturn(initialTargetReturn);
+    setTargetReturn(clampTargetReturn(initialTargetReturn));
   }, [ticker, initialFcf, initialGrowth, initialMultiple, initialDiscount, initialTargetReturn]);
 
   // --------------------------------------------------------------------------
@@ -448,7 +452,7 @@ export function DCFWidget({
                     value={targetReturn}
                     onChange={(e) => {
                       const val = parseFloat(e.target.value);
-                      setTargetReturn(Number.isFinite(val) ? Math.max(-90, Math.min(500, val)) : 0);
+                      setTargetReturn(clampTargetReturn(val));
                     }}
                     aria-label="Target return percentage"
                     className="w-16 bg-background border border-border rounded text-center text-xs py-1 text-foreground focus:outline-none focus:ring-1 focus:ring-primary font-mono"
