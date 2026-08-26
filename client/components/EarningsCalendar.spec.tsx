@@ -137,8 +137,9 @@ describe("EarningsCalendar", () => {
     expect(html).toContain("NVIDIA Corporation");
     expect(html).toContain("$0.65");
     expect(html).toContain("$28.70B");
-    // Should NOT contain a premature BEAT / MISS badge or actual EPS
+    // Should NOT contain a premature BEAT / MISS badge or actual EPS row
     expect(html).not.toContain("BEAT");
     expect(html).not.toContain("MISS");
+    expect(html).not.toContain("Actual EPS");
   });
 });
