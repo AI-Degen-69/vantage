@@ -223,7 +223,6 @@ const en = {
   "dcf.sensitivityTooltip": "Evaluates intrinsic fair value across varying cost of capital (WACC) and terminal growth/exit assumptions. Click any cell to apply those parameters.",
   "dcf.dimensionGrowth": "WACC × Growth Rate",
   "dcf.dimensionMultiple": "WACC × Exit Multiple",
-  "dcf.marketPrice": "Market Price",
   "dcf.sensitivityClickHint": "Click any cell to apply that valuation scenario to the sandbox.",
   "dcf.viewSensitivityMatrix": "Sensitivity Matrix",
 
@@ -1308,7 +1307,6 @@ const he: Record<string, string> = {
   "dcf.sensitivityTooltip": "מעריכה שווי הוגן פנימי מול שילובי עלות הון (WACC) והנחות צמיחה/מכפיל יציאה. לחיצה על תא מעדכנת את הסליידרים מיד.",
   "dcf.dimensionGrowth": "WACC × שיעור צמיחה",
   "dcf.dimensionMultiple": "WACC × מכפיל יציאה",
-  "dcf.marketPrice": "מחיר שוק",
   "dcf.sensitivityClickHint": "לחץ על כל תא כדי להחיל את תרחיש התמחור על מחשבון ה-DCF.",
   "dcf.viewSensitivityMatrix": "מטריצת רגישות",
 

@@ -200,7 +200,10 @@ export default function ValuationSensitivityMatrix({
             <div className="p-1.5 rounded-md bg-primary/10 text-primary">
               <Table2 className="w-4 h-4" />
             </div>
-            <h3 className="text-base font-semibold text-foreground tracking-tight">
+            <h3
+              id="sensitivity-matrix-title"
+              className="text-base font-semibold text-foreground tracking-tight"
+            >
               {t("dcf.sensitivityTitle") || "2D Valuation Sensitivity Matrix"}
             </h3>
             <TooltipProvider>
@@ -275,7 +278,7 @@ export default function ValuationSensitivityMatrix({
           </span>
         </div>
         <div className="flex items-center gap-1 text-[11px] bg-background/80 px-2 py-0.5 rounded border border-border">
-          <Crosshair className="w-3 h-3 text-primary animate-pulse" />
+          <Crosshair className="w-3 h-3 text-primary motion-safe:animate-pulse" />
           <span>{t("dcf.marketPrice") || "Market Price"}:</span>
           <strong className="text-foreground">${currentPrice.toFixed(2)}</strong>
         </div>
@@ -285,6 +288,7 @@ export default function ValuationSensitivityMatrix({
       <div className="overflow-x-auto mt-2 pb-2">
         <table
           className="w-full border-collapse text-center text-xs min-w-[540px]"
+          aria-labelledby="sensitivity-matrix-title"
           dir={isRtl ? "rtl" : "ltr"}
         >
           <thead>
@@ -365,7 +369,7 @@ export default function ValuationSensitivityMatrix({
                         >
                           {cell.isCurrent && (
                             <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                              <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
                               <span className="relative inline-flex rounded-full h-3 w-3 bg-primary" />
                             </span>
                           )}
