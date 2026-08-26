@@ -160,9 +160,9 @@ export interface CashFlowRow {
   reportedCurrency: string;
   calendarYear: string;
   period: string;
-  operatingCashFlow: number;
+  operatingCashFlow?: number;
   capitalExpenditure?: number;
-  freeCashFlow: number;
+  freeCashFlow?: number;
   stockBasedCompensation?: number;
   dividendPayments?: number;
 }

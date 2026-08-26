@@ -7,6 +7,7 @@ import DipFinder from "@/components/DipFinder";
 import { AddWatchlistSheet } from "@/components/AddWatchlistSheet";
 import EagerLogoWarmer from "@/components/EagerLogoWarmer";
 import TickerLogo from "@/components/TickerLogo";
+import PageHeader from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import BatchQuoteFallbackHint from "@/components/BatchQuoteFallbackHint";
@@ -144,15 +145,17 @@ export default function Watchlists() {
           Renders nothing — purely a side-effect host. */}
       <EagerLogoWarmer />
       <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex items-center gap-3 flex-wrap">
-          <h1 className="text-3xl font-bold text-foreground">{t("nav.watchlists")}</h1>
-          <div className="ms-auto flex items-center gap-2">
+        <PageHeader
+          eyebrow={t("nav.watchlists")}
+          title={t("nav.watchlists")}
+          description={t("watchlists.description")}
+          actions={
             <Button size="sm" onClick={() => setAddOpen(true)}>
               <Plus className="w-4 h-4 me-1.5" />
               {t("watchlists.addButton")}
             </Button>
-          </div>
-        </div>
+          }
+        />
 
         {/* Watchlist switcher */}
         <div className="flex items-center gap-2 flex-wrap">

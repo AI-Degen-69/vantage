@@ -3,6 +3,7 @@ import { useState, useMemo, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import EarningsCalendar from "@/components/EarningsCalendar";
+import PageHeader from "@/components/PageHeader";
 
 type MarketCapFilter = "all" | "large" | "mid" | "small";
 
@@ -115,9 +116,11 @@ export default function EarningsPage() {
   return (
     <div className="w-full bg-background dark min-h-screen p-8">
       <div className="max-w-7xl mx-auto space-y-8">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-foreground">{t("nav.earnings")}</h1>
-        </div>
+        <PageHeader
+          eyebrow={t("nav.earnings")}
+          title={t("earnings.title")}
+          description={t("earnings.subtitle")}
+        />
 
         <div className="flex items-center justify-between bg-slate-900/50 p-4 rounded-xl border border-border gap-4 flex-wrap">
           {/* Week Navigation */}

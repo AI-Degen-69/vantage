@@ -432,6 +432,8 @@ const en = {
 
   // Earnings page (new namespace)
   "earnings.title": "Earnings Calendar",
+  "earnings.subtitle":
+    "Track earnings reporting dates, consensus EPS/revenue estimates, and surprises.",
   "earnings.loading": "Loading earnings calendar from Finnhub...",
   "earnings.error.title": "Failed to load earnings calendar",
   "earnings.error.desc":
@@ -459,6 +461,8 @@ const en = {
   "earnings.midday": "Midday",
 
   // Watchlists
+  "watchlists.description":
+    "Organize high-conviction ideas, monitor live scorecards, and track sector exposure across customizable lists.",
   "watchlists.noUpcoming": "No upcoming earnings in the next 14 days.",
 
   // Watchlists v2 — user-defined lists, persistence, drag-reorder
@@ -502,6 +506,8 @@ const en = {
 
   // Portfolio
   "portfolio.title": "Portfolios",
+  "portfolio.description":
+    "Track asset allocation, risk-adjusted returns, and dividend income across portfolios.",
   "portfolio.analyticsTitle": "Analytics",
   "portfolio.annualIncome": "Annual Income",
   "portfolio.cagr": "CAGR",
@@ -1351,6 +1357,8 @@ const he: Record<string, string> = {
   "insights.yes": "כן",
 
   "earnings.title": "לוח דוחות",
+  "earnings.subtitle":
+    "עקוב אחר תאריכי דיווח, תחזיות רווח והכנסות של האנליסטים והפתעות ביצועים.",
   "earnings.loading": "טוען דוחות מ-Finnhub...",
   "earnings.error.title": "טעינת לוח הדוחות נכשלה",
   "earnings.error.desc": "ייתכן ש-API של Finnhub הוגבל. נסה שוב בעוד רגע.",
@@ -1378,6 +1386,8 @@ const he: Record<string, string> = {
   "watchlists.noUpcoming": "אין אירועים ב-14 ימים הקרובים.",
 
   // Watchlists v2
+  "watchlists.description":
+    "ארגן רעיונות השקעה בעלי סבירות גבוהה, עקוב אחר לוחות תוצאות חיים וחשיפה סקטוריאלית ברשימות מותאמות אישית.",
   "watchlists.addButton": "+ הוסף",
   "watchlists.addTitle": "צור רשימת מעקב חדשה",
   "watchlists.nameLabel": "שם",
@@ -1412,6 +1422,8 @@ const he: Record<string, string> = {
   "notfound.returnHome": "חזור לדף הבית",
 
   "portfolio.title": "תיקים",
+  "portfolio.description":
+    "מעקב אחר הקצאת נכסים, תשואות מותאמות סיכון והכנסות מדיבידנדים.",
   "portfolio.analyticsTitle": "ניתוחים",
   "portfolio.annualIncome": "הכנסה שנתית",
   "portfolio.cagr": "CAGR",
