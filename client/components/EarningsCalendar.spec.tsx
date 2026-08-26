@@ -126,4 +126,19 @@ describe("EarningsCalendar", () => {
     expect(htmlEmpty).toContain("No earnings events this week");
     expect(htmlEmpty).toContain("Adjust your watchlist or market cap filters");
   });
+
+  it("renders upcoming fallback mock events with estimates only and without premature BEAT badges", () => {
+    const html = renderWithContext(
+      <EarningsCalendar from="2026-08-24" to="2026-08-28" />
+    );
+
+    // NVDA should be rendered with EPS and Rev estimates
+    expect(html).toContain("NVDA");
+    expect(html).toContain("NVIDIA Corporation");
+    expect(html).toContain("$0.65");
+    expect(html).toContain("$28.70B");
+    // Should NOT contain a premature BEAT / MISS badge or actual EPS
+    expect(html).not.toContain("BEAT");
+    expect(html).not.toContain("MISS");
+  });
 });
