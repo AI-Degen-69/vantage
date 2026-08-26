@@ -22,7 +22,7 @@ export default function NotFound() {
     <div className="min-h-screen flex items-center justify-center bg-background text-foreground p-6">
       <div className="bg-card border border-border rounded-2xl p-8 max-w-md w-full text-center shadow-2xl space-y-6">
         <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto text-primary">
-          <Compass className="w-8 h-8 animate-pulse" />
+          <Compass className="w-8 h-8 motion-safe:animate-pulse" />
         </div>
         <div className="space-y-2">
           <p className="text-xs uppercase tracking-[0.2em] font-semibold text-primary/80">
