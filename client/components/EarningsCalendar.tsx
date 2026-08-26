@@ -3,6 +3,7 @@ import { defaultWatchlist } from "@/lib/mockData";
 import { useEarningsCalendar } from "@/hooks/useStockData";
 import { useEffect, useMemo, useRef, useState } from "react";
 import EarningsCard, { type EarningsEventData } from "@/components/EarningsCard";
+import DataStatusBadge from "@/components/DataStatusBadge";
 import { LayoutGrid, CalendarDays, Sun, Moon, Clock, Database, Sparkles } from "lucide-react";
 
 export type MarketCapFilter = "all" | "large" | "mid" | "small";
@@ -23,19 +24,17 @@ interface EarningsCalendarProps {
 
 export const mockEarningsEvents: EarningsEventData[] = [
   {
-    ticker: "NVDA",
-    name: "NVIDIA Corporation",
+    ticker: "PANW",
+    name: "Palo Alto Networks",
     date: "2025-02-24",
     dateFull: "2025-02-24",
     weekday: 1,
-    epsEst: 5.59,
-    epsActual: 5.82,
-    revEst: 24.6,
-    revActual: 26.04,
+    epsEst: 1.48,
+    revEst: 2.12,
     time: "After Close",
-    surprise: "beat",
-    marketCap: 3_120_000_000_000,
-    isWatchlist: true,
+    surprise: "none",
+    marketCap: 114_200_000_000,
+    isWatchlist: false,
   },
   {
     ticker: "SNOW",
@@ -44,13 +43,24 @@ export const mockEarningsEvents: EarningsEventData[] = [
     dateFull: "2025-02-25",
     weekday: 2,
     epsEst: 0.14,
-    epsActual: 0.18,
     revEst: 0.749,
-    revActual: 0.775,
     time: "Before Open",
-    surprise: "beat",
+    surprise: "none",
     marketCap: 52_400_000_000,
     isWatchlist: false,
+  },
+  {
+    ticker: "NVDA",
+    name: "NVIDIA Corporation",
+    date: "2025-02-26",
+    dateFull: "2025-02-26",
+    weekday: 3,
+    epsEst: 0.65,
+    revEst: 28.7,
+    time: "After Close",
+    surprise: "none",
+    marketCap: 3_120_000_000_000,
+    isWatchlist: true,
   },
   {
     ticker: "CRM",
@@ -59,25 +69,11 @@ export const mockEarningsEvents: EarningsEventData[] = [
     dateFull: "2025-02-26",
     weekday: 3,
     epsEst: 2.44,
-    epsActual: 2.51,
     revEst: 9.35,
-    revActual: 9.42,
     time: "After Close",
-    surprise: "beat",
+    surprise: "none",
     marketCap: 298_600_000_000,
     isWatchlist: true,
-  },
-  {
-    ticker: "PANW",
-    name: "Palo Alto Networks",
-    date: "2025-02-27",
-    dateFull: "2025-02-27",
-    weekday: 4,
-    epsEst: 1.48,
-    revEst: 2.12,
-    time: "Before Open",
-    marketCap: 114_200_000_000,
-    isWatchlist: false,
   },
   {
     ticker: "DELL",
@@ -88,6 +84,7 @@ export const mockEarningsEvents: EarningsEventData[] = [
     epsEst: 2.05,
     revEst: 24.5,
     time: "After Close",
+    surprise: "none",
     marketCap: 98_500_000_000,
     isWatchlist: true,
   },
@@ -100,6 +97,7 @@ export const mockEarningsEvents: EarningsEventData[] = [
     epsEst: 2.68,
     revEst: 38.1,
     time: "Before Open",
+    surprise: "none",
     marketCap: 215_000_000_000,
     isWatchlist: false,
   },
@@ -421,7 +419,6 @@ export function EarningsCalendar({
         <div className="flex items-center gap-2 text-muted-foreground">
           <Database className="w-3.5 h-3.5 text-primary" />
           <span>{t("earningsCalendar.dataSource")}</span>
-          <span className="w-1.5 h-1.5 rounded-full bg-chart-positive motion-safe:animate-pulse" />
         </div>
         <div className="flex items-center gap-2">
           {!isLoading && (
@@ -429,10 +426,11 @@ export function EarningsCalendar({
               {t("earningsCalendar.showing", { count: displayedCount })}
             </span>
           )}
-          {isMock && !isLoading && (
-            <span className="text-amber-300 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded text-[11px] font-semibold">
-              [MOCK VERIFIED]
-            </span>
+          {!isLoading && (
+            <DataStatusBadge
+              status={isMock ? "mock" : "live"}
+              source={isMock ? t("earningsCalendar.sourceMock") : t("earningsCalendar.sourceLive")}
+            />
           )}
         </div>
       </div>

@@ -8,13 +8,16 @@ import DataLegend from "@/components/DataLegend";
 import DataStatusBadge from "@/components/DataStatusBadge";
 
 /**
- * Formats a date as an ISO calendar date.
+ * Formats a date as an ISO calendar date (YYYY-MM-DD) in local time.
  *
  * @param date - The date to format
  * @returns The date in `YYYY-MM-DD` format
  */
 function formatISO(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 /**
@@ -43,8 +46,8 @@ function currentWeekRange(): { from: string; to: string } {
  * @returns The shifted date range in ISO date format
  */
 function shiftRange(from: string, to: string, weeks: number): { from: string; to: string } {
-  const f = new Date(from);
-  const t = new Date(to);
+  const f = parseLocalDate(from);
+  const t = parseLocalDate(to);
   f.setDate(f.getDate() + weeks * 7);
   t.setDate(t.getDate() + weeks * 7);
   return { from: formatISO(f), to: formatISO(t) };
