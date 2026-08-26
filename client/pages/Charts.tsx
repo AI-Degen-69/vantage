@@ -132,15 +132,20 @@ export function Charts() {
                 onFocus={() => setIsSearchOpen(true)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && searchQuery.trim()) {
-                    handleSelectTicker(searchQuery.trim());
+                    if (searchResults.length > 0) {
+                      handleSelectTicker(searchResults[0].symbol);
+                    } else {
+                      handleSelectTicker(searchQuery.trim());
+                    }
                   }
                 }}
-                placeholder="Search any stock ticker or company..."
+                placeholder={t("charts.searchPlaceholder")}
                 className="w-full pl-9 pr-8 py-1.5 text-xs bg-muted/50 border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary font-mono"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
+                  aria-label={t("charts.clearSearch")}
                   className="absolute right-2.5 text-muted-foreground hover:text-foreground"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -152,10 +157,12 @@ export function Charts() {
             {isSearchOpen && debouncedQuery.length > 0 && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-lg shadow-lg z-50 overflow-hidden max-h-64 overflow-y-auto">
                 {searchLoading ? (
-                  <div className="p-3 text-xs text-muted-foreground text-center">Searching stocks...</div>
+                  <div className="p-3 text-xs text-muted-foreground text-center">
+                    {t("charts.searchingStocks")}
+                  </div>
                 ) : searchResults.length === 0 ? (
                   <div className="p-3 text-xs text-muted-foreground text-center">
-                    No matching stocks. Press Enter to load &quot;{debouncedQuery.toUpperCase()}&quot;.
+                    {t("charts.noMatchingStocks", { query: debouncedQuery.toUpperCase() })}
                   </div>
                 ) : (
                   searchResults.map((item) => (
@@ -182,7 +189,9 @@ export function Charts() {
 
           {/* Quick Popular Ticker Chips */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
-            <span className="text-[11px] text-muted-foreground font-medium mr-1 uppercase">Quick:</span>
+            <span className="text-[11px] text-muted-foreground font-medium mr-1 uppercase">
+              {t("charts.quickLabel")}
+            </span>
             {POPULAR_TICKERS.map((sym) => (
               <button
                 key={sym}
@@ -241,7 +250,9 @@ export function Charts() {
                 </div>
                 <div className="min-h-[1.25rem] mt-2 flex items-center">
                   <span className="text-[11px] text-muted-foreground font-mono">
-                    {quoteData?.volume ? `Vol: ${(quoteData.volume / 1e6).toFixed(1)}M` : ""}
+                    {quoteData?.volume
+                      ? t("charts.vol", { amount: (quoteData.volume / 1e6).toFixed(1) })
+                      : ""}
                   </span>
                 </div>
               </div>
@@ -255,7 +266,9 @@ export function Charts() {
                     </span>
                     {dayLow !== null && dayHigh !== null && dayHigh > dayLow && (
                       <span className="text-[11px] font-mono text-muted-foreground px-1.5 py-0.5 rounded bg-muted/50 border border-border/50" dir="ltr">
-                        {Math.min(100, Math.max(0, ((currentPrice - dayLow) / (dayHigh - dayLow)) * 100)).toFixed(0)}% in range
+                        {t("charts.inRange", {
+                          percent: Math.min(100, Math.max(0, ((currentPrice - dayLow) / (dayHigh - dayLow)) * 100)).toFixed(0),
+                        })}
                       </span>
                     )}
                   </div>
@@ -287,7 +300,9 @@ export function Charts() {
                     </span>
                     {yearLow !== null && yearHigh !== null && yearHigh > yearLow && (
                       <span className="text-[11px] font-mono text-muted-foreground px-1.5 py-0.5 rounded bg-muted/50 border border-border/50" dir="ltr">
-                        {Math.min(100, Math.max(0, ((currentPrice - yearLow) / (yearHigh - yearLow)) * 100)).toFixed(0)}% in range
+                        {t("charts.inRange", {
+                          percent: Math.min(100, Math.max(0, ((currentPrice - yearLow) / (yearHigh - yearLow)) * 100)).toFixed(0),
+                        })}
                       </span>
                     )}
                   </div>

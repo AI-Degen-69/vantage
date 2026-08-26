@@ -1019,7 +1019,7 @@ export default function Landing() {
             <div className="lg:col-span-5 p-6 rounded-[6px] bg-background/90 border border-border space-y-5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono uppercase tracking-wider text-muted-foreground">
-                  {t("landing.dcfSandbox.computedFairValue")} (Per Share)
+                  {t("landing.dcfSandbox.computedFairValue")} {t("landing.dcfSandbox.perShare")}
                 </span>
 
                 <span
@@ -1063,7 +1063,7 @@ export default function Landing() {
                 </div>
 
                 <div className="flex justify-between text-muted-foreground/80 pt-1 border-t border-border/40 text-[11px]">
-                  <span>Total Enterprise Value:</span>
+                  <span>{t("landing.dcfSandbox.totalEnterpriseValue")}</span>
                   <span className="font-semibold text-foreground" dir="ltr">
                     ${(computedDcf.enterpriseValue / 1e3).toFixed(2)}T (${computedDcf.enterpriseValue.toFixed(0)}B)
                   </span>
@@ -1074,7 +1074,7 @@ export default function Landing() {
                 onClick={() => navigate("/charts?ticker=AAPL")}
                 className="w-full py-2.5 px-4 rounded-[4px] bg-primary text-primary-foreground font-semibold text-xs hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5"
               >
-                <span>Open DCF Valuation in Charts →</span>
+                <span>{t("landing.dcfSandbox.openInCharts")}</span>
               </button>
             </div>
           </div>
