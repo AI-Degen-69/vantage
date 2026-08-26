@@ -165,9 +165,13 @@ export function Charts() {
 
         {/* DCF widget */}
         {quoteLoading || currentPrice == null ? (
-          <SectionCardSkeleton height={360} />
+          <SectionCardSkeleton height={420} />
         ) : (
-          <DCFWidget currentPrice={currentPrice} />
+          <DCFWidget
+            ticker={ticker}
+            companyName={profileData?.companyName}
+            currentPrice={currentPrice}
+          />
         )}
 
         {/* Footer hint card */}

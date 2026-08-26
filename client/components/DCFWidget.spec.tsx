@@ -3,32 +3,49 @@
 import { describe, expect, it } from "vitest";
 import { renderToString } from "react-dom/server";
 import * as React from "react";
+import { MemoryRouter } from "react-router-dom";
 import { DCFWidget } from "./DCFWidget";
 import { I18nProvider } from "@/lib/i18n";
 
-function withI18n(node: React.ReactNode): React.ReactElement {
-  return <I18nProvider>{node}</I18nProvider>;
+function withContext(node: React.ReactNode): React.ReactElement {
+  return (
+    <I18nProvider>
+      <MemoryRouter>{node}</MemoryRouter>
+    </I18nProvider>
+  );
 }
 
 describe("DCFWidget", () => {
-  it("renders with title, mode switches, and input labels", () => {
+  it("renders sandbox eyebrow, title, sliders, and fair value summary card", () => {
     const html = renderToString(
-      withI18n(<DCFWidget currentPrice={150} />)
+      withContext(<DCFWidget ticker="AAPL" currentPrice={231.42} />)
     );
 
-    expect(html).toMatch(/DCF Valuation|הערכת שווי DCF/);
-    expect(html).toMatch(/Earnings Mode|מצב רווחים/);
-    expect(html).toMatch(/Cash Flow Mode|מצב תזרים מזומנים/);
-    expect(html).toMatch(/Forward return over 5 years|תשואה צפויה ל-5 שנים/);
-    expect(html).toContain("150");
+    expect(html).toContain("INTERACTIVE VALUATION ENGINE");
+    expect(html).toContain("Instant Discounted Cash Flow Sandbox");
+    expect(html).toContain("Base FCF ($B)");
+    expect(html).toContain("Expected 5Y Growth Rate (%)");
+    expect(html).toContain("Terminal Exit Multiple (P/FCF)");
+    expect(html).toContain("Target Discount Rate (%)");
+    expect(html).toContain("ESTIMATED FAIR VALUE");
+    expect(html).toContain("231.42");
   });
 
-  it("renders forward return calculation and target price based on currentPrice", () => {
+  it("renders correctly with custom assumptions and computes intrinsic fair value", () => {
     const html = renderToString(
-      withI18n(<DCFWidget currentPrice={50} />)
+      withContext(
+        <DCFWidget
+          ticker="MSFT"
+          currentPrice={400.0}
+          initialFcf={80.0}
+          initialGrowth={12.0}
+          initialMultiple={30.0}
+        />
+      )
     );
 
-    expect(html).toContain("26.36");
-    expect(html).toContain("80.07");
+    expect(html).toContain("MSFT");
+    expect(html).toContain("400.00");
+    expect(html).toContain("ESTIMATED FAIR VALUE");
   });
 });
