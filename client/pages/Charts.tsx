@@ -350,7 +350,7 @@ export function Charts() {
         {quoteLoading || currentPrice == null ? (
           <SectionCardSkeleton height={420} />
         ) : (() => {
-          const mktCap = profileData?.mktCap ?? (profileData as any)?.marketCap ?? null;
+          const mktCap = profileData?.marketCap ?? null;
           const isFinitePositiveMktCap = mktCap != null && Number.isFinite(mktCap) && mktCap > 0;
           const derivedShares =
             isFinitePositiveMktCap && currentPrice > 0
@@ -387,7 +387,7 @@ export function Charts() {
               ? Math.max(1, (mktCap / 1e9) / (profileData?.peRatio || 25))
               : 100.9;
 
-          const stockPe = profileData?.peRatio ?? metricsData?.keyMetricsTTM?.peRatioTTM ?? 25;
+          const stockPe = profileData?.peRatio ?? metricsData?.metrics?.peRatioTTM ?? 25;
           const initialMultiple = stockPe > 0 && stockPe < 150 ? Math.round(stockPe) : 25;
 
           return (
