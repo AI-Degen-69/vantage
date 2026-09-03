@@ -92,6 +92,17 @@ function computeYoY(data: any[], key: string): number | null {
 }
 
 /**
+ * True when a metric value is a real number — including 0.
+ *
+ * C6 semantics: a literal 0 (breakeven free cash flow, a debt-free balance
+ * sheet) is real data and renders as "$0" / "0.00%" / "0.00x". Only null,
+ * undefined, or non-finite values mean "no data" and render as "—".
+ */
+function hasValue(v: number | null | undefined): v is number {
+  return v != null && Number.isFinite(v);
+}
+
+/**
  * Main aggregator: fetch all data for a ticker from multiple sources.
  * Yahoo = real-time quotes, profile, financial data, price history (FREE, unlimited).
  * FMP = financial statements, ratios, key metrics (250 req/day free tier).
@@ -170,7 +181,10 @@ export async function aggregateStockData(ticker: string) {
   const priceToBook = yahooQuote?.priceToBook ?? fmpRatiosTTM?.priceToBookRatioTTM ?? null;
 
   const fcf = yahooFinancial?.freeCashFlow ?? null;
-  const fcfYield = fcf && marketCap ? (fcf / marketCap) * 100 : null;
+  const fcfYield =
+    hasValue(fcf) && hasValue(marketCap) && marketCap !== 0
+      ? (fcf / marketCap) * 100
+      : null;
   const operatingCashFlow = yahooFinancial?.operatingCashFlow ?? null;
   const payoutRatio = yahooQuote?.payoutRatio ?? fmpRatiosTTM?.dividendPayoutRatioTTM ?? null;
 
@@ -184,7 +198,9 @@ export async function aggregateStockData(ticker: string) {
   const totalDebt = yahooFinancial?.totalDebt ?? fmpBalance[0]?.totalDebt ?? null;
   const totalCash = yahooFinancial?.totalCash ?? fmpBalance[0]?.cashAndCashEquivalents ?? null;
   const debtToEquity =
-    fmpBalance[0]?.totalDebt && fmpBalance[0]?.totalStockholdersEquity
+    hasValue(fmpBalance[0]?.totalDebt) &&
+    hasValue(fmpBalance[0]?.totalStockholdersEquity) &&
+    fmpBalance[0].totalStockholdersEquity !== 0
       ? fmpBalance[0].totalDebt / fmpBalance[0].totalStockholdersEquity
       : null;
   const currentRatio = fmpRatios[0]?.currentRatio ?? null;
@@ -207,68 +223,68 @@ export async function aggregateStockData(ticker: string) {
   const quickStats = [
     {
       label: "Valuation",
-      value: marketCap ? formatLargeNumber(marketCap) : "—",
+      value: hasValue(marketCap) ? formatLargeNumber(marketCap) : "—",
       details: [
-        { label: "Market Cap", value: marketCap ? formatLargeNumber(marketCap) : "—" },
+        { label: "Market Cap", value: hasValue(marketCap) ? formatLargeNumber(marketCap) : "—" },
         {
           label: "P/E (TTM / NTM)",
-          value: `${peTtm ? peTtm.toFixed(2) : "—"} | ${peNtm ? peNtm.toFixed(2) : "—"}`,
+          value: `${hasValue(peTtm) ? peTtm.toFixed(2) : "—"} | ${hasValue(peNtm) ? peNtm.toFixed(2) : "—"}`,
         },
-        { label: "Price to Sales", value: priceToSales ? priceToSales.toFixed(2) : "—" },
-        { label: "EV to EBITDA", value: evToEbitda ? evToEbitda.toFixed(2) : "—" },
-        { label: "Price to Book", value: priceToBook ? priceToBook.toFixed(2) : "—" },
+        { label: "Price to Sales", value: hasValue(priceToSales) ? priceToSales.toFixed(2) : "—" },
+        { label: "EV to EBITDA", value: hasValue(evToEbitda) ? evToEbitda.toFixed(2) : "—" },
+        { label: "Price to Book", value: hasValue(priceToBook) ? priceToBook.toFixed(2) : "—" },
       ],
     },
     {
       label: "Cash Flow",
-      value: fcf ? formatLargeNumber(fcf) : "—",
+      value: hasValue(fcf) ? formatLargeNumber(fcf) : "—",
       details: [
-        { label: "Operating Cash Flow (TTM)", value: operatingCashFlow ? formatLargeNumber(operatingCashFlow) : "—" },
-        { label: "FCF (Free Cash Flow TTM)", value: fcf ? formatLargeNumber(fcf) : "—" },
-        { label: "FCF Yield", value: fcfYield ? `${fcfYield.toFixed(2)}%` : "—" },
-        { label: "Dividend/Price", value: divYield ? `${divYield.toFixed(2)}%` : "—" },
-        { label: "Cash Amount", value: totalCash ? formatLargeNumber(totalCash) : "—" },
+        { label: "Operating Cash Flow (TTM)", value: hasValue(operatingCashFlow) ? formatLargeNumber(operatingCashFlow) : "—" },
+        { label: "FCF (Free Cash Flow TTM)", value: hasValue(fcf) ? formatLargeNumber(fcf) : "—" },
+        { label: "FCF Yield", value: hasValue(fcfYield) ? `${fcfYield.toFixed(2)}%` : "—" },
+        { label: "Dividend/Price", value: hasValue(divYield) ? `${divYield.toFixed(2)}%` : "—" },
+        { label: "Cash Amount", value: hasValue(totalCash) ? formatLargeNumber(totalCash) : "—" },
       ],
     },
     {
       label: "Margins & Growth",
-      value: grossMargin ? `${grossMargin.toFixed(1)}%` : "—",
+      value: hasValue(grossMargin) ? `${grossMargin.toFixed(1)}%` : "—",
       details: [
-        { label: "Gross Margin (TTM)", value: grossMargin ? `${grossMargin.toFixed(2)}%` : "—" },
-        { label: "Operating Margin", value: operatingMargin ? `${operatingMargin.toFixed(2)}%` : "—" },
-        { label: "Net Margin", value: netMargin ? `${netMargin.toFixed(2)}%` : "—" },
-        { label: "Quarterly Earnings (YoY)", value: qEarningsYoY ? `${qEarningsYoY.toFixed(2)}%` : "—" },
-        { label: "Quarterly Revenue (YoY)", value: qRevenueYoY ? `${qRevenueYoY.toFixed(2)}%` : "—" },
+        { label: "Gross Margin (TTM)", value: hasValue(grossMargin) ? `${grossMargin.toFixed(2)}%` : "—" },
+        { label: "Operating Margin", value: hasValue(operatingMargin) ? `${operatingMargin.toFixed(2)}%` : "—" },
+        { label: "Net Margin", value: hasValue(netMargin) ? `${netMargin.toFixed(2)}%` : "—" },
+        { label: "Quarterly Earnings (YoY)", value: hasValue(qEarningsYoY) ? `${qEarningsYoY.toFixed(2)}%` : "—" },
+        { label: "Quarterly Revenue (YoY)", value: hasValue(qRevenueYoY) ? `${qRevenueYoY.toFixed(2)}%` : "—" },
       ],
     },
     {
       label: "Balance",
-      value: totalAssets ? formatLargeNumber(totalAssets) : "—",
+      value: hasValue(totalAssets) ? formatLargeNumber(totalAssets) : "—",
       details: [
-        { label: "Total Assets", value: totalAssets ? formatLargeNumber(totalAssets) : "—" },
-        { label: "Total Debt", value: totalDebt ? formatLargeNumber(totalDebt) : "—" },
-        { label: "Debt to Equity", value: debtToEquity ? `${debtToEquity.toFixed(2)}x` : "—" },
-        { label: "Current Ratio", value: currentRatio ? `${currentRatio.toFixed(2)}x` : "—" },
-        { label: "Quick Ratio", value: quickRatio ? `${quickRatio.toFixed(2)}x` : "—" },
+        { label: "Total Assets", value: hasValue(totalAssets) ? formatLargeNumber(totalAssets) : "—" },
+        { label: "Total Debt", value: hasValue(totalDebt) ? formatLargeNumber(totalDebt) : "—" },
+        { label: "Debt to Equity", value: hasValue(debtToEquity) ? `${debtToEquity.toFixed(2)}x` : "—" },
+        { label: "Current Ratio", value: hasValue(currentRatio) ? `${currentRatio.toFixed(2)}x` : "—" },
+        { label: "Quick Ratio", value: hasValue(quickRatio) ? `${quickRatio.toFixed(2)}x` : "—" },
       ],
     },
     {
       label: "Dividend",
-      value: divYield ? `${divYield.toFixed(2)}%` : "—",
+      value: hasValue(divYield) ? `${divYield.toFixed(2)}%` : "—",
       details: [
-        { label: "Dividend Yield", value: divYield ? `${divYield.toFixed(2)}%` : "—" },
-        { label: "Payout Ratio", value: payoutRatio ? `${payoutRatio.toFixed(2)}%` : "—" },
+        { label: "Dividend Yield", value: hasValue(divYield) ? `${divYield.toFixed(2)}%` : "—" },
+        { label: "Payout Ratio", value: hasValue(payoutRatio) ? `${payoutRatio.toFixed(2)}%` : "—" },
         { label: "Next Ex-Date", value: exDivDate || "—" },
       ],
     },
     {
       label: "Trading",
-      value: fiftyTwoWeekHigh ? `$${fiftyTwoWeekHigh.toFixed(2)}` : "—",
+      value: hasValue(fiftyTwoWeekHigh) ? `$${fiftyTwoWeekHigh.toFixed(2)}` : "—",
       details: [
-        { label: "52-Week High", value: fiftyTwoWeekHigh ? `$${fiftyTwoWeekHigh.toFixed(2)}` : "—" },
-        { label: "52-Week Low", value: fiftyTwoWeekLow ? `$${fiftyTwoWeekLow.toFixed(2)}` : "—" },
-        { label: "Average Volume", value: avgVolume ? formatLargeNumber(avgVolume, { omit$: true }) : "—" },
-        { label: "Beta", value: beta ? beta.toFixed(2) : "—" },
+        { label: "52-Week High", value: hasValue(fiftyTwoWeekHigh) ? `$${fiftyTwoWeekHigh.toFixed(2)}` : "—" },
+        { label: "52-Week Low", value: hasValue(fiftyTwoWeekLow) ? `$${fiftyTwoWeekLow.toFixed(2)}` : "—" },
+        { label: "Average Volume", value: hasValue(avgVolume) ? formatLargeNumber(avgVolume, { omit$: true }) : "—" },
+        { label: "Beta", value: hasValue(beta) ? beta.toFixed(2) : "—" },
       ],
     },
   ];
