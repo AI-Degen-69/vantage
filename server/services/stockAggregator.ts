@@ -181,7 +181,10 @@ export async function aggregateStockData(ticker: string) {
   const priceToBook = yahooQuote?.priceToBook ?? fmpRatiosTTM?.priceToBookRatioTTM ?? null;
 
   const fcf = yahooFinancial?.freeCashFlow ?? null;
-  const fcfYield = fcf != null && marketCap ? (fcf / marketCap) * 100 : null;
+  const fcfYield =
+    hasValue(fcf) && hasValue(marketCap) && marketCap !== 0
+      ? (fcf / marketCap) * 100
+      : null;
   const operatingCashFlow = yahooFinancial?.operatingCashFlow ?? null;
   const payoutRatio = yahooQuote?.payoutRatio ?? fmpRatiosTTM?.dividendPayoutRatioTTM ?? null;
 
@@ -195,7 +198,9 @@ export async function aggregateStockData(ticker: string) {
   const totalDebt = yahooFinancial?.totalDebt ?? fmpBalance[0]?.totalDebt ?? null;
   const totalCash = yahooFinancial?.totalCash ?? fmpBalance[0]?.cashAndCashEquivalents ?? null;
   const debtToEquity =
-    fmpBalance[0]?.totalDebt != null && fmpBalance[0]?.totalStockholdersEquity
+    hasValue(fmpBalance[0]?.totalDebt) &&
+    hasValue(fmpBalance[0]?.totalStockholdersEquity) &&
+    fmpBalance[0].totalStockholdersEquity !== 0
       ? fmpBalance[0].totalDebt / fmpBalance[0].totalStockholdersEquity
       : null;
   const currentRatio = fmpRatios[0]?.currentRatio ?? null;

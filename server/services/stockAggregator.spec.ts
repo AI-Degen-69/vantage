@@ -186,6 +186,32 @@ describe("aggregateStockData quickStats — zero-value semantics (C6)", () => {
     expect(margins.value).toBe("—");
   });
 
+  it("renders an em-dash when a zero numerator meets a non-finite denominator", async () => {
+    // 0 / Infinity evaluates to 0, which must NOT render as a real 0.00%
+    // when the denominator itself is non-finite garbage (CodeRabbit, PR #56).
+    mocks.yahooQuote.mockResolvedValue({ name: "Inf Cap", marketCap: Number.POSITIVE_INFINITY });
+    mocks.yahooFinancial.mockResolvedValue({ freeCashFlow: 0 });
+
+    const res = await aggregateStockData("TEST");
+    const cashFlow = block(res.quickStats, "Cash Flow");
+
+    expect(cashFlow.value).toBe("$0");
+    expect(detail(cashFlow, "FCF Yield")).toBe("—");
+  });
+
+  it("renders an em-dash when equity is non-finite despite a zero debt", async () => {
+    mocks.balance.mockResolvedValue([
+      { totalAssets: 0, totalDebt: 0, totalStockholdersEquity: Number.POSITIVE_INFINITY },
+    ]);
+
+    const res = await aggregateStockData("TEST");
+    const balance = block(res.quickStats, "Balance");
+
+    expect(balance.value).toBe("$0");
+    expect(detail(balance, "Total Debt")).toBe("$0");
+    expect(detail(balance, "Debt to Equity")).toBe("—");
+  });
+
   it("keeps the sign before the currency symbol for negative cash flow", async () => {
     mocks.yahooFinancial.mockResolvedValue({
       freeCashFlow: -4_800_000,
