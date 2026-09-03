@@ -84,6 +84,15 @@ next loop iteration. New candidates are appended at the bottom.
 - **CodeRabbit**: 2 Minor findings — backlog card staleness (fixed in this PR), zero-guard semantics (deferred → Candidate 6).
 - **Next**: highest-priority unaddressed candidate is 2 (i18n god-module split), needs a bounded slice to fit the ≤3-file loop scope.
 
+### Loop status: terminated after 2 of 3 iterations (controlled shutdown, 2026-09-03)
+
+Two verified PRs are open awaiting human merge: #54 (Candidate 1) and #55
+(Candidate 2, dictionary slice). The third iteration was deliberately not
+started: PR #54 carries a deferred semantic decision (Candidate 6), and the
+next-best candidates either exceed the ≤3-file loop rail (the 4-site
+timestamp-heuristic dedupe, done properly, touches 6 paths) or need a
+product call. Resume with the next candidate after the open PRs land.
+
 ### Iteration 2 (2026-09-03) — completed
 
 - **Candidate implemented**: 2, dictionary slice → PR #55 (`refactor/loop-iter-2-i18n-dict-extraction`, tag `loop-iter-2-20260903-184000`). `client/lib/i18n.tsx` 2,566 → 467 lines; dictionaries verbatim into `client/lib/i18n/dictionaries.ts` with stable re-exports.
