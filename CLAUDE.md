@@ -41,7 +41,7 @@ There is no lint script; prettier + `tsc` are the only static gates.
 ## Deploy
 
 - **Vercel**: `vercel.json` builds with `vite build`, serves `dist/spa`, rewrites all non-`/api/` paths to `index.html`.
-- **Netlify**: `netlify.toml` builds `pnpm build:client`, publishes `dist/spa`, redirects `/api/*` to `/.netlify/functions/api/:splat`.
+- **Netlify**: `netlify.toml` builds with `npm run build:client` (locally equivalent to `pnpm build:client`), publishes `dist/spa`, redirects `/api/*` to `/.netlify/functions/api/:splat`.
 
 ## Agent config
 
