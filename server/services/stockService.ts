@@ -1650,12 +1650,26 @@ export const stockService = {
         const marketCap = extract(price.marketCap) ?? null;
         const operatingCashFlow = extract(fd.operatingCashflow) ?? null;
         const freeCashFlow = extract(fd.freeCashflow) ?? null;
+        // A finite number is real data even at a literal 0 (breakeven FCF,
+        // zero-dividend yield) — only non-finite values mean "missing".
+        // Denominator operands additionally reject 0 so a division can
+        // never produce Infinity that leaks through toFixed rendering.
+        const hasValue = (v: number | null): v is number =>
+          v !== null && Number.isFinite(v);
         const pcf =
-          operatingCashFlow && marketCap ? marketCap / operatingCashFlow : null;
+          hasValue(operatingCashFlow) &&
+          hasValue(marketCap) &&
+          operatingCashFlow !== 0
+            ? marketCap / operatingCashFlow
+            : null;
         const pfcf =
-          freeCashFlow && marketCap ? marketCap / freeCashFlow : null;
+          hasValue(freeCashFlow) && hasValue(marketCap) && freeCashFlow !== 0
+            ? marketCap / freeCashFlow
+            : null;
         const fcfYield =
-          freeCashFlow && marketCap ? (freeCashFlow / marketCap) * 100 : null;
+          hasValue(freeCashFlow) && hasValue(marketCap) && marketCap !== 0
+            ? (freeCashFlow / marketCap) * 100
+            : null;
         const metrics: KeyMetricsTTM = {
           revenuePerShareTTM: extract(fd.revenuePerShare),
           netIncomePerShareTTM: extract(dks.trailingEps),

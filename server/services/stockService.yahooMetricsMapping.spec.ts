@@ -33,6 +33,22 @@ function freshService(): Promise<StockService> {
 }
 
 /**
+ * Breakeven cash flow: both OCF and FCF are a literal 0 with a real
+ * market cap. Per the C6 product contract, a literal 0 is real data
+ * (FCF yield renders 0.00%, never "—"), but a zero *denominator* is
+ * not data — P/OCF and P/FCF must stay undefined, never Infinity.
+ */
+const zeroCashFlowPayload = {
+  price: { marketCap: { raw: 1_000_000_000 } },
+  financialData: {
+    operatingCashflow: { raw: 0 },
+    freeCashflow: { raw: 0 },
+  },
+  defaultKeyStatistics: {},
+  summaryDetail: {},
+};
+
+/**
  * Yahoo quoteSummary payload where every trailing-PE / price-to-sales
  * primary field is absent and only their mislabeled aliases exist.
  */
@@ -94,5 +110,18 @@ describe("getMetrics Yahoo mapping correctness (CodeRabbit follow-ups)", () => {
     // strict ×100 (1.52 → 152), never the |n| ≤ 1 heuristic skip.
     expect(result.metrics.returnOnEquityTTM).toBeCloseTo(152, 6);
     expect(result.metrics.returnOnAssetsTTM).toBeCloseTo(28, 6);
+  });
+
+  it("treats a literal zero free cash flow as real data for FCF yield", async () => {
+    mockQuoteSummary.mockResolvedValue(zeroCashFlowPayload);
+    const svc = await freshService();
+    const result: StockMetrics = await svc.getMetrics("TEST");
+    // Breakeven FCF is real data: the yield is 0.00%, not "—" (the
+    // `&&` short-circuit used to swallow the literal 0 upstream).
+    expect(result.metrics.freeCashFlowYieldTTM).toBe(0);
+    // Zero denominators stay undefined — a P/OCF or P/FCF of "Infinity"
+    // would leak a "NaN"/"Infinity" string through toFixed rendering.
+    expect(result.ratios.priceToOperatingCashFlowRatioTTM).toBeUndefined();
+    expect(result.ratios.priceToFreeCashFlowRatioTTM).toBeUndefined();
   });
 });
