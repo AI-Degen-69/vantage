@@ -7,14 +7,19 @@ next loop iteration. New candidates are appended at the bottom.
 
 ## Iteration 1 — Candidate Cards (generated 2026-09-03)
 
-### Candidate 1 — Dedupe `formatLargeNumber`, fix negative-money rendering (Strong)
+### Candidate 1 — Dedupe `formatLargeNumber`, fix negative-money rendering (Strong) — ✅ COMPLETED in iteration 1 (PR #54)
+
+> Implemented as `shared/format.ts` + `shared/format.spec.ts`, wired into
+> `stockAggregator.ts` (private copy deleted, `$` wrapping removed) and
+> `StockSlideOver.tsx` (dead copy deleted). Kept the inherited no-promotion
+> tier boundary for parity: 999,999 renders as `$1000.00K`, NOT `$1.00M`.
 
 - **Area / Files**: `shared/format.ts` (new), `server/services/stockAggregator.ts`, `client/components/StockSlideOver.tsx`, `shared/format.spec.ts` (new)
 - **Problem**: Two drifted copies of `formatLargeNumber` exist: `StockSlideOver.tsx:13` (client) and `stockAggregator.ts:24` (server). The client copy is dead code (zero call sites). The server copy is live at ~12 call sites, and every caller wraps the result in `` `$${...}` `` — so negative FCF renders as `$-4.80M` (sign after the currency symbol) instead of `-$4.80M`. This is the exact bug class the canonical `client/lib/format.ts` `formatMoney` already fixed client-side ("-$4.80B, not $-4.80B"), still live server-side.
 - **Solution**: Extract a canonical `shared/format.ts` with `formatLargeNumber(num, opts?)` — handles negatives with sign-before-`$`, null → "—", 0 → "$0", K/M/B/T tiers with 2 decimals, optional `omit$`for raw volume counts.`stockAggregator.ts`imports it via`@shared/format`(alias already used by server and client) and drops its private copy and hand-rolled`$`wrapping;`StockSlideOver.tsx` deletes its dead copy.
 - **Benefits**: Kills a drift vector (this repo has fixed formatMoney drift 3× before: PRs #40, #28, #41), fixes a user-visible rendering bug (negative values inside financial profile blocks), moves a pure formatter to the shared layer where both runtimes can test it.
 - **Strength Badge**: `Strong`
-- **Scope**: ~3 files, well under 120 changed lines. Machine-decidable: unit specs on tier boundaries (999.99K→1.00M promotion, negatives, null, 0) + full suite green + prettier clean.
+- **Scope**: ~3 files, well under 120 changed lines. Machine-decidable: unit specs on tier boundaries (incl. the inherited no-promotion boundary 999,999 → $1000.00K, negatives, null, 0) + full suite green + prettier clean.
 
 ### Candidate 2 — Split `client/lib/i18n.tsx` god module (2,566 lines) (Worth exploring)
 
@@ -51,3 +56,23 @@ next loop iteration. New candidates are appended at the bottom.
 - **Benefits**: Narrower re-render surface, targeted tests.
 - **Strength Badge**: `Speculative`
 - **Scope risk**: Every consumer uses the facade; behavior parity must be verified.
+
+### Candidate 6 — Decide zero-valued metric semantics in stockAggregator (Worth exploring)
+
+- **Area / Files**: `server/services/stockAggregator.ts` (quickStats guards), possibly backend consumers
+- **Problem**: Truthiness guards (`marketCap ? ... : "—"`) render a literal `0` as "—" even though `formatLargeNumber` can render `$0`. Flagged by CodeRabbit on PR #54; deliberately deferred because the behavior is pre-existing and changing it alters API response semantics, which exceeds a refactor PR's parity contract.
+- **Solution**: Decide whether 0 is meaningful data (e.g., breakeven FCF) or indistinguishable from missing data in these provider feeds. If meaningful, switch guards to `value != null` and add a spec pinning `0 → "$0"` through `aggregateStockData`'s shaping.
+- **Benefits**: Correct rendering for edge-case companies; removes a silent truthiness trap for future call sites.
+- **Strength Badge**: `Worth exploring`
+- **Scope risk**: Semantic change to API output; needs a product call on whether `0` and "no data" are distinguishable in the FMP/Yahoo feeds.
+
+---
+
+## Iteration log
+
+### Iteration 1 (2026-09-03) — completed
+
+- **Candidate implemented**: 1 (canonical `formatLargeNumber`) → PR #54 (`improve/loop-iter-1-format-large-number`, tag `loop-iter-1-20260903-181400`).
+- **Verification**: 597/597 tests (58 files, +8 new), `tsc` clean, `pnpm build:server` clean, prettier clean on touched files.
+- **CodeRabbit**: 2 Minor findings — backlog card staleness (fixed in this PR), zero-guard semantics (deferred → Candidate 6).
+- **Next**: highest-priority unaddressed candidate is 2 (i18n god-module split), needs a bounded slice to fit the ≤3-file loop scope.
