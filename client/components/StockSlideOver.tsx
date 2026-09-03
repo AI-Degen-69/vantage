@@ -10,16 +10,6 @@ interface StockSlideOverProps {
   onClose: () => void;
 }
 
-function formatLargeNumber(num: number | null | undefined): string {
-  if (num == null) return "—";
-  if (num === 0) return "$0";
-  if (Math.abs(num) >= 1e12) return `$${(num / 1e12).toFixed(2)}T`;
-  if (Math.abs(num) >= 1e9) return `$${(num / 1e9).toFixed(2)}B`;
-  if (Math.abs(num) >= 1e6) return `$${(num / 1e6).toFixed(2)}M`;
-  if (Math.abs(num) >= 1e3) return `$${(num / 1e3).toFixed(2)}K`;
-  return `$${num.toFixed(2)}`;
-}
-
 export function StockSlideOver({ ticker, isOpen, onClose }: StockSlideOverProps) {
   const navigate = useNavigate();
   const panelRef = useRef<HTMLDivElement>(null);

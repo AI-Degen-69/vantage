@@ -20,16 +20,7 @@ import {
   getInsiderTrades,
 } from "./fmp";
 import { fetchCompanyNews, type NewsItem } from "./finnhub";
-
-function formatLargeNumber(num: number | null | undefined): string {
-  if (num == null) return "—";
-  if (num === 0) return "0";
-  if (Math.abs(num) >= 1e12) return `${(num / 1e12).toFixed(2)}T`;
-  if (Math.abs(num) >= 1e9) return `${(num / 1e9).toFixed(2)}B`;
-  if (Math.abs(num) >= 1e6) return `${(num / 1e6).toFixed(2)}M`;
-  if (Math.abs(num) >= 1e3) return `${(num / 1e3).toFixed(2)}K`;
-  return num.toLocaleString(undefined, { maximumFractionDigits: 2 });
-}
+import { formatLargeNumber } from "@shared/format";
 
 /**
  * Map FMP financial statements into chart-ready quarterly/annual arrays.
@@ -216,9 +207,9 @@ export async function aggregateStockData(ticker: string) {
   const quickStats = [
     {
       label: "Valuation",
-      value: marketCap ? `$${formatLargeNumber(marketCap)}` : "—",
+      value: marketCap ? formatLargeNumber(marketCap) : "—",
       details: [
-        { label: "Market Cap", value: marketCap ? `$${formatLargeNumber(marketCap)}` : "—" },
+        { label: "Market Cap", value: marketCap ? formatLargeNumber(marketCap) : "—" },
         {
           label: "P/E (TTM / NTM)",
           value: `${peTtm ? peTtm.toFixed(2) : "—"} | ${peNtm ? peNtm.toFixed(2) : "—"}`,
@@ -230,13 +221,13 @@ export async function aggregateStockData(ticker: string) {
     },
     {
       label: "Cash Flow",
-      value: fcf ? `$${formatLargeNumber(fcf)}` : "—",
+      value: fcf ? formatLargeNumber(fcf) : "—",
       details: [
-        { label: "Operating Cash Flow (TTM)", value: operatingCashFlow ? `$${formatLargeNumber(operatingCashFlow)}` : "—" },
-        { label: "FCF (Free Cash Flow TTM)", value: fcf ? `$${formatLargeNumber(fcf)}` : "—" },
+        { label: "Operating Cash Flow (TTM)", value: operatingCashFlow ? formatLargeNumber(operatingCashFlow) : "—" },
+        { label: "FCF (Free Cash Flow TTM)", value: fcf ? formatLargeNumber(fcf) : "—" },
         { label: "FCF Yield", value: fcfYield ? `${fcfYield.toFixed(2)}%` : "—" },
         { label: "Dividend/Price", value: divYield ? `${divYield.toFixed(2)}%` : "—" },
-        { label: "Cash Amount", value: totalCash ? `$${formatLargeNumber(totalCash)}` : "—" },
+        { label: "Cash Amount", value: totalCash ? formatLargeNumber(totalCash) : "—" },
       ],
     },
     {
@@ -252,10 +243,10 @@ export async function aggregateStockData(ticker: string) {
     },
     {
       label: "Balance",
-      value: totalAssets ? `$${formatLargeNumber(totalAssets)}` : "—",
+      value: totalAssets ? formatLargeNumber(totalAssets) : "—",
       details: [
-        { label: "Total Assets", value: totalAssets ? `$${formatLargeNumber(totalAssets)}` : "—" },
-        { label: "Total Debt", value: totalDebt ? `$${formatLargeNumber(totalDebt)}` : "—" },
+        { label: "Total Assets", value: totalAssets ? formatLargeNumber(totalAssets) : "—" },
+        { label: "Total Debt", value: totalDebt ? formatLargeNumber(totalDebt) : "—" },
         { label: "Debt to Equity", value: debtToEquity ? `${debtToEquity.toFixed(2)}x` : "—" },
         { label: "Current Ratio", value: currentRatio ? `${currentRatio.toFixed(2)}x` : "—" },
         { label: "Quick Ratio", value: quickRatio ? `${quickRatio.toFixed(2)}x` : "—" },
@@ -276,7 +267,7 @@ export async function aggregateStockData(ticker: string) {
       details: [
         { label: "52-Week High", value: fiftyTwoWeekHigh ? `$${fiftyTwoWeekHigh.toFixed(2)}` : "—" },
         { label: "52-Week Low", value: fiftyTwoWeekLow ? `$${fiftyTwoWeekLow.toFixed(2)}` : "—" },
-        { label: "Average Volume", value: avgVolume ? formatLargeNumber(avgVolume) : "—" },
+        { label: "Average Volume", value: avgVolume ? formatLargeNumber(avgVolume, { omit$: true }) : "—" },
         { label: "Beta", value: beta ? beta.toFixed(2) : "—" },
       ],
     },
