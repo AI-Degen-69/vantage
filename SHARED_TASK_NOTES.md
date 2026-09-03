@@ -21,7 +21,14 @@ next loop iteration. New candidates are appended at the bottom.
 - **Strength Badge**: `Strong`
 - **Scope**: ~3 files, well under 120 changed lines. Machine-decidable: unit specs on tier boundaries (incl. the inherited no-promotion boundary 999,999 → $1000.00K, negatives, null, 0) + full suite green + prettier clean.
 
-### Candidate 2 — Split `client/lib/i18n.tsx` god module (2,566 lines) (Worth exploring)
+### Candidate 2 — Split `client/lib/i18n.tsx` god module (2,566 lines) (Worth exploring) — 🔶 IN PROGRESS: dictionary slice completed in iteration 2 (PR #55)
+
+> Iteration 2 extracted the en/he string tables verbatim into
+> `client/lib/i18n/dictionaries.ts` with `i18n.tsx` re-exporting them
+> (public API stable, all 39 importers untouched; parity pinned by a new
+> dictionaries.spec.ts, including the 10 legitimate Hebrew-dual `_two`
+> keys). Remaining slice: plural/ICU/provider logic split — deferred to a
+> future iteration.
 
 - **Area / Files**: `client/lib/i18n.tsx` → locale data modules (`locales/` dir already exists but appears unused by the provider)
 - **Problem**: Provider, hook, ICU engine glue, and (likely) large inline translation tables live in one 2,566-line file. Any key edit touches the same file as the React context machinery, causing noisy diffs and slow tooling.
@@ -76,3 +83,11 @@ next loop iteration. New candidates are appended at the bottom.
 - **Verification**: 597/597 tests (58 files, +8 new), `tsc` clean, `pnpm build:server` clean, prettier clean on touched files.
 - **CodeRabbit**: 2 Minor findings — backlog card staleness (fixed in this PR), zero-guard semantics (deferred → Candidate 6).
 - **Next**: highest-priority unaddressed candidate is 2 (i18n god-module split), needs a bounded slice to fit the ≤3-file loop scope.
+
+### Iteration 2 (2026-09-03) — completed
+
+- **Candidate implemented**: 2, dictionary slice → PR #55 (`refactor/loop-iter-2-i18n-dict-extraction`, tag `loop-iter-2-20260903-184000`). `client/lib/i18n.tsx` 2,566 → 467 lines; dictionaries verbatim into `client/lib/i18n/dictionaries.ts` with stable re-exports.
+- **Verification**: 593/593 tests (59 files, +4 new, 0 deleted), `tsc` clean, `pnpm build:client` clean; pre-existing 619-line i18n.spec.ts passes unchanged.
+- **CodeRabbit**: APPROVED, zero inline findings.
+- **Discovery for next iteration**: the seconds-vs-ms timestamp heuristic (`value < 1e12 ? value * 1000 : value`) is duplicated at 4 sites — `client/lib/finance.ts:198`, `client/lib/formatTimeAgo.ts:49`, `server/services/stockService.ts:729` and `:741`. Same cross-runtime dedupe shape as Candidate 1.
+- **Next**: timestamp dedupe (small, bounded) or stockService decomposition (Candidate 3, larger).
