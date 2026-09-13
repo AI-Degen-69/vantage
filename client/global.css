@@ -138,4 +138,13 @@
     overflow-x: auto;
     white-space: pre;
   }
+
+  /*
+   * Hebrew RTL reading convention (Issue #75): body/paragraph text is
+   * justified and paragraphs start at the right edge (natural in RTL).
+   * Scoped to html[dir="rtl"] so English LTR rendering is untouched.
+   */
+  html[dir="rtl"] :where(p) {
+    text-align: justify;
+  }
 }
