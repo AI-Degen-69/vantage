@@ -1094,11 +1094,13 @@ export default function Index() {
                       <div className="p-3.5 rounded-lg bg-background/50 border border-border/50 space-y-2.5">
                         <div className="flex items-center justify-between text-xs font-mono">
                           <span className="text-muted-foreground font-medium">
-                            52W Corridor
+                            {t("index.corridor52w")}
                           </span>
                           {year52Stats && (
                             <span className="text-[11px] font-semibold text-foreground/80 px-1.5 py-0.5 rounded bg-muted/60 border border-border/40">
-                              {year52Stats.pctOfRange.toFixed(0)}% of 52W Range
+                              {t("index.pctOfRange", {
+                                pct: year52Stats.pctOfRange.toFixed(0),
+                              })}
                             </span>
                           )}
                         </div>
@@ -1156,29 +1158,20 @@ export default function Index() {
                               </div>
                               <div className="flex items-center justify-between text-xs font-mono tabular-nums text-muted-foreground pt-0.5">
                                 <span>
-                                  Low:{" "}
-                                  <strong
-                                    className="text-foreground font-bold"
-                                    dir="ltr"
-                                  >
+                                  {t("index.corridorLow")}:{" "}
+                                  <strong className="text-foreground font-bold">
                                     ${quoteData.yearLow.toFixed(2)}
                                   </strong>
                                 </span>
-                                <span
-                                  className="text-center font-bold text-foreground"
-                                  dir="ltr"
-                                >
-                                  Current:{" "}
+                                <span className="text-center font-bold text-foreground">
+                                  {t("index.corridorCurrent")}:{" "}
                                   <span className={textColor}>
                                     ${quoteData.price.toFixed(2)}
                                   </span>
                                 </span>
                                 <span>
-                                  High:{" "}
-                                  <strong
-                                    className="text-foreground font-bold"
-                                    dir="ltr"
-                                  >
+                                  {t("index.corridorHigh")}:{" "}
+                                  <strong className="text-foreground font-bold">
                                     ${quoteData.yearHigh.toFixed(2)}
                                   </strong>
                                 </span>
