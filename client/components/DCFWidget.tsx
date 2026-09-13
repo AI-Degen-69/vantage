@@ -76,7 +76,11 @@ export function DCFWidget({
   initialTargetReturn = 15.0,
   initialValuationMode = "cashFlow",
 }: DCFWidgetProps) {
-  const { t } = useI18n();
+  const { t, isRtl } = useI18n();
+
+  // RTL: native range tracks mirror automatically (min on the right), so the
+  // painted fill must grow from the min side ΓÇö flip the gradient direction.
+  const fillDir = isRtl ? "to left" : "to right";
 
   // Active view tab: Interactive Sandbox, 5Y Trajectory Chart, Sensitivity Matrix, or Reverse DCF Solver
   const [activeTab, setActiveTab] = useState<
@@ -428,7 +432,7 @@ export function DCFWidget({
                     }
                     className="w-full h-2.5 bg-secondary rounded-full appearance-none cursor-pointer accent-primary border border-border focus:outline-none focus:ring-1 focus:ring-primary shadow-inner"
                     style={{
-                      background: `linear-gradient(to right, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((activeBase - 0.5) / (baseSliderMax - 0.5)) * 100}%, hsl(250 20% 18%) ${((activeBase - 0.5) / (baseSliderMax - 0.5)) * 100}%, hsl(250 20% 18%) 100%)`,
+                      background: `linear-gradient(${fillDir}, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((activeBase - 0.5) / (baseSliderMax - 0.5)) * 100}%, hsl(250 20% 18%) ${((activeBase - 0.5) / (baseSliderMax - 0.5)) * 100}%, hsl(250 20% 18%) 100%)`,
                     }}
                   />
                 </div>
@@ -483,7 +487,7 @@ export function DCFWidget({
                     aria-label={t("dcf.growthRate5Y") || "Growth Rate"}
                     className="w-full h-2.5 bg-secondary rounded-full appearance-none cursor-pointer accent-primary border border-border focus:outline-none focus:ring-1 focus:ring-primary shadow-inner"
                     style={{
-                      background: `linear-gradient(to right, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((growthRate - -10) / (40 - -10)) * 100}%, hsl(250 20% 18%) ${((growthRate - -10) / (40 - -10)) * 100}%, hsl(250 20% 18%) 100%)`,
+                      background: `linear-gradient(${fillDir}, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((growthRate - -10) / (40 - -10)) * 100}%, hsl(250 20% 18%) ${((growthRate - -10) / (40 - -10)) * 100}%, hsl(250 20% 18%) 100%)`,
                     }}
                   />
                 </div>
@@ -546,7 +550,7 @@ export function DCFWidget({
                     }
                     className="w-full h-2.5 bg-secondary rounded-full appearance-none cursor-pointer accent-primary border border-border focus:outline-none focus:ring-1 focus:ring-primary shadow-inner"
                     style={{
-                      background: `linear-gradient(to right, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((multiple - 5) / (70 - 5)) * 100}%, hsl(250 20% 18%) ${((multiple - 5) / (70 - 5)) * 100}%, hsl(250 20% 18%) 100%)`,
+                      background: `linear-gradient(${fillDir}, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((multiple - 5) / (70 - 5)) * 100}%, hsl(250 20% 18%) ${((multiple - 5) / (70 - 5)) * 100}%, hsl(250 20% 18%) 100%)`,
                     }}
                   />
                 </div>
@@ -601,7 +605,7 @@ export function DCFWidget({
                     aria-label={t("dcf.discountRate") || "Discount Rate"}
                     className="w-full h-2.5 bg-secondary rounded-full appearance-none cursor-pointer accent-primary border border-border focus:outline-none focus:ring-1 focus:ring-primary shadow-inner"
                     style={{
-                      background: `linear-gradient(to right, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((discountRate - 4) / (18 - 4)) * 100}%, hsl(250 20% 18%) ${((discountRate - 4) / (18 - 4)) * 100}%, hsl(250 20% 18%) 100%)`,
+                      background: `linear-gradient(${fillDir}, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((discountRate - 4) / (18 - 4)) * 100}%, hsl(250 20% 18%) ${((discountRate - 4) / (18 - 4)) * 100}%, hsl(250 20% 18%) 100%)`,
                     }}
                   />
                 </div>
