@@ -337,10 +337,7 @@ export function Charts() {
                     {dayLow !== null &&
                       dayHigh !== null &&
                       dayHigh > dayLow && (
-                        <span
-                          className="text-[11px] font-mono text-muted-foreground px-1.5 py-0.5 rounded bg-muted/50 border border-border/50"
-                          dir="ltr"
-                        >
+                        <span className="text-[11px] font-mono text-muted-foreground px-1.5 py-0.5 rounded bg-muted/50 border border-border/50">
                           {t("charts.inRange", {
                             percent: Math.min(
                               100,
@@ -366,10 +363,7 @@ export function Charts() {
                 </div>
                 <div className="min-h-[1.25rem] mt-2 flex items-center">
                   {midpointCaption && (
-                    <p
-                      className="text-[11px] text-muted-foreground font-mono"
-                      dir="ltr"
-                    >
+                    <p className="text-[11px] text-muted-foreground font-mono">
                       {midpointCaption}
                     </p>
                   )}
@@ -386,10 +380,7 @@ export function Charts() {
                     {yearLow !== null &&
                       yearHigh !== null &&
                       yearHigh > yearLow && (
-                        <span
-                          className="text-[11px] font-mono text-muted-foreground px-1.5 py-0.5 rounded bg-muted/50 border border-border/50"
-                          dir="ltr"
-                        >
+                        <span className="text-[11px] font-mono text-muted-foreground px-1.5 py-0.5 rounded bg-muted/50 border border-border/50">
                           {t("charts.inRange", {
                             percent: Math.min(
                               100,
@@ -416,10 +407,7 @@ export function Charts() {
                 </div>
                 <div className="min-h-[1.25rem] mt-2 flex items-center">
                   {yearMidpointCaption && (
-                    <p
-                      className="text-[11px] text-muted-foreground font-mono"
-                      dir="ltr"
-                    >
+                    <p className="text-[11px] text-muted-foreground font-mono">
                       {yearMidpointCaption}
                     </p>
                   )}
@@ -531,14 +519,14 @@ function DualRange({
   high: number;
   current: number;
 }) {
-  const { t } = useI18n();
+  const { t, isRtl } = useI18n();
   const pct =
     high > low
       ? Math.min(100, Math.max(0, ((current - low) / (high - low)) * 100))
       : 50;
 
   return (
-    <div className="space-y-2" dir="ltr">
+    <div className="space-y-2" dir={isRtl ? "rtl" : "ltr"}>
       {/* Track container */}
       <div className="relative h-2 w-full rounded-full bg-muted/60 border border-border/40 overflow-visible my-3">
         {/* Midpoint marker line */}
@@ -548,16 +536,16 @@ function DualRange({
           title={t("charts.midpointTitle")}
         />
 
-        {/* Active gradient fill up to current position */}
+        {/* Active gradient fill up to current position (anchored to the min side) */}
         <div
-          className="absolute top-0 bottom-0 left-0 rounded-full bg-gradient-to-r from-chart-positive/20 via-primary/30 to-primary/50"
+          className={`absolute top-0 bottom-0 rounded-full ${isRtl ? "right-0 bg-gradient-to-l" : "left-0 bg-gradient-to-r"} from-chart-positive/20 via-primary/30 to-primary/50`}
           style={{ width: `${pct}%` }}
         />
 
         {/* Current price marker needle/pip */}
         <div
-          className="absolute -top-1.5 h-5 w-2.5 -ml-1 rounded-sm bg-primary border border-background shadow-[0_0_8px_rgba(245,158,11,0.6)] ring-1 ring-primary/40 z-10 transition-all cursor-default"
-          style={{ left: `${pct}%` }}
+          className={`absolute -top-1.5 h-5 w-2.5 rounded-sm bg-primary border border-background shadow-[0_0_8px_rgba(245,158,11,0.6)] ring-1 ring-primary/40 z-10 transition-all cursor-default ${isRtl ? "-mr-1" : "-ml-1"}`}
+          style={isRtl ? { right: `${pct}%` } : { left: `${pct}%` }}
           title={`$${current.toFixed(2)} (${pct.toFixed(0)}%)`}
         />
       </div>
@@ -568,9 +556,7 @@ function DualRange({
           <span className="text-[10px] text-muted-foreground uppercase font-sans">
             {t("charts.low")}
           </span>
-          <span className="font-semibold" dir="ltr">
-            ${low.toFixed(2)}
-          </span>
+          <span className="font-semibold tabular-nums">${low.toFixed(2)}</span>
         </div>
         <div className="flex items-center gap-1 text-muted-foreground text-[10px]">
           <span>
@@ -581,9 +567,7 @@ function DualRange({
           <span className="text-[10px] text-muted-foreground uppercase font-sans">
             {t("charts.high")}
           </span>
-          <span className="font-semibold" dir="ltr">
-            ${high.toFixed(2)}
-          </span>
+          <span className="font-semibold tabular-nums">${high.toFixed(2)}</span>
         </div>
       </div>
     </div>

@@ -342,7 +342,7 @@ const staggerContainer: Variants = {
  * Main Landing & Showcase Home Page for Vantage Observatory.
  */
 export default function Landing() {
-  const { t } = useI18n();
+  const { t, isRtl } = useI18n();
   const navigate = useNavigate();
   const [selectedTicker, setSelectedTicker] = useState<string>("AAPL");
   const [searchOpen, setSearchOpen] = useState<boolean>(false);
@@ -366,6 +366,9 @@ export default function Landing() {
   const [dcfMultiple, setDcfMultiple] = useState<number>(25);
   const [dcfDiscount, setDcfDiscount] = useState<number>(9);
   const [dcfShares, setDcfShares] = useState<number>(15.2);
+  // RTL: native range tracks mirror automatically (min on the right), so the
+  // painted fill must grow from the min side — flip the gradient direction.
+  const fillDir = isRtl ? "to left" : "to right";
 
   // Filtered earnings events
   const filteredEarnings = useMemo(() => {
@@ -1101,7 +1104,7 @@ export default function Landing() {
                     onChange={(e) => setDcfFcf(parseFloat(e.target.value))}
                     className="w-full h-2.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-amber-400 border border-slate-700/80 focus:outline-none focus:ring-1 focus:ring-amber-400/50 shadow-inner"
                     style={{
-                      background: `linear-gradient(to right, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((dcfFcf - 10) / (150 - 10)) * 100}%, hsl(250 20% 18%) ${((dcfFcf - 10) / (150 - 10)) * 100}%, hsl(250 20% 18%) 100%)`,
+                      background: `linear-gradient(${fillDir}, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((dcfFcf - 10) / (150 - 10)) * 100}%, hsl(250 20% 18%) ${((dcfFcf - 10) / (150 - 10)) * 100}%, hsl(250 20% 18%) 100%)`,
                     }}
                   />
                 </div>
@@ -1131,7 +1134,7 @@ export default function Landing() {
                     onChange={(e) => setDcfGrowth(parseFloat(e.target.value))}
                     className="w-full h-2.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-amber-400 border border-slate-700/80 focus:outline-none focus:ring-1 focus:ring-amber-400/50 shadow-inner"
                     style={{
-                      background: `linear-gradient(to right, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${(dcfGrowth / 35) * 100}%, hsl(250 20% 18%) ${(dcfGrowth / 35) * 100}%, hsl(250 20% 18%) 100%)`,
+                      background: `linear-gradient(${fillDir}, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${(dcfGrowth / 35) * 100}%, hsl(250 20% 18%) ${(dcfGrowth / 35) * 100}%, hsl(250 20% 18%) 100%)`,
                     }}
                   />
                 </div>
@@ -1161,7 +1164,7 @@ export default function Landing() {
                     onChange={(e) => setDcfMultiple(parseFloat(e.target.value))}
                     className="w-full h-2.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-amber-400 border border-slate-700/80 focus:outline-none focus:ring-1 focus:ring-amber-400/50 shadow-inner"
                     style={{
-                      background: `linear-gradient(to right, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((dcfMultiple - 10) / (45 - 10)) * 100}%, hsl(250 20% 18%) ${((dcfMultiple - 10) / (45 - 10)) * 100}%, hsl(250 20% 18%) 100%)`,
+                      background: `linear-gradient(${fillDir}, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((dcfMultiple - 10) / (45 - 10)) * 100}%, hsl(250 20% 18%) ${((dcfMultiple - 10) / (45 - 10)) * 100}%, hsl(250 20% 18%) 100%)`,
                     }}
                   />
                 </div>
@@ -1191,7 +1194,7 @@ export default function Landing() {
                     onChange={(e) => setDcfDiscount(parseFloat(e.target.value))}
                     className="w-full h-2.5 bg-slate-800 rounded-full appearance-none cursor-pointer accent-amber-400 border border-slate-700/80 focus:outline-none focus:ring-1 focus:ring-amber-400/50 shadow-inner"
                     style={{
-                      background: `linear-gradient(to right, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((dcfDiscount - 6) / (16 - 6)) * 100}%, hsl(250 20% 18%) ${((dcfDiscount - 6) / (16 - 6)) * 100}%, hsl(250 20% 18%) 100%)`,
+                      background: `linear-gradient(${fillDir}, hsl(42 65% 70% / 0.8) 0%, hsl(42 65% 70% / 0.8) ${((dcfDiscount - 6) / (16 - 6)) * 100}%, hsl(250 20% 18%) ${((dcfDiscount - 6) / (16 - 6)) * 100}%, hsl(250 20% 18%) 100%)`,
                     }}
                   />
                 </div>
